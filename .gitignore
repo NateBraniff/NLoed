@@ -1,3 +1,12 @@
+
+#VS code settings
 /.vscode
 
+#pyenv settings
 .python-version
+
+#bytecode from importing and running lib
+/nloed/__pycache__
+
+#edit install files
+/nloed.egg-info

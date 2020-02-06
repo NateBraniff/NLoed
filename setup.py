@@ -4,7 +4,7 @@ with open("README.md", "r") as fh:
     long_description = fh.read()
 
 setuptools.setup(
-    name="NLoed", # Replace with your own username
+    name="nloed", 
     version="0.0.1",
     author="Nate Braniff",
     description="A package for nonlinear optimal experimental design",
