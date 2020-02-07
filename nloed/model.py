@@ -28,9 +28,10 @@ class model:
                 #create loglikelihood symbolics and function 
                 logLikSymbol= -0.5*cs.log(2*cs.pi*sigma) - (y-mu)**2/(2*sigma)
                 self.loglik.append( cs.Function('ll_'+str(counter), [y,beta,x], [logLikSymbol]) )
-                #create FIM symbolics and function
+                #generate derivatives of distribution parameters, theta (here mu and sigma) with respect to parameters-of-interest, beta
                 dmu_dbeta=cs.jacobian(mu,beta)
                 dsigma_dbeta=cs.jacobian(sigma,beta)
+                #create FIM symbolics and function
                 fimSymbol=(dmu_dbeta.T @ dmu_dbeta)/sigma+(dsigma_dbeta.T @ dsigma_dbeta)/sigma**2
                 self.fim.append(cs.Function('fim_'+str(counter), [beta,x], [fimSymbol]) )
             else:
