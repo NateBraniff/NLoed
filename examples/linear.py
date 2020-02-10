@@ -7,7 +7,7 @@ x=cs.SX.sym('x',1)
 
 #Declare the number of parameters-of-interest
 #These are the parameters you are interested in estimating as accurately as possible (or nuisance parameters, you can decide which is which later)
-beta=cs.SX.sym('beta',2); 
+beta=cs.SX.sym('beta',2)
 
 # x and beta combine to form a model that predicts a response, y
 #Each observed response variable, y_i, must a have a distribution, you can choose a unique distribution for each response

@@ -9,6 +9,7 @@ class model:
         self.beta=beta
         self.x=x
         self.dist=[]
+        self.theta=[]
         self.loglik=[]
         self.fim=[]
 
@@ -20,6 +21,7 @@ class model:
             if r[0] =='normal':
 
                 #extract theta's from response list
+                self.theta=r[1]
                 mu=r[1][0]
                 sigma=r[1][1]
 
@@ -34,9 +36,14 @@ class model:
                 #create FIM symbolics and function
                 fimSymbol=(dmu_dbeta.T @ dmu_dbeta)/sigma+(dsigma_dbeta.T @ dsigma_dbeta)/sigma**2
                 self.fim.append(cs.Function('fim_'+str(counter), [beta,x], [fimSymbol]) )
+            elif r[0]=='poisson':
+                print('Not Implemeneted')
+            elif r[0]=='lognormal':    
+                print('Not Implemeneted')
+            elif r[0]=='binomial': 
+                print('Not Implemeneted')
             else:
-
-                print('error')
+                print('Unknown Distribution: '+r[0])
 
         counter=counter+1
 
@@ -84,3 +91,4 @@ class model:
         xi_opt = sol['x'].full().flatten()
 
         return xi_opt
+
