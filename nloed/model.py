@@ -56,6 +56,10 @@ class model:
                 print('Not Implemeneted')
             elif r[0]=='binomial': 
                 print('Not Implemeneted')
+            elif r[0]=='exponential': 
+                print('Not Implemeneted')
+            elif r[0]=='gamma': 
+                print('Not Implemeneted')
             else:
                 print('Unknown Distribution: '+r[0])
 
@@ -78,10 +82,9 @@ class factorial(cs.Callback):
     # Evaluate numerically
     def eval(self, arg):
         k = arg[0]
-        # cnt=1
-        f=k*k
+        cnt=1
+        f=k
+        while (k-cnt)>0:
+            f=f*(k-cnt)
+            cnt=cnt+1
         return [f]
-        # while (k-cnt)>0:
-        #     f=f*(k-cnt)
-        #     cnt=cnt+1
-        # return [f]
