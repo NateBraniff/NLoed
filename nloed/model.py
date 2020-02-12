@@ -88,3 +88,9 @@ class factorial(cs.Callback):
             f=f*(k-cnt)
             cnt=cnt+1
         return [f]
+
+
+# IRWLS fitting
+# fit assesment, with standardized/weighted residual plots, confidence regions via asymptotics (with beale bias), likelihood  basins, profile liklihood, sigma point (choose one or maybe two)
+# function to generate a prior covariance (that can be fed into design)
+# function for easy simulation studies (generate data, with given experiment)
