@@ -1,5 +1,4 @@
 import casadi as cs
-#import math as mt
 import numpy as np
 
 class model:
@@ -17,16 +16,15 @@ class model:
         counter=0
 
         for r in response:
+            #create a response symbol
+            y=cs.MX.sym('y_'+str(counter),1)
 
             if r[0] =='normal':
-
                 #extract theta's from response list
-                self.theta=r[1]
                 mu=r[1][0]
                 sigma=r[1][1]
-
-                #create a response symbol
-                y=cs.SX.sym('y_'+str(counter),1)
+                #create a function for the model (links response distribution parameters to the parameters-of-interest)
+                self.theta.append( cs.Function('theta_'+str(counter), [beta,x], [mu,sigma]))
                 #create loglikelihood symbolics and function 
                 logLikSymbol= -0.5*cs.log(2*cs.pi*sigma) - (y-mu)**2/(2*sigma)
                 self.loglik.append( cs.Function('ll_'+str(counter), [y,beta,x], [logLikSymbol]) )
@@ -37,7 +35,23 @@ class model:
                 fimSymbol=(dmu_dbeta.T @ dmu_dbeta)/sigma+(dsigma_dbeta.T @ dsigma_dbeta)/sigma**2
                 self.fim.append(cs.Function('fim_'+str(counter), [beta,x], [fimSymbol]) )
             elif r[0]=='poisson':
-                print('Not Implemeneted')
+                #extract theta's from response list
+                #lambd=cs.Function('lambd_'+str(counter), [beta,x], [r[1][0]]) 
+                lambd=r[1][0]
+                #create a function for the model (links response distribution parameters to the parameters-of-interest)
+                self.theta.append( cs.Function('theta_'+str(counter), [beta,x], [lambd]))
+                #create a custom casadi function for doing factorials (needed in poisson loglikelihood and fim)
+                fact=factorial('fact')
+                #store the function in the class so it doesn't go out of scope
+                self.___factorialFunc=fact
+                #create loglikelihood symbolics and function 
+                logLikSymbol= y*cs.log(lambd)+fact(y)-lambd
+                self.loglik.append( cs.Function('ll_'+str(counter), [y,beta,x], [logLikSymbol]) )
+                #generate derivatives of distribution parameters, theta (here mu and sigma) with respect to parameters-of-interest, beta
+                dlambd_dbeta=cs.jacobian(lambd,beta)
+                #create FIM symbolics and function
+                fimSymbol=(dlambd_dbeta.T @ dlambd_dbeta)/lambd
+                self.fim.append(cs.Function('fim_'+str(counter), [beta,x], [fimSymbol]) )
             elif r[0]=='lognormal':    
                 print('Not Implemeneted')
             elif r[0]=='binomial': 
@@ -47,48 +61,27 @@ class model:
 
         counter=counter+1
 
-    def design(self, beta0, xbounds):
 
-        nparameters=self.beta.size1()
+class factorial(cs.Callback):
+    def __init__(self, name, opts={}):
+        cs.Callback.__init__(self)
+        self.construct(name, opts)
 
-        xgrid=np.linspace(xbounds[0],xbounds[1],11)
+    # Number of inputs and outputs
+    def get_n_in(self): return 1
+    def get_n_out(self): return 1
 
-        xi0=np.ones(np.shape(xgrid))/xgrid.size
-        xi_list=[]
-        xi_sum=0
+    # Initialize the object
+    def init(self):
+        print('initializing object')
 
-        fim_sum=np.zeros((nparameters,nparameters) )
-
-        constr=[]
-        lowerboundxi = []
-        upperboundxi = []
-        lowerboundconstr = []
-        upperboundconstr = []
-
-        for k in range(xgrid.size):
-
-            xi_k=cs.SX.sym('xi_'+ str(k))
-            lowerboundxi += [0]
-            upperboundxi += [1]
-            xi_list += [xi_k]
-                
-            fim_sum= fim_sum + xi_k*self.fim[0](beta0,xgrid[k])
-            xi_sum=xi_sum+xi_k
-
-        constr+=[xi_sum-1]
-        lowerboundconstr += [0]
-        upperboundconstr += [0]
-        
-        #objective deff (include ds as well)
-        objective=-cs.log(cs.det(fim_sum))
-
-        # Create an NLP solver
-        prob = {'f': objective, 'x': cs.vertcat(*xi_list), 'g': cs.vertcat(*constr)}
-        solver = cs.nlpsol('solver', 'ipopt', prob)
-
-        # Solve the NLP
-        sol = solver(x0=xi0, lbx=lowerboundxi, ubx=upperboundxi, lbg=lowerboundconstr, ubg=upperboundconstr)
-        xi_opt = sol['x'].full().flatten()
-
-        return xi_opt
-
+    # Evaluate numerically
+    def eval(self, arg):
+        k = arg[0]
+        # cnt=1
+        f=k*k
+        return [f]
+        # while (k-cnt)>0:
+        #     f=f*(k-cnt)
+        #     cnt=cnt+1
+        # return [f]
