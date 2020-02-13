@@ -3,27 +3,44 @@ import numpy as np
 
 class model:
 
-    def __init__(self, response,xnames):
+    def __init__(self, response,xnames,betanames):
         
         #names must be unique
         #must enforce ordering of parameters in theta function
-
+        #check for unique names
+        if not(len(set(xnames)) == len(xnames)):
+            raise Exception('X names must be unique!')
+        if not(len(set(betanames)) == len(betanames)):
+            raise Exception('Parameter names must be unique!')
+        # extract and store dimensions of the model
+        self.Ny=max(response)
         self.Nb=max(response[0][2].size_in(0))
         self.Nx=max(response[0][2].size_in(1))
-
-        self.xnames=xnames
-        self.ynames=[]
+        #read names into a dictionary, can be used to link names to index of list functions
+        self.xdict={}
+        self.betadict={}
+        for i in range(self.Nx):
+            self.xdict[xnames[i]]=i
+        for i in range(self.Nb):
+            self.betadict[betanames[i]]=i
+        self.ydict={}
+        #lists to contains needed Casadi functions for evaluation, design and fitting
         self.dist=[]
         self.theta=[]
         self.loglik=[]
         self.fim=[]
 
+        #create symbols for parameters and inputs, needed for function defs below
         beta=cs.MX.sym('beta',self.Nb)
         x=cs.MX.sym('x',self.Nx)
 
-        for r in response:
+        for i in range(self.Ny):
+            r=response[i]
             #extract names of response variables
-            self.ynames.append( r[0])
+            if not(r[0] in self.ydict):
+                self.ydict[r[0]]=i
+            else:
+                raise Exception('Y names must be unique!')
             #create a response symbol
             y=cs.MX.sym(r[0],1)
             #store the function for the model (links response distribution parameters to the parameters-of-interest)

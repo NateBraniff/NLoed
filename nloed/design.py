@@ -1,56 +1,89 @@
 import casadi as cs
 import numpy as np
 
-def design( model,beta0,xbounds):#models, structure, betainfo, data):
+def design(models, ostruct, betainfo, data):
 
-    nparameters=model.beta.size1()
+    for m in models:
+        if len(m)==2:
+            weight=m[2]
+        elif len(m)==1:
+            weight=1/len(models)
+        else:
+            raise Exception('Model entry must be either a model object or a tuple with (model, weight)!')
 
-    xgrid=np.linspace(xbounds[0],xbounds[1],101)
+        model=m
 
-    xi0=np.ones(np.shape(xgrid))/xgrid.size
-    xi_list=[]
-    xi_sum=0
+        for obs in ostruct:
 
-    fim_sum=np.zeros((nparameters,nparameters) )
+            eXbounds=obs['eXbounds']
+            if 'eXconstraints' in obs:
+                eXconstraints=obs['eXconstraints']
+            else:
+                eXconstraints=()
 
-    constr=[]
-    lowerboundxi = []
-    upperboundxi = []
-    lowerboundconstr = []
-    upperboundconstr = []
+            xgrid=createGrid(eXbounds,eXconstraints)
 
-    for k in range(xgrid.size):
 
-        xi_k=cs.MX.sym('xi_'+ str(k))
-        lowerboundxi += [0]
-        upperboundxi += [1]
-        xi_list += [xi_k]
+            for x in xgrid:
+
+# build dict that maps grid point to x values, extend on grid refinment
+
+
+def createGrid(eXbounds,eXconstraints):
+
+    xgrid=1
+    return xgrid
+
+
+#### Old stuff
+    # nparameters=model.beta.size1()
+
+    # xgrid=np.linspace(xbounds[0],xbounds[1],101)
+
+    # xi0=np.ones(np.shape(xgrid))/xgrid.size
+    # xi_list=[]
+    # xi_sum=0
+
+    # fim_sum=np.zeros((nparameters,nparameters) )
+
+    # constr=[]
+    # lowerboundxi = []
+    # upperboundxi = []
+    # lowerboundconstr = []
+    # upperboundconstr = []
+
+    # for k in range(xgrid.size):
+
+    #     xi_k=cs.MX.sym('xi_'+ str(k))
+    #     lowerboundxi += [0]
+    #     upperboundxi += [1]
+    #     xi_list += [xi_k]
             
-        fim_sum= fim_sum + xi_k*model.fim[0](beta0,xgrid[k])
-        xi_sum=xi_sum+xi_k
+    #     fim_sum= fim_sum + xi_k*model.fim[0](beta0,xgrid[k])
+    #     xi_sum=xi_sum+xi_k
 
-    constr+=[xi_sum-1]
-    lowerboundconstr += [0]
-    upperboundconstr += [0]
+    # constr+=[xi_sum-1]
+    # lowerboundconstr += [0]
+    # upperboundconstr += [0]
     
-    M = cs.SX.sym('M',nparameters, nparameters)
-    R = cs.qr(M)[1]
-    det = cs.exp(cs.trace(cs.log(R)))
-    qrdeterminant = cs.Function('qrdeterminant',[M],[-det])
+    # M = cs.SX.sym('M',nparameters, nparameters)
+    # R = cs.qr(M)[1]
+    # det = cs.exp(cs.trace(cs.log(R)))
+    # qrdeterminant = cs.Function('qrdeterminant',[M],[-det])
 
-    #objective deff (include ds as well)
-    #objective=-cs.log(cs.det(fim_sum))
-    objective=qrdeterminant(fim_sum)
+    # #objective deff (include ds as well)
+    # #objective=-cs.log(cs.det(fim_sum))
+    # objective=qrdeterminant(fim_sum)
 
-    # Create an NLP solver
-    prob = {'f': objective, 'x': cs.vertcat(*xi_list), 'g': cs.vertcat(*constr)}
-    solver = cs.nlpsol('solver', 'ipopt', prob)
+    # # Create an NLP solver
+    # prob = {'f': objective, 'x': cs.vertcat(*xi_list), 'g': cs.vertcat(*constr)}
+    # solver = cs.nlpsol('solver', 'ipopt', prob)
 
-    # Solve the NLP
-    sol = solver(x0=xi0, lbx=lowerboundxi, ubx=upperboundxi, lbg=lowerboundconstr, ubg=upperboundconstr)
-    xi_opt = sol['x'].full().flatten()
+    # # Solve the NLP
+    # sol = solver(x0=xi0, lbx=lowerboundxi, ubx=upperboundxi, lbg=lowerboundconstr, ubg=upperboundconstr)
+    # xi_opt = sol['x'].full().flatten()
 
-    return xi_opt
+    # return xi_opt
 
 
 #Should this be a class?? would make rounding easier
