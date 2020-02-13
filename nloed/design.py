@@ -1,7 +1,7 @@
 import casadi as cs
 import numpy as np
 
-def design( model, beta0, xbounds):
+def design( model,beta0,xbounds):#models, structure, betainfo, data):
 
     nparameters=model.beta.size1()
 
