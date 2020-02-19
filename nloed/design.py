@@ -1,36 +1,121 @@
 import casadi as cs
 import numpy as np
 
-def design(models, ostruct, betainfo, data):
+def design(models, ostruct, data):
 
-    for m in models:
-        weight=m[1]
+    #data or past fim (as function of beta???)
 
-        print('model')
+    #models must have the same x domain and exact names, not same parameters though
+    #model D score must be weighted/rooted log-divided according to number of params
 
-        for obs in ostruct:
+    optvar_list=[]
+    constr=[]
+    lowerbound = []
+    upperbound = []
+    lowerboundconstr = []
+    upperboundconstr = []
 
-            print('obs')
+    fimlist=[]
+    betalist=[]
+    Nxcheck=models[0].Nx
+    Nycheck=models[0].Ny
+    for m in range(len(models)):
+        model=models[m]['Model']
+        if not(Nxcheck==model.Nx and Nycheck==model.Ny):
+            raise Exception('All model input and output dimensions must match!')
+        fimlist.append(np.zeros((model.Nb,model.Nb) ))
+        betalist.append(cs.MX.sym('beta_'+str(m)))
 
+    for o in range(len(ostruct)):
+        obs=ostruct[o]
+
+        if not('Groups' in obs):
+            raise Exception('No observations variable group passed!')
+        Ynames=obs['Groups']
+        Yindex=[m.ydict[y] for y in Ynames]
+
+        if not('eX' in obs or 'aX' in obs):
+            raise Exception('A design requires inputs to be assigned as exact (\'ex\') or approximate (\'aX\')!, neither were provided!')
+        #need check for sum of ax and ex len equal to total x
+
+        if 'eX' in obs: 
+            if not('eXbounds' in obs):
+                raise Exception('Exact inputs have no bounds!')
+            eXnames=obs['eX']
+            eXindex=[m.xdict[e] for e in eXnames]
+            eXbounds=obs['eXbounds']
+            if not(len(eXnames)==len(eXbounds)):
+                raise Exception('There are '+str(len(eXnames))+' exact inputs listed, but there are '+str(len(eXbounds))+' bounds, these must match!')
+            NeX=len(eXnames)
+            eXsym=cs.MX.sym('eXsym'+ str(o), NeX)
+            if 'eXconstraints' in obs:
+                eXconstraints=obs['eXconstraints']
+                for eXcon in eXconstraints:
+                    constr+=eXcon(eXsym)
+                    lowerboundconstr += [0]
+                    upperboundconstr += [cs.inf]
+
+
+        if 'aX' in obs:
+            if not('aXbounds' in obs):
+                raise Exception('Approximate inputs have no bounds!')
+            aXnames=obs['aX']
+            aXindex=[m.xdict[a] for a in aXnames]
             aXbounds=obs['aXbounds']
-            #print(aXbounds)
+            if not(len(aXnames)==len(aXbounds)):
+                raise Exception('There are '+str(len(aXnames))+' approximate inputs listed, but there are '+str(len(aXbounds))+' bounds, these must match!')
+            NeX=len(eXnames)
             if 'aXconstraints' in obs:
                 aXconstraints=obs['aXconstraints']
             else:
                 aXconstraints=()
 
             N=5
-
             xlists=[]
             for b in aXbounds:
                 xlists.extend([np.linspace(b[0],b[1],N).tolist()])
                 print(xlists)
             #print('enter grid func')
             xgrid=createGrid(xlists,aXconstraints)
-            #print('exit grid func')
-            #print(xgrid)
-
     
+            for k in range(xgrid.size):
+                xi_k=cs.MX.sym('xi_'+ str(m)+'_'+ str(k))
+                lowerbound += [0]
+                upperbound += [1]
+                optvar_list += [xi_k]
+                for m in range(len(models)):
+                    model=m[m]['Model']
+                    betasym=betalist[m]
+                    for y in Yindex:
+                        fimlist[m]= fimlist[m] + xi_k*model.fim[y](betasym,xgrid[k])
+                xi_sum=xi_sum+xi_k
+
+            #only if we are capping weight within group, else its all together and constrains added at the end
+            constr+=[xi_sum-1]
+            lowerboundconstr += [0]
+            upperboundconstr += [0]
+
+        else:
+            #account for FIM when no approximate aX and grid
+            i=0
+
+
+    # NEED one of these for each parameter set, bit awkward
+    # M = cs.SX.sym('M',nparameters, nparameters)
+    # R = cs.qr(M)[1]
+    # det = cs.exp(cs.trace(cs.log(R)))
+    # qrdeterminant = cs.Function('qrdeterminant',[M],[-det])
+
+    # #Switch case for objective type
+    # objective=qrdeterminant(fim_sum)
+
+    # # Create an NLP solver
+    # prob = {'f': objective, 'x': cs.vertcat(*xi_list), 'g': cs.vertcat(*constr)}
+    # solver = cs.nlpsol('solver', 'ipopt', prob)
+
+    # # Solve the NLP
+    # sol = solver(x0=xi0, lbx=lowerboundxi, ubx=upperboundxi, lbg=lowerboundconstr, ubg=upperboundconstr)
+    # xi_opt = sol['x'].full().flatten()
 
     xi=[]
     return xi
@@ -41,22 +126,22 @@ def design(models, ostruct, betainfo, data):
 
 def createGrid(xlists,aXconstraints):
 
-    print('prepop len xlist: '+str(len(xlists)))
+    #print('prepop len xlist: '+str(len(xlists)))
 
     newgrid=[]
     currentdim=xlists.pop()
 
     if len(xlists)>0:
         currentgrid=createGrid(xlists,aXconstraints)
-        print('current grid: '+str(currentgrid))
-        print('currentdim'+str(currentdim))
+        #print('current grid: '+str(currentgrid))
+        #print('currentdim'+str(currentdim))
         for g in currentgrid:
-            print('g: '+str(g))
+            #print('g: '+str(g))
             for d in currentdim:
-                print('d: '+str(d))
+                #print('d: '+str(d))
                 temp=g.copy()
                 temp.append(d)
-                print('g'+str(temp))
+                #print('g'+str(temp))
                 newgrid.extend([temp])
     else:
         newgrid=[[d] for d in currentdim]

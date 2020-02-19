@@ -27,15 +27,15 @@ linear2dx2d=model(response,xnames,betanames)
 #(response grouping), (grided x), ((xgrided1min,xgrided1max),(xgrided2min,xgrided2max))
 
 #structure=[(('y1','y2'),('x1'),((0,1)),(),('x2'),((0,1)),(),0),(('y2'),('x1','x2'),((0,1)),(),(),(),(),0)]
-models=[(linear2dx2d,1)]
-obsgroup1={'Group': ('y1','y2'), 'aX': ('x1'),'aXbounds': [(0,1)], 'eX': ('x2'),'eXbounds': [(0,1)]}
-obsgroup2={'Group': ('y2'), 'aX': ('x1','x2'),'aXbounds': [(0,1),(0,1)]}
-obsgroup2={'Group': ('y2'), 'aX': ('x1','x2'),'aXbounds': [(0,1),(0,1)]}
+model1={'Model':linear2dx2d, 'Beta': [1, 1, 1, 1],'Prior':[],'Weight':0.5}
+model2={'Model':linear2dx2d, 'Beta': [2, 2, 2, 2],'Prior':[],'Weight':0.5}
+modelstruct=[model1,model2]
+obsgroup1={'Group': ('y1','y2'), 'aX': ('x1'),'aXbounds': [(0,1)], 'eX': ('x2','x3','x4','x5'),'eXbounds': [(0,1),(0,1),(0,1),(0,1)]}
+obsgroup2={'Group': ('y2'), 'aX': ('x2','x1','x4'),'aXbounds': [(0,1),(-1,1),(2,5)], 'eX': ('x3','x5'),'eXbounds': [(0,1),(0,1)]}
+obsgroup2={'Group': ('y2'), 'aX': ('x1','x2','x3','x4','x5'),'aXbounds': [(-.5,.5),(-1,1),(0,1),(-1,1),(2,5)]}
 obsstruct=[obsgroup1, obsgroup2]
 
-beta0=(0.5,1)
-
-xi=design(models,obsstruct,beta0,())
+xi=design(modelstruct,obsstruct,0)
 
 
 #beta0=(0.5,1)
