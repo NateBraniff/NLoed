@@ -13,9 +13,13 @@ class model:
         if not(len(set(betanames)) == len(betanames)):
             raise Exception('Parameter names must be unique!')
         # extract and store dimensions of the model
-        self.Ny=max(response)
-        self.Nb=max(response[0][2].size_in(0))
+        self.Ny=len(response)
+        self.Nb=max(response[0][2].size_in(0)) #somewhat unsafe, using max assumes its nx1 or 1xn
         self.Nx=max(response[0][2].size_in(1))
+        if not(len(set(xnames)) == len(xnames)):
+            raise Exception('Model depends on '+str(self.Nx)+' inputs but there are '+str(len(xnames))+' input names!')
+        if not(self.Nb == len(betanames)):
+            raise Exception('Model depends on '+str(self.Nb)+' parameters but there are '+str(len(betanames))+' parameter names!')
         #read names into a dictionary, can be used to link names to index of list functions
         self.xdict={}
         self.betadict={}

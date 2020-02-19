@@ -4,35 +4,69 @@ import numpy as np
 def design(models, ostruct, betainfo, data):
 
     for m in models:
-        if len(m)==2:
-            weight=m[2]
-        elif len(m)==1:
-            weight=1/len(models)
-        else:
-            raise Exception('Model entry must be either a model object or a tuple with (model, weight)!')
+        weight=m[1]
 
-        model=m
+        print('model')
 
         for obs in ostruct:
 
-            eXbounds=obs['eXbounds']
-            if 'eXconstraints' in obs:
-                eXconstraints=obs['eXconstraints']
+            print('obs')
+
+            aXbounds=obs['aXbounds']
+            #print(aXbounds)
+            if 'aXconstraints' in obs:
+                aXconstraints=obs['aXconstraints']
             else:
-                eXconstraints=()
+                aXconstraints=()
 
-            xgrid=createGrid(eXbounds,eXconstraints)
+            N=5
 
+            xlists=[]
+            for b in aXbounds:
+                xlists.extend([np.linspace(b[0],b[1],N).tolist()])
+                print(xlists)
+            #print('enter grid func')
+            xgrid=createGrid(xlists,aXconstraints)
+            #print('exit grid func')
+            #print(xgrid)
 
-            for x in xgrid:
+    
+
+    xi=[]
+    return xi
+            #for x in xgrid:
 
 # build dict that maps grid point to x values, extend on grid refinment
 
 
-def createGrid(eXbounds,eXconstraints):
+def createGrid(xlists,aXconstraints):
 
-    xgrid=1
-    return xgrid
+    print('prepop len xlist: '+str(len(xlists)))
+
+    newgrid=[]
+    currentdim=xlists.pop()
+
+    if len(xlists)>0:
+        currentgrid=createGrid(xlists,aXconstraints)
+        print('current grid: '+str(currentgrid))
+        print('currentdim'+str(currentdim))
+        for g in currentgrid:
+            print('g: '+str(g))
+            for d in currentdim:
+                print('d: '+str(d))
+                temp=g.copy()
+                temp.append(d)
+                print('g'+str(temp))
+                newgrid.extend([temp])
+    else:
+        newgrid=[[d] for d in currentdim]
+
+    return newgrid
+
+
+
+
+
 
 
 #### Old stuff
