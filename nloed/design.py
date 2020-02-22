@@ -3,12 +3,13 @@ import numpy as np
 
 def design(models, ostruct, data):
 
-    #data or past fim (as function of beta???)
+    #data or past fim (as function of beta???) Probably just pass in design/data, fim comp for data will ignore obseved y info anyways for asympotitic fim
 
     #models must have the same x domain and exact names, not same parameters though
     #model D score must be weighted/rooted log-divided according to number of params
 
     optvar_list=[]
+    optvar_start=[]
     constr=[]
     lowerbound = []
     upperbound = []
@@ -17,37 +18,98 @@ def design(models, ostruct, data):
 
     fimlist=[]
     betalist=[]
-    Nxcheck=models[0].Nx
-    Nycheck=models[0].Ny
+
+    label=[]
+
+    Nxcheck=0
+    ObjectiveFuncs=[]
+    NxAll=models[0]['Model'].Nx
+    NyAll=models[0]['Model'].Ny
+    xDictAll=models[0]['Model'].xdict
+    yDictAll=models[0]['Model'].ydict
     for m in range(len(models)):
         model=models[m]['Model']
-        if not(Nxcheck==model.Nx and Nycheck==model.Ny):
-            raise Exception('All model input and output dimensions must match!')
-        fimlist.append(np.zeros((model.Nb,model.Nb) ))
-        betalist.append(cs.MX.sym('beta_'+str(m)))
+        if not(NyAll==model.Ny):
+            raise Exception('Model output dimensions must match!')
+        if not(NxAll==model.Nx ):
+            raise Exception('All model input dimensions must match!')
+        if not(xDictAll==model.xdict):
+            raise Exception('Model input name and ordering must match!')
+        if not(yDictAll==model.ydict):
+            raise Exception('Model output name and ordering must match!')
 
-    for o in range(len(ostruct)):
+        if not('Objective' in models[m]):
+            raise Exception('Missing objective for model'+str(m)+'!')
+
+        if models[m]['Objective']=='D':
+            M = cs.SX.sym('M',model.Nb, model.Nb)
+            R = cs.qr(M)[1]
+            normlogdet = cs.trace(cs.log(R))/model.Nb
+            ObjectiveFuncs.append( cs.Function('ObjFunc'+str(m),[M],[-normlogdet]) )
+        elif models[m]['Objective']=='Ds':
+            if not('POI' in models[m]):
+                raise Exception('No parameters of interest provided for Ds design objective! Need list of parameter-of-interest names!')
+            poi=models[m]['POI']
+            #need to write this
+            #ObjectiveFuncs.append( cs.Function('ObjFunc'+str(m),[M],[-logdet]) )
+        elif models[m]['Objective']=='T':
+            i=0
+            #add for model difference, need to flag this and switch to computing output rather than fim
+        elif models[m]['Objective']=='Custom':
+            i=0
+            #add for custom function of FIM
+        else:
+            raise Exception('Unknown objective: '+str(models[m]['Objective'])+'!')
+
+        #should maybe output list for model selection objective
+        fimlist.append(np.zeros((model.Nb,model.Nb) ))
+        betalist.append(cs.MX.sym('beta_model'+str(m),model.Nb))
+
+    xi_sum=0
+    if 'Weight' in ostruct[0]:
+        weightFlag=True
+    else:
+        weightFlag=False
+
+    Ngroups=len(ostruct)
+
+    for o in range(Ngroups):
         obs=ostruct[o]
 
-        if not('Groups' in obs):
-            raise Exception('No observations variable group passed!')
-        Ynames=obs['Groups']
-        Yindex=[m.ydict[y] for y in Ynames]
-
+        if not('Group' in obs):
+            raise Exception('No observation variable group passed!')
         if not('eX' in obs or 'aX' in obs):
-            raise Exception('A design requires inputs to be assigned as exact (\'ex\') or approximate (\'aX\')!, neither were provided!')
-        #need check for sum of ax and ex len equal to total x
+            raise Exception('A design requires inputs to be identified as exact (\'ex\') or approximate (\'aX\')!, neither were provided!')
+        if not("Weight" in obs == weightFlag):
+            raise Exception('A sample weight must be provided for every observation group or none!')
 
+        Ynames=obs['Group']
+        Yindex=[models[0]['Model'].ydict[y] for y in Ynames] #hack, should maybe creat shared name list for all models after check
+        
         if 'eX' in obs: 
             if not('eXbounds' in obs):
                 raise Exception('Exact inputs have no bounds!')
             eXnames=obs['eX']
-            eXindex=[m.xdict[e] for e in eXnames]
-            eXbounds=obs['eXbounds']
-            if not(len(eXnames)==len(eXbounds)):
-                raise Exception('There are '+str(len(eXnames))+' exact inputs listed, but there are '+str(len(eXbounds))+' bounds, these must match!')
             NeX=len(eXnames)
+            Nxcheck=Nxcheck+NeX
+            eXindex=[m.xdict[e] for e in eXnames]
             eXsym=cs.MX.sym('eXsym'+ str(o), NeX)
+            optvar_list+=eXsym
+
+            if not(eXstart in obs):
+                raise Exception('No starting values for exact inputs was passed!')
+            eXstart=obs['eXstart']
+            optvar_start+=eXstart
+
+            eXbounds=obs['eXbounds']
+            if not(NeX==len(eXbounds)):
+                raise Exception('There are '+str(len(eXnames))+' exact inputs listed, but there are '+str(len(eXbounds))+' bounds, these must match!')
+            
+            
+            for b in eXbounds:
+                lowerbound += [b[0]]
+                upperbound += [b[1]]
+
             if 'eXconstraints' in obs:
                 eXconstraints=obs['eXconstraints']
                 for eXcon in eXconstraints:
@@ -55,70 +117,123 @@ def design(models, ostruct, data):
                     lowerboundconstr += [0]
                     upperboundconstr += [cs.inf]
 
-
         if 'aX' in obs:
             if not('aXbounds' in obs):
                 raise Exception('Approximate inputs have no bounds!')
             aXnames=obs['aX']
-            aXindex=[m.xdict[a] for a in aXnames]
+            NaX=len(aXnames)
+            Nxcheck=Nxcheck+NaX
+            aXindex=[models[0]['Model'].xdict[a] for a in aXnames] #hack, should have shared model list of inputs and outputs
             aXbounds=obs['aXbounds']
-            if not(len(aXnames)==len(aXbounds)):
+            if not(NaX==len(aXbounds)):
                 raise Exception('There are '+str(len(aXnames))+' approximate inputs listed, but there are '+str(len(aXbounds))+' bounds, these must match!')
-            NeX=len(eXnames)
+            
+            if not(Nxcheck==NxAll):
+                raise Exception('All input variables must be passed as either approximate or exact and total to match the number of inputs for the models! There are '+str(NaX+NeX)+' inputs passed but '+str(NxAll)+' expected!')
             if 'aXconstraints' in obs:
                 aXconstraints=obs['aXconstraints']
             else:
                 aXconstraints=()
 
-            N=5
+            N=10
             xlists=[]
             for b in aXbounds:
                 xlists.extend([np.linspace(b[0],b[1],N).tolist()])
-                print(xlists)
-            #print('enter grid func')
             xgrid=createGrid(xlists,aXconstraints)
-    
-            for k in range(xgrid.size):
-                xi_k=cs.MX.sym('xi_'+ str(m)+'_'+ str(k))
+
+            if not(weightFlag):
+                xi_sum=0
+            for k in range(len(xgrid)):
+                xi_k=cs.MX.sym('xi_'+ str(o)+'_'+ str(k))
                 lowerbound += [0]
                 upperbound += [1]
                 optvar_list += [xi_k]
+                if weightFlag:
+                    wght=obs['Weight']
+                    optvar_start +=  [wght/k]
+                else:
+                    optvar_start +=  [1]
+
+                xvec=[]
+                for i in range(NxAll):
+                    if i in aXindex:
+                        xvec.append(xgrid[k][aXindex.index(i)])
+                    elif i in eXindex:
+                        xvec.append(eXsym[eXindex.index(i)])
+                    else:
+                        raise Exception('Cannot find !'+str(i)+' model input in approximate or exact inputs provided!')
+
                 for m in range(len(models)):
-                    model=m[m]['Model']
+                    model=models[m]['Model']
                     betasym=betalist[m]
                     for y in Yindex:
-                        fimlist[m]= fimlist[m] + xi_k*model.fim[y](betasym,xgrid[k])
+                        fimlist[m]= fimlist[m] + xi_k*model.fim[y](betasym[m],xvec)
                 xi_sum=xi_sum+xi_k
 
-            #only if we are capping weight within group, else its all together and constrains added at the end
-            constr+=[xi_sum-1]
-            lowerboundconstr += [0]
-            upperboundconstr += [0]
+            if weightFlag:
+                wght=obs['Weight']
+                constr += [xi_sum - wght]
+                lowerboundconstr += [0]
+                upperboundconstr += [0]
 
         else:
-            #account for FIM when no approximate aX and grid
-            i=0
+
+            if not(NeX==NxAll):
+                raise Exception('All input variables must be passed as either approximate or exact and total to match the number of inputs for the models! There are '+str(NaX+NeX)+' inputs passed but '+str(NxAll)+' expected!')
+            
+            if not(weightFlag):
+                xi_sum=0
+                xi_k=cs.MX.sym('xi_'+ str(o))
+                lowerbound += [0]
+                upperbound += [1]
+                optvar_list += [xi_k]
+                optvar_start += [1/Ngroups]
+            else:
+                wght=obs['Weight']
+                xi_k=wght
+
+            xvec=[]
+            for i in range(NxAll):
+                if i in eXindex:
+                    xvec.append(eXsym[eXindex.index(i)])
+                else:
+                    raise Exception('Cannot find !'+str(i)+' model input in approximate or exact inputs provided!')
+
+            for m in range(len(models)):
+                model=models[m]['Model']
+                betasym=betalist[m]
+                for y in Yindex:
+                    fimlist[m]= fimlist[m] + xi_k*model.fim[y](betasym[m],xvec)
+            xi_sum=xi_sum+xi_k
+
+    if not(weightFlag):
+        constr+=[xi_sum-wght]
+        lowerboundconstr += [0]
+        upperboundconstr += [0]
 
 
-    # NEED one of these for each parameter set, bit awkward
-    # M = cs.SX.sym('M',nparameters, nparameters)
-    # R = cs.qr(M)[1]
-    # det = cs.exp(cs.trace(cs.log(R)))
-    # qrdeterminant = cs.Function('qrdeterminant',[M],[-det])
+    ObjParameterFuncs=[]
+    ObjTot=0
+    for m in range(len(models)): 
+        model=models[m]['Model']
 
-    # #Switch case for objective type
-    # objective=qrdeterminant(fim_sum)
+        ObjSymbol=ObjectiveFuncs[m](fimlist[m])
+        ObjParameterFuncs.append( cs.Function('ObjParFunc'+str(m),[betalist[m]+optvar_list],[ObjSymbol]) )
+        #loop over bayesian prior here
+        # for p in parameters
+        beta0=models[m]['Beta']
+        wght=models[m]['Weight']
+        ObjTot=ObjTot+wght*ObjParameterFuncs[m](beta0,optvar_list)
 
-    # # Create an NLP solver
-    # prob = {'f': objective, 'x': cs.vertcat(*xi_list), 'g': cs.vertcat(*constr)}
-    # solver = cs.nlpsol('solver', 'ipopt', prob)
+    # Create an NLP solver
+    prob = {'f': ObjTot, 'x': cs.vertcat(*optvar_list), 'g': cs.vertcat(*constr)}
+    solver = cs.nlpsol('solver', 'ipopt', prob)
 
-    # # Solve the NLP
-    # sol = solver(x0=xi0, lbx=lowerboundxi, ubx=upperboundxi, lbg=lowerboundconstr, ubg=upperboundconstr)
-    # xi_opt = sol['x'].full().flatten()
+    # Solve the NLP
+    sol = solver(x0=xi0, lbx=lowerbound, ubx=upperbound, lbg=lowerboundconstr, ubg=upperboundconstr)
+    opt_output = sol['x'].full().flatten()
 
-    xi=[]
-    return xi
+    return opt_output
             #for x in xgrid:
 
 # build dict that maps grid point to x values, extend on grid refinment

@@ -20,12 +20,14 @@ theta=cs.Function('theta',[beta,x],[beta[0] + x*beta[1], 1],['beta','x'],['mu','
 response= [('y1','normal',theta)]
 
 xnames=['x1']
+betanames=['beta0','beta1']
 
 #Instantiate class
-linear1d=model(response,xnames)
+linear1d=model(response,xnames,betanames)
 
-#beta0=(0.5,1)
-#xbounds=(0,10)
-#xi=design(linear1d,beta0,xbounds)
+model1={'Model':linear1d, 'Beta': [1, 1],'Objective':'D'}
+modelstruct=[model1]
+obsgroup1={'Group': ['y1'], 'aX': ['x1'],'aXbounds': [(0,1)]}
+obsstruct=[obsgroup1]
 
-#print(xi)
+xi=design(modelstruct,obsstruct,0)
