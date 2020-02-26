@@ -3,6 +3,8 @@ import numpy as np
 
 class model:
 
+    #NOTE: need to rename variables here!!!
+
     def __init__(self, response,xnames,betanames):
         
         #names must be unique
