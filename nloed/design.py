@@ -2,21 +2,27 @@ import casadi as cs
 import numpy as np
 import random as rn
 
-def design(models, exact=None, approx=None, observ=None, fixed=None):
-
-    #NOTE: should we avoid 'Input' as it makes error strings awkward when talking about function inputs?!
+def design(models, approxinputs=None, exactinputs=None, observgroups=None, fixed=None):
+    """ 
+    Add a docstring
+    """
+    #NOTE: should we avoid model 'Input' as it makes error strings awkward when talking about function inputs?!
+    
     #NOTE: should bayesian priors be treated as symbolics in group loop, and loop over sigma points done just before ipopt pass
     #NOTE: OR should sigma points be generatedin inital model loop as numbers, and looped over within group loop, with FIMList being sigmaXmodels in size
     #NOTE: leaning towards latter at least initially
+    
     #NOTE: current structure makes grid refinments difficult
-    #NOTE: is exact vs approx in each group too flexible??
-    #NOTE: can't have a common exact for all groups, i.e. initial conditions??
-    #NOTE: maybe we should have exact constants for all groups, and then exact vs approximate but common to all groups
+
     #NOTE: fixed (observations), data or past fim (as function of beta???) Probably just pass in design/data, fim comp for data will ignore obseved y info anyways for asympotitic fim
     #NOTE: models must have the same x dim and input names, not same parameters though
+    #NOTE: should fixed be an approx design (by weight) or an exact design (count), approx does everything more flexible, exact enforces 'real' data
+    #NOTE: leaning towards approx
+
+    #NOTE: should sort design output so it has a common ordering (ie by x1, then x2 etc.), should group non-unique elements and merge their weights
 
     #check that either exact xor approx has been passed NOTE: could provide some default functionality here
-    if not(approx) and not(exact):
+    if not( approxinputs) and not(exactinputs):
         raise Exception('The design function requires at least one of the approximate or exact values to be passed!')
 
     #get number of models
@@ -31,11 +37,11 @@ def design(models, exact=None, approx=None, observ=None, fixed=None):
     if not('Model' in models[0]):
             raise Exception('Missing objective for model at index '+str(0)+' in models list!')
     #set common dimensions for all model
-    InputDim = models[0]['Model'].Nx
-    ObservDim = models[0]['Model'].Ny
+    InputDim = models[0]['Model'].NumInputs
+    ObservDim = models[0]['Model'].NumObserv
     #set common dicts for inputs and observations, NOTE: could later allow for different orderings
-    InputDict = models[0]['Model'].xdict
-    ObservDict = models[0]['Model'].ydict
+    InputDict = models[0]['Model'].InputNameDict
+    ObservDict = models[0]['Model'].ObservNameDict
     #loop over models check dimensions and dicts, build objective functions, create fim and beta lists NOTE: this loop needs to be cleaned up formating-wise
     for m in range(NumModels):
         if not('Model' in models[m]):
@@ -48,19 +54,19 @@ def design(models, exact=None, approx=None, observ=None, fixed=None):
         Params = models[m]['Parameters']
         ObjectiveType = models[m]['Objective']
         #check if each model has the exact same dimensions and input/ouput naming, if not throw error
-        if not(ObservDim == Model.Ny):
+        if not(ObservDim == Model.NumObserv):
             raise Exception('All model output dimensions must match!')
-        if not(InputDim == Model.Nx ):
+        if not(InputDim == Model.NumInputs ):
             raise Exception('All model input dimensions must match!')
-        if not(InputDict == Model.xdict):
+        if not(InputDict == Model.InputNameDict):
             raise Exception('Model input name and ordering must match!')
-        if not(ObservDict == Model.ydict):
+        if not(ObservDict == Model.ObservNameDict):
             raise Exception('Model output name and ordering must match!')
         #NOTE:model D score must be weighted/rooted log-divided according to number of params
         if ObjectiveType =='D':
-            Matrx = cs.SX.sym('Matrx',Model.Nb, Model.Nb)
+            Matrx = cs.SX.sym('Matrx',Model.NumParams, Model.NumParams)
             RFact = cs.qr(Matrx)[1]
-            NormalizedLogDet = cs.trace(cs.log(RFact))/Model.Nb
+            NormalizedLogDet = cs.trace(cs.log(RFact))/Model.NumParams
             ObjectiveFuncs.append( cs.Function('ObjFunc'+str(m),[Matrx],[-NormalizedLogDet]) )
         elif ObjectiveType == 'Ds':
             if not('POI' in Model[m]):
@@ -80,31 +86,31 @@ def design(models, exact=None, approx=None, observ=None, fixed=None):
         #create the fim list for summing fim symbolics in group loop and parameter symbols for each model 
         #ParamList used for bayesian priors
         #NOTE:should maybe be an 'output' list for model selection objective; T-optimality etc.
-        FIMList.append(np.zeros((Model.Nb,Model.Nb) ))
+        FIMList.append(np.zeros((Model.NumParams,Model.NumParams) ))
         #ParamList.append(cs.MX.sym('beta_model'+str(m),model.Nb))
         ParamList.append(Params)
 
     #counter to track the total number inputs across exact and approx, must sum to total for the model(s)
     InputNumCheck=0
     #if user has passed approximate inputs
-    if approx:
+    if  approxinputs:
         #get names, number and indices of approximate inputs
-        ApproxInputNames = approx['Inputs']
+        ApproxInputNames =  approxinputs['Inputs']
         ApproxInputNum = len(ApproxInputNames)
         ApproxInputIndices = [InputDict[a] for a in ApproxInputNames] 
         #add approx inputs to the total input number (used to check all inputs are accounted for after loading exact)
         InputNumCheck = InputNumCheck + ApproxInputNum
         #check if approximate bounds have been passed, if not throw error, if so get them
-        if not('Bounds' in approx):
+        if not('Bounds' in  approxinputs):
             raise Exception('Approximate inputs have no bounds!')
-        ApproxInputBounds = approx['Bounds']
+        ApproxInputBounds =  approxinputs['Bounds']
         #check if we have bounds for each approx input
         if not(ApproxInputNum == len(ApproxInputBounds)):
             raise Exception('There are '+str(len(ApproxInputNames))+' approximate inputs listed, but there are '+str(len(ApproxInputBounds))+' bounds, these must match!')
         #check if inquality OptimConstraintsains have been passed, if so store them 
         ApproxInputConstr = []
-        if 'Constraints' in approx:
-            ApproxInputConstr  = approx['Constraints']          
+        if 'Constraints' in  approxinputs:
+            ApproxInputConstr  =  approxinputs['Constraints']          
         #set resolution of grid NOTE: this should be able to be specified by the user, will change
         N = 5
         #create a list for storing possible levels of each approxmate input
@@ -115,6 +121,10 @@ def design(models, exact=None, approx=None, observ=None, fixed=None):
         #call recursive createGrid function to generate ApproxInputGrid, a list of all possible permuations of xlist's that also satisfy inequality OptimConstraintsaints
         #NOTE: currently, createGrid doesn't actually check the inequality OptimConstraintsaints, need to add, and perhaps add points on inequality boundary??!
         ApproxInputGrid = creategrid(ApproxInputLists,ApproxInputConstr)
+        NumApproxGrid=len(ApproxInputGrid)
+    else:
+        NumApproxGrid=1 #NOTE: this is ugly, but needed for now so that while loops and weight initialization works out if approx isn't passed
+        ApproxInputIndices=[]
 
     # dictionary of lists and dictionaries, mapping between indices in different datat a structure (i.e. OptimSymbolList, ApproxInputGrid, ExactSymbolArchetypes etc.)
     # used to track where exact input symbols and approx input weights end up in the final optimization solution
@@ -132,24 +142,24 @@ def design(models, exact=None, approx=None, observ=None, fixed=None):
     LowerBoundConstraints = []
     UppperBoundConstraints = []
     #if the user has passed exact inputs
-    if exact:
+    if exactinputs:
         #get names, number and indices of exact inputs
-        ExactInputNames = exact['Inputs']
+        ExactInputNames = exactinputs['Inputs']
         ExactInputNum = len(ExactInputNames)
         ExactInputIndices = [InputDict[e] for e in ExactInputNames]
         #add these to the total input number check for this group
         InputNumCheck = InputNumCheck + ExactInputNum
         #if no bounds passed for exact inputs, throw error, if not get the exact input bounds
-        if not('Bounds' in exact):
+        if not('Bounds' in exactinputs):
             raise Exception('Exact inputs have no bounds!')
-        ExactInputBounds=exact['Bounds']
+        ExactInputBounds=exactinputs['Bounds']
         #if the number of bounds don't match the exact names, throw error
         if not(ExactInputNum == len(ExactInputBounds)):
             raise Exception('There are '+str(len(ExactInputNames))+' exact inputs listed, but there are '+str(len(ExactInputBounds))+' bounds, these must match!')
         #if structure for exact inputs is not provided throw error, else get
-        if not('Structure' in exact):
+        if not('Structure' in exactinputs):
             raise Exception('No exact input structure was provided!')
-        ExactInputStructure = exact['Structure']
+        ExactInputStructure = exactinputs['Structure']
         #create a list of dicts for tracking existing symbols NOTE: do this with list comprehension???
         ExistingExactSymbols = []
         #add a dictionary to the list for each exact input
@@ -197,6 +207,10 @@ def design(models, exact=None, approx=None, observ=None, fixed=None):
             ExactSymbolArchetypes.append(Archetype)
             #append the current archetype's index list to the ArchetypeIndex_To_OptimIndices list within the optimal solution map
             OptimSolutionMap['ArchetypeIndex_To_OptimIndices'].append(ArchetypeOptimIndices) 
+            NumExactArchetypes=len(ExactSymbolArchetypes)
+    else:
+        NumExactArchetypes=1 #NOTE: this is ugly, but needed for now so that while loops and weight initialization works out if exact isn't passed
+        ExactInputIndices=[]
 
     #check if total inputs passed, exact + approx, is equal to total model inputs, if not throw error
     if not(InputNumCheck == InputDim):
@@ -204,16 +218,19 @@ def design(models, exact=None, approx=None, observ=None, fixed=None):
                         'There are '+str(ApproxInputNum)+' approximate inputs and '+str(ExactInputNum)+' exact inputs passed but model(s) expect '+str(InputDim)+'!')
     
     #check if observ passed NOTE: should change this to use a good default if not passed
-    if not(observ):
-        raise Exception('No observation dictionary has been passed!')
+    if not( observgroups):
+        observgroups={}
+        observgroups['Observations']=[[o] for o in list(ObservDict.keys())]
+    #    raise Exception('No observation dictionary has been passed!')
     #check if observation groups have been passed, if not throw error, if so get
-    if not('Observations' in observ):
+    if not('Observations' in  observgroups):
         raise Exception('No observation field was passed!')
-    ObservGroups = observ['Observations']
+    ObservGroups =  observgroups['Observations']
     #list for observation group indices in the models
     ObservGroupIndices = []
     for i in range(len(ObservGroups)):
         CurrentGroupNames = ObservGroups[i]
+        #NOTE: need to add check that names exist here
         #lookup the indices for the y variable names
         CurrentIndices = [ObservDict[n] for n in CurrentGroupNames] 
         ObservGroupIndices.append(CurrentIndices)
@@ -222,13 +239,11 @@ def design(models, exact=None, approx=None, observ=None, fixed=None):
     ApproxWeightSum = 0
     #set up loop counters
     i=0
-    NumApproxGrid=len(ApproxInputGrid)
-    NumExactArchetypes=len(ExactSymbolArchetypes)
     # loop over exact symbol archetypes, or if exact wasn't passed then enter the loop only once
-    while i < NumExactArchetypes or (not(exact) and i==0):
+    while i < NumExactArchetypes or (not(exactinputs) and i==0):
         j=0
         # loop over approximate grid, or if approx wasn't passed then enter the loop only once
-        while j < NumApproxGrid or (not(approx) and j==0):
+        while j < NumApproxGrid or (not( approxinputs) and j==0):
             #create a list to hold the current input to the model
             InputList = []
             #loop over model inputs
@@ -273,7 +288,7 @@ def design(models, exact=None, approx=None, observ=None, fixed=None):
                     #loop over observatino variables in sample group
                     for var in obs:
                         #add the weighted FIM to the running total for the experiment (for each model)
-                        FIMList[mod]= FIMList[mod] + (NewSampleWeight / N) * Model.fim[var](Params,InputVector)
+                        FIMList[mod]= FIMList[mod] + (NewSampleWeight / N) * Model.FIM[var](Params,InputVector)
             j+=1
         i+=1
 
@@ -300,8 +315,10 @@ def design(models, exact=None, approx=None, observ=None, fixed=None):
     Design=[]
     for i in NonZeroWeightOptimIndices:
         ArchetypeGridPair = OptimSolutionMap['OptimIndex_To_ArchetypeGridIndices'][i]
-        ExactInputs = [ OptimSolution[j] for j in OptimSolutionMap['ArchetypeIndex_To_OptimIndices'][ ArchetypeGridPair[0] ] ]
-        ApproxInputs = ApproxInputGrid[ ArchetypeGridPair[1] ]
+        if exactinputs:
+            ExactInputs = [ OptimSolution[j] for j in OptimSolutionMap['ArchetypeIndex_To_OptimIndices'][ ArchetypeGridPair[0] ] ]
+        if  approxinputs:
+            ApproxInputs = ApproxInputGrid[ ArchetypeGridPair[1] ]
         DesignRow=[]
         for k in range(InputDim):
             #check if input index is in approximate or exact inputs

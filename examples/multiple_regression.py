@@ -2,16 +2,13 @@ import casadi as cs
 from nloed import model
 from nloed import design
 
-#Declare independent variables (covarietes, control inputs, conditions etc.)
-#These are the variables you control in the experimental design, and for which you want to find the optimal settings of
+#Declare model inputs
 x=cs.MX.sym('x',4)
 
-#Declare the number of parameters-of-interest
-#These are the parameters you are interested in estimating as accurately as possible (or nuisance parameters, you can decide which is which later)
+#Declare the parameters-of-interest
 beta=cs.MX.sym('beta',4)
 
-#Now we define how x and beta are linked to the distribution parameters, theta, of the normal response distribution
-#Define a 1D linear model with slope and intercept for the mean
+#Define a model t
 theta1 = cs.Function('theta1',[beta,x],[beta[0] + x[0]*beta[2] + x[1]*beta[3],1])
 theta2 = cs.Function('theta2',[beta,x],[beta[1] + x[3]*beta[0] + x[2]*beta[3],1])
 
@@ -33,10 +30,10 @@ approx={'Inputs':['x3','x4'],'Bounds':[(-1,1),(0,3)]}
 struct=[['x1_lvl1', 'x2_lvl1'],['x1_lvl1', 'x2_lvl2'],['x1_lvl2', 'x2_lvl1'],['x1_lvl2', 'x2_lvl2']]
 exact={'Inputs':['x1','x2'],'Bounds':[(5,10),(2,3)],'Structure':struct}
 #NOTE: Add to exact later: Replicates (code to default with full reps of all unique vec), Constraints, Start, 
-obs={'Observations':[('y1','y2')]}
-#NOTE: Add to obs later: Weights
+obs={'Observations':[['y1','y2']]}
+#NOTE: Add to obs later: Weights, if not passed, treat each observation as individual option
 
-design1=design(models,exact,approx,obs)
+design1=design(models,approx,exact,obs)
 
 print(design1)
 
