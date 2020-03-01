@@ -107,6 +107,7 @@ class model:
         #NOTE: multiplex this, so it generate multiple datasets from multiple designs, multiple parameter values
         print('Not Implemeneted')
 
+    #NOTE: should maybe rename this
     def assess(self):
         # assess model/design, returns various estimates of cov, bias, confidence regions/intervals
         # no data: asymptotic: covaraince, beale bias, maybe MSE
@@ -114,6 +115,8 @@ class model:
         #          monte carlo: covariance, bias, MSE
         # with data: bootstrap; covariance, mean, MSE
         #            (profile) likelihood: intervals/basins not sure how to return
+    
+    #NOTE: maybe add a basic residual computatino method for goodness of fit assesment?? Or maybe better show how in tutorial but not here
 
         print('Not Implemeneted')
     

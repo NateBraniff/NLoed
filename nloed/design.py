@@ -2,10 +2,29 @@ import casadi as cs
 import numpy as np
 import random as rn
 
-def design(models, approxinputs=None, exactinputs=None, observgroups=None, fixed=None):
+def design(models, approxinputs=None, exactinputs=None, observgroups=None, fixeddesign=None):
     """ 
     Add a docstring
     """
+
+    #NOTE: ***[important]*** Need to handle multiple inputs (groups too), w.r.t. to sample weights and observation selection, need good default
+    #NOTE: should add replicates code, will make good defaults easier maaybe (double check)....
+    #NOTE: design ouput and related code needs some clean up (i.e. map)
+    #NOTE: start thinknig about more modular code (i.e. other functions for design.py), user may want to access something like
+    #      creategrid for custome grid generation (i.e. for log distributed grid), but not internal functions, private funcs somehow??, leading '__'
+
+    #NOTE: need to decide on design/experiment/data structure, thinking dictionary with input and output names as keys
+    #      list of settings as value, list of list for observations, need to implement a sort alg. for inputs to standardize inoput order
+    #      need to combine non-unique elements, this will make implementing fixeddesign, power, fitting easier
+    #      need to make sure weighting works out on grouped observations (half the optimal weight to each??)
+    #NOTE: with current code, struct matrix provided to exact doesn't allow for you to assign specific  observations to each input
+    #       inputs arechetype in a fully exact design, this is limiting, but forces user to select optimal observation vars (which maybe okay)
+    #       or they have to observe all (specific subset of) vars at each exact input archetype (probabyl okay, otherwise gets too complex I think)
+    #       user can lock in weight fractions (with observation weights field) to compensate for diff in obs. cost, but can't have a hard max on an assay type for example
+    #NOTE: need to change design ouput so it can build dictionary (with proper obervartion vect handling), according to above
+    #       maybe observations with no weight get 0 weight in design output, or blanks??, or we just list obervations that are observed
+    #       but then we can't handle weights...
+
     #NOTE: should we avoid model 'Input' as it makes error strings awkward when talking about function inputs?!
     
     #NOTE: should bayesian priors be treated as symbolics in group loop, and loop over sigma points done just before ipopt pass
@@ -14,7 +33,7 @@ def design(models, approxinputs=None, exactinputs=None, observgroups=None, fixed
     
     #NOTE: current structure makes grid refinments difficult
 
-    #NOTE: fixed (observations), data or past fim (as function of beta???) Probably just pass in design/data, fim comp for data will ignore obseved y info anyways for asympotitic fim
+    #NOTE: fixeddesign (observations), data or past fim (as function of beta???) Probably just pass in design/data, fim comp for data will ignore obseved y info anyways for asympotitic fim
     #NOTE: models must have the same x dim and input names, not same parameters though
     #NOTE: should fixed be an approx design (by weight) or an exact design (count), approx does everything more flexible, exact enforces 'real' data
     #NOTE: leaning towards approx
