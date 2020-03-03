@@ -40,8 +40,8 @@ class model:
         self.FIM = []
 
         #create symbols for parameters and inputs, needed for function defs below
-        ParamSymbols = cs.MX.sym('ParamSymbols',self.NumParams)
-        InputSymbols = cs.MX.sym('InputSymbols',self.NumInputs)
+        ParamSymbols = cs.SX.sym('ParamSymbols',self.NumParams)
+        InputSymbols = cs.SX.sym('InputSymbols',self.NumInputs)
 
         for i in range(self.NumObserv):
             Observation = observationlist[i]
@@ -51,7 +51,7 @@ class model:
             else:
                 raise Exception('Observation names must be unique!')
             #create a observationlist symbol
-            ObervSymbol = cs.MX.sym(Observation[0],1)
+            ObervSymbol = cs.SX.sym(Observation[0],1)
             #store the function for the model (links observationlist distribution parameters to the parameters-of-interest)
             self.ObservStatistics.append(Observation[2])
             if Observation[1]  == 'normal':

@@ -37,7 +37,7 @@ opt_approx=design([model],approx)
 print(opt_approx)
 
 model={'Model':linear1d, 'Parameters': [0.5, 1],'Objective':'D'}
-struct=[['x1_lvl1'],['x1_lvl2']]
+struct=[['x1_lvl1'],['x1_lvl2'],['x1_lvl3']]
 exact={'Inputs':['x1'],'Bounds':[(-1,1)],'Structure':struct}
 obs={'Observations':[['y1']]}
 
