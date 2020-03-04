@@ -6,6 +6,28 @@ def design(models, approxinputs=None, exactinputs=None, observgroups=None, fixed
     """ 
     Add a docstring
     """
+    #Fixes/asthetics:   keywords are shared across all inputs, can cause unexpected collisions
+
+    #Easy Changes:      model priors weights
+    #                   observation weight caps
+    #                   replicate arg for model structure
+    #                   resolution option passing to IPOPT/custom options
+    #                   custom grid/candidate list
+    #Medium Changes:    passing in fixed design
+    #                   start values for exact
+    #                   Ds optimality
+    #Hard Changes:      partition into subfunctions
+    #                   exact/approx constraints
+    #                   bayesian parameter prior with sigma points
+    #                   Custom optimality
+    #                   T optimality
+    #                   Beal/Hunter curvature/bias optimality
+    #                   Constrained parameter optimality
+    #Speculative:       grid points on constraint boundary
+    #                   grid refinment
+    #                   L2 regularization on weights for unique design
+
+    #NOTE: should add simple if statment to check if models is a model or a list of models, allows user to pass more conveniently 
 
     #NOTE: maybe add some L2 regularization (or Linf??, L1 does nothing given sum-to-one constraint) or some fancy exchange of coordinates at the end using derivatives to produce equivlant designs using fewer support points
     # (i.e. pathological model with two responses and few interactions between inputs and parameters across responses tends to give huge number of suppor points)
@@ -30,7 +52,7 @@ def design(models, approxinputs=None, exactinputs=None, observgroups=None, fixed
 
     #NOTE: Add to model later: Weight, Prior (cov, norm only, user can transform var), POI (parameters-of-interest)
     #NOTE: Add to approx later: Constraints, Resolution (stepsize), Grid (user defined set of possible input levels, or full grid?)
-    #NOTE: Add to exact later: Replicates (code to default with full reps of all unique vec), Constraints, Start, 
+    #NOTE: Add to exact later: Replicates (code to default with full reps of all unique vec), Constraints, Start values (pass in struct matrix??)
     #NOTE: Add to obs later: Weights, if not passed, treat each observation as individual option
 
     #NOTE: should we avoid model 'Input' as it makes error strings awkward when talking about function inputs?!
@@ -40,15 +62,13 @@ def design(models, approxinputs=None, exactinputs=None, observgroups=None, fixed
     #NOTE: leaning towards latter at least initially
     
     #NOTE: current structure makes grid refinments difficult
-
     #NOTE: fixeddesign (observations), data or past fim (as function of beta???) Probably just pass in design/data, fim comp for data will ignore obseved y info anyways for asympotitic fim
     #NOTE: models must have the same x dim and input names, not same parameters though
     #NOTE: should fixed be an approx design (by weight) or an exact design (count), approx does everything more flexible, exact enforces 'real' data
-    #NOTE: leaning towards approx
-
+    #NOTE: leaning towards approx, or auto configure for both
     #NOTE: should sort design output so it has a common ordering (ie by x1, then x2 etc.), should group non-unique elements and merge their weights
 
-    #check that either exact xor approx has been passed NOTE: could provide some default functionality here
+    #check that either exact xor approx has been passed 
     if not( approxinputs) and not(exactinputs):
         raise Exception('The design function requires at least one of the approximate or exact values to be passed!')
 
@@ -56,7 +76,7 @@ def design(models, approxinputs=None, exactinputs=None, observgroups=None, fixed
     NumModels=len(models)
     # fim list for each model, keeps a running sum of symbols for each model (and prior parameter evaluation)
     FIMList = []
-    # List of beta symbols for each model NOTE: need either symbols and build funcs at end for sigma point
+    # List of beta symbols for each model 
     # or create sigma points first and nest loop within model loop for fim, with fim list sigmaXmodels big
     ParamList = []
     #list for casadi objective functions for each model, as matrix dim.s change, we need to define at run-time
@@ -72,7 +92,7 @@ def design(models, approxinputs=None, exactinputs=None, observgroups=None, fixed
     #create lists for reverse lookup, index to name mapping 
     InputNameList=list(InputDict.keys())
     ObservNameList=list(ObservDict.keys())
-    #loop over models check dimensions and dicts, build objective functions, create fim and beta lists NOTE: this loop needs to be cleaned up formating-wise
+    #loop over models check dimensions and dicts, build objective functions, create fim and beta lists 
     for m in range(NumModels):
         if not('Model' in models[m]):
             raise Exception('Missing model field for model at index '+str(m)+' in models list!')
@@ -92,7 +112,7 @@ def design(models, approxinputs=None, exactinputs=None, observgroups=None, fixed
             raise Exception('Model input name and ordering must match!')
         if not(ObservDict == Model.ObservNameDict):
             raise Exception('Model output name and ordering must match!')
-        #NOTE:model D score must be weighted/rooted log-divided according to number of params
+        #NOTE:model D score must be weighted/rooted log-divided according to number of params, need to check this
         if ObjectiveType =='D':
             Matrx = cs.SX.sym('Matrx',Model.NumParams, Model.NumParams)
             RFact = cs.qr(Matrx)[1]
@@ -197,7 +217,7 @@ def design(models, approxinputs=None, exactinputs=None, observgroups=None, fixed
         if not('Structure' in exactinputs):
             raise Exception('No exact input structure was provided!')
         ExactInputStructure = exactinputs['Structure']
-        #create a list of dicts for tracking existing symbols NOTE: do this with list comprehension???
+        #create a list of dicts for tracking existing symbols 
         ExistingExactSymbols = []
         #add a dictionary to the list for each exact input
         for i in range(ExactInputNum):
@@ -254,7 +274,7 @@ def design(models, approxinputs=None, exactinputs=None, observgroups=None, fixed
         raise Exception('All input variables must be passed as either approximate or exact, and the total number of inputs passed must be the same as recieved by the model(s)!\n'
                         'There are '+str(ApproxInputNum)+' approximate inputs and '+str(ExactInputNum)+' exact inputs passed but model(s) expect '+str(InputDim)+'!')
     
-    #check if observ passed NOTE: should change this to use a good default if not passed
+    #check if observ passed 
     if not( observgroups):
         observgroups={}
         observgroups['Observations']=[[o] for o in list(ObservDict.keys())]
@@ -318,7 +338,7 @@ def design(models, approxinputs=None, exactinputs=None, observgroups=None, fixed
                 OptimSolutionMap[len(OptimSymbolList)]={'InputType':CurrentInputTypeLabels,'InputLookUpIndex':CurrentInputLookupIndices,'GridIndex':j,'ObsGroupIndices':obs} 
                 #add sample weight symbol to the optimization symbol list
                 OptimSymbolList += [NewSampleWeight]
-                #set the starting weights so that all grid points at all archetypes have equal weights NOTE: should probably clean this up
+                #set the starting weights so that all grid points at all archetypes have equal weights NOTE: should probably clean this up, conditional on approx and exact being passed
                 OptimVariableStart += [1/(NumApproxGrid*NumExactArchetypes*NumObservGroups)]
                 #apply appropriate bounds for the sampling weight NOTE: upper bound 1 should be scaled by passed observation weights when this functionality is added
                 LowerBoundVariables += [0]
@@ -356,58 +376,74 @@ def design(models, approxinputs=None, exactinputs=None, observgroups=None, fixed
     # Create an IPOPT solver
     IPOPTProblemStructure = {'f': OverallObjectiveSymbol, 'x': cs.vertcat(*OptimSymbolList), 'g': cs.vertcat(*OptimConstraints)}
     print('Setting up optimization problem, this can take some time...')
-    IPOPTSolver = cs.nlpsol('solver', 'ipopt', IPOPTProblemStructure,{"verbose":True,'ipopt.hessian_approximation':'limited-memory'}) #NOTE: need to give option to turn off full hessian (or coloring), may need to restucture problem mx/sx, maybe use quadratic programming in full approx mode?
+    #"verbose":True,
+    IPOPTSolver = cs.nlpsol('solver', 'ipopt', IPOPTProblemStructure,{'ipopt.hessian_approximation':'limited-memory'}) #NOTE: need to give option to turn off full hessian (or coloring), may need to restucture problem mx/sx, maybe use quadratic programming in full approx mode?
     print('Problem set up complete.')
     # Solve the NLP with IPOPT call
-    IPOPTSolutionStruct = IPOPTSolver(x0=OptimVariableStart, lbx=LowerBoundVariables, ubx=UpperBoundVariables, lbg=LowerBoundConstraints, ubg=UppperBoundConstraints)
     print('Begining optimization...')
+    IPOPTSolutionStruct = IPOPTSolver(x0=OptimVariableStart, lbx=LowerBoundVariables, ubx=UpperBoundVariables, lbg=LowerBoundConstraints, ubg=UppperBoundConstraints)
     OptimSolution = IPOPTSolutionStruct['x'].full().flatten()
 
     Tol=1e-4 #NOTE: this should probably be a function of the numeber of parameters and maybe the bayesian/model mixture inputs
+    #get the samle weights indices that have a non-trivial non-zero value
     NonZeroWeightOptimIndices=[i for i in List_Of_SampleWeightOptimIndices if OptimSolution[i]>Tol]
 
-    Design={'InputNames':InputNameList,'ObservationNames':ObservNameList,'Inputs':[],'Weights':[]}
-     
+    #create the design dictionary
+    Design={'InputNames':InputNameList,'ObservationNames':ObservNameList,'Inputs':[],'Weight':[]}
+    #loop over the non-zero sample weights
     for i in NonZeroWeightOptimIndices:
+        #get relevant information for looking up input values and observation indices from OptimSolutionMap
         CurrentInputTypeList = OptimSolutionMap[i]['InputType']
         CurrentInputLookupIndices = OptimSolutionMap[i]['InputLookUpIndex']
         CurrentApproxGridIndex = OptimSolutionMap[i]['GridIndex']
         CurrentObservGroupIndices = OptimSolutionMap[i]['ObsGroupIndices']
+        #create a list to store the potential new input vector
         NewInputRow = []
+        #loop over input indices to the full model
         for k in range(InputDim):
+            #get the current type 'A' approx, 'E' exact
             CurrentType=CurrentInputTypeList[k]
             #check if input is approximate or exact
             if CurrentType =='A':
+                #if approx, look up the approxgrid location and the input index within the grid and add to new row
                 NewInputRow.append(round(ApproxInputGrid[CurrentApproxGridIndex][CurrentInputLookupIndices[k]],4))
             elif CurrentType =='E':
-                #if in index corresponds to an exact input add the appropriate optimized level to the design row
+                #if exact, look up the optimal solution of the given exact input and add to the new row
                 NewInputRow.append(round(OptimSolution[CurrentInputLookupIndices[k]],4))
             else:
-                #if we can't find the index k in either the approximate or exact indices, throw an error
+                #this should never be reached
                 raise Exception('Error formating the experimental design! Contact the developers for further support')
 
-        Nobs=len(CurrentObservGroupIndices)
+        #check if the input row is unique (i.e. if not alread inserted into the design)
         InputUnique=not(NewInputRow in Design['Inputs'])
+
+        #get the number of observations in the observation group associated with this non-zero sample weight
+        Nobs=len(CurrentObservGroupIndices)
+        #create a new observation row
         NewObservRow=[]
+        #loop over the observation variables #NOTE: this loop could use some clean up, if statments and loop interaction with unique flag are sloppy
         for k in range(ObservDim):
-            #check if input index is in approximate or exact inputs
+            #check the current index of the observation variables is in the current observation group
             if k in CurrentObservGroupIndices:
-                #if in index corresponds to an approximate input add the appropriate numerical grid values to the design row
+                #if the index is in the group, add the optimal sampling weight, paritioned according to the number of observation variables in the group
                 NewWeight = round(OptimSolution[i]/Nobs,4)
             else: 
-                #if in index corresponds to an exact input add the appropriate optimized level to the design row
+                #if the observation index is not in the group than that variable gets a zero weight
                 NewWeight = 0.0
-            
+            #check if new input row was unique
             if InputUnique:
+                #if unique add the new weight to 
                 NewObservRow.append(NewWeight)
             else:
+                #if not unique, add the weights to the corresponding existing input
                 ExistingIndex = Design['Inputs'].index(NewInputRow)
-                Design['Weights'][ExistingIndex][k]=Design['Weights'][ExistingIndex][k] + NewWeight
+                Design['Weight'][ExistingIndex][k]=Design['Weight'][ExistingIndex][k] + NewWeight
         
+        #if the input was unique add the new input row and new input weights, sort while adding to provide a standardized order to the design
         if InputUnique:
             InsertIndex=sortinputs(NewInputRow,Design['Inputs'])
             Design['Inputs'].insert(InsertIndex,NewInputRow)
-            Design['Weights'].insert(InsertIndex,NewObservRow)
+            Design['Weight'].insert(InsertIndex,NewObservRow)
 
     return Design
 
@@ -448,7 +484,6 @@ def sortinputs(newrow,rows,rowpntr=0,colpntr=0):
 # inputs: model list ,grouping matrix, beta info, past data
 # return: ys, xs, weights (not ready for actual experiment because you need to do power/rounding analysis)
 
-
 # Goals
 # can enter either past data or maybe fisher info from past data as starting point to improve an experiment
 # grouping response variables that need to be sampled together, paritioning overall sample number across groups
@@ -457,14 +492,12 @@ def sortinputs(newrow,rows,rowpntr=0,colpntr=0):
 # OptimConstraintsaints on x, linear and nonlinear
 # grid refinment for grided x, starting values for non-grided
 # optional optimality criteria, D, Ds (need to group parameters), A, custom (but simple casadi function of fisher info)
-# otimality measures for curvature/bias measure, also OptimConstraintsained measure (maybe not possible with bayesian???)
 # average designs for multiple models, with priors over the models
 # bayesian (normal prior) using sigma points for all or subset of the parameters
 # possible support for rounding design into an experiment
-
 
 # Questions
 # Do we scale the FIM?, only D maybe Ds is invariant under linear re-scaling (maybe all rescaling), but not others or custom, however is more numerically stable
 # Also do we log the opt(FIM)? for numerical stability, this maybe generally useful
 # how to select sigma points
-# how to do OptimConstraintsained and curvature/bias optimality measures
+# how to do constrained and curvature/bias optimality measures

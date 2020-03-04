@@ -15,7 +15,7 @@ theta1 = cs.Function('theta1',[beta,x],[beta[0] + x[0]*beta[2] + x[1]*x[3]*beta[
 theta2 = cs.Function('theta2',[beta,x],[beta[1] + x[1]*beta[3] + x[0]*x[2]*beta[5],1])
 
 #Enter the above model into the list of reponse variables
-response= [('y1','normal',theta1),('y2','normal',theta2)]
+response= [('y1','Normal',theta1),('y2','Normal',theta2)]
 #xnames=['x1','x2']
 xnames=['x1','x2','x3','x4']
 #betanames=['b1','b2','b3','b4']

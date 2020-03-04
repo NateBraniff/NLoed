@@ -19,12 +19,21 @@ beta=cs.SX.sym('Betas',2)
 theta=cs.Function('theta',[beta,x],[beta[0] + x*beta[1], 1])
 
 #Enter the above model into the list of reponse variables
-response= [('y1','normal',theta)]
+response= [('y1','Normal',theta)]
 xnames=['x1']
 betanames=['beta0','beta1']
 
 #Instantiate class
 linear1d=model(response,xnames,betanames)
+
+Experiment={}
+Experiment['InputNames']=xnames
+Experiment['ObservationNames']=['y1']
+Experiment['Inputs']=[[-1],[0],[1]]
+Experiment['Count']=[[2],[1],[2]]
+dataset1=linear1d.sample(Experiment,[0,1],4)
+
+dataset2=linear1d.sample([Experiment,Experiment],[0,1])
 
 model={'Model':linear1d, 'Parameters': [0.5, 1],'Objective':'D'}
 approx={'Inputs':['x1'],'Bounds':[(-1,1)]}

@@ -1,17 +1,24 @@
 import casadi as cs
 import numpy as np
+import copy as cp
 
 class model:
     """ 
     Add a docstring
     """
 
-    #NOTE: need to rename variables here!!!
+    #Moderate:  implement ML fitting
+    #           implement data sampling
+    #Difficult: implement various cov/bias assesment methods, also (profile) likelihood intervals/plots
+    #           add other distributions binomial/bernouli, lognormal, gamma, exponential, weibull etc., negative binomial
+    #           implement plotting function
+    
+    #NOTE: Data/design/experiment objects may need deep copies so internal lists aren't shared??
+    #names must be unique
+    #must enforce ordering of parameters in statistics function
 
     def __init__(self, observationlist, inputnames, paramnames):
         
-        #names mustst be unique
-        #mustt enforce ordering of parameters in statistics function
         #check for unique names
         if not(len(set(inputnames))  ==  len(inputnames)):
             raise Exception('Model input names must be unique!')
@@ -34,8 +41,9 @@ class model:
             self.ParamNameDict[paramnames[i]] = i
         self.ObservNameDict = {}
         #lists to contains needed Casadi functions for evaluation, design and fitting
-        self.dist = []
-        self.ObservStatistics = []
+        self.Dist = []
+        self.StatisticModel = []
+        self.Model = []
         self.LogLik = []
         self.FIM = []
 
@@ -45,6 +53,8 @@ class model:
 
         for i in range(self.NumObserv):
             Observation = observationlist[i]
+            #store the distribution type for later
+            self.Dist.append(Observation[1])
             #extract names of observationlist variables
             if not(Observation[0] in self.ObservNameDict):
                 self.ObservNameDict[Observation[0]] = i
@@ -53,21 +63,22 @@ class model:
             #create a observationlist symbol
             ObervSymbol = cs.SX.sym(Observation[0],1)
             #store the function for the model (links observationlist distribution parameters to the parameters-of-interest)
-            self.ObservStatistics.append(Observation[2])
-            if Observation[1]  == 'normal':
+            self.StatisticModel.append(Observation[2])
+            if Observation[1]  == 'Normal':
+                #get the distribution statistics
                 Mean = Observation[2](ParamSymbols,InputSymbols)[0]
                 Variance = Observation[2](ParamSymbols,InputSymbols)[1]
                 #create LogLikelihood symbolics and function 
                 LogLikSymbol =  -0.5*cs.log(2*cs.pi*Variance) - (ObervSymbol-Mean)**2/(2*Variance)
                 self.LogLik.append( cs.Function('ll_'+Observation[0], [ObervSymbol,ParamSymbols,InputSymbols], [LogLikSymbol]) )
-                #generate derivatives of distribution parameters, ObservStatistics (here Mean and Variance) with respect to parameters-of-interest, Params
+                #generate derivatives of distribution parameters, StatisticModel (here Mean and Variance) with respect to parameters-of-interest, Params
                 dMean_dParams = cs.jacobian(Mean,ParamSymbols)
                 dVariance_dParams = cs.jacobian(Variance,ParamSymbols)
                 #create FIM symbolics and function
                 FIMSymbol = (dMean_dParams.T @ dMean_dParams)/Variance+(dVariance_dParams.T @ dVariance_dParams)/Variance**2
                 self.FIM.append(cs.Function('FIM_'+Observation[0], [ParamSymbols,InputSymbols], [FIMSymbol]) )
-            elif Observation[1] == 'poisson':
-                #extract ObservStatistics's from observationlist list
+            elif Observation[1] == 'Poisson':
+                #get the distribution statistic
                 Lambda = Observation[2](ParamSymbols,InputSymbols)[0]
                 #create a custom casadi function for doing factorials (needed in poisson LogLikelihood and FIM)
                 fact = factorial('fact')
@@ -76,51 +87,131 @@ class model:
                 #create LogLikelihood symbolics and function 
                 LogLikSymbol =  ObervSymbol*cs.log(Lambda)+fact(ObervSymbol)-Lambda
                 self.LogLik.append( cs.Function('ll_'+Observation[0], [ObervSymbol,ParamSymbols,InputSymbols], [LogLikSymbol]) )
-                #generate derivatives of distribution parameters, ObservStatistics (here Mean and Variance) with respect to parameters-of-interest, Params
+                #generate derivatives of distribution parameters, StatisticModel (here Mean and Variance) with respect to parameters-of-interest, Params
                 dLambda_dParams = cs.jacobian(Lambda,ParamSymbols)
                 #create FIM symbolics and function
                 FIMSymbol = (dLambda_dParams.T @ dLambda_dParams)/Lambda
                 self.FIM.append(cs.Function('FIM_'+Observation[0], [ParamSymbols,InputSymbols], [FIMSymbol]) )
-            elif Observation[0] == 'lognormal':    
+            elif Observation[1] == 'Lognormal':    
                 print('Not Implemeneted')
-            elif Observation[0] == 'binomial': 
+            elif Observation[1] == 'Binomial': 
                 print('Not Implemeneted')
-            elif Observation[0] == 'exponential': 
+            elif Observation[1] == 'Exponential': 
                 print('Not Implemeneted')
-            elif Observation[0] == 'gamma': 
+            elif Observation[1] == 'Gamma': 
                 print('Not Implemeneted')
             else:
-                print('Unknown Distribution: '+Observation[0])
+                raise Exception('Unknown Distribution: '+Observation[1])
 
-    def fit(self):
+    def fit(self,datasets,parameterstart):
         """
         fit the model to a dataset using maximum likelihood and casadi/IPOPT
         """
-        #NOTE: should return, param fit,  beal bias, (profile) logliklihood CI's (not regions)
+        #NOTE: could solve multiplex simultaneosly (one big opt problem) or sequentially (more flexible, perhaps slower, leaning towards this for now)
+        #NOTE: allow for parameter constraints to be passed (once FIM supports constraints)
+        #NOTE: should return, param fit, (profile) logliklihood CI's ??
         #NOTE: leave it to use (and show in docs) how to use loglike to get profile liklihood region
         #NOTE: multiplex this, so it fits multiple datasets
-        #NOTE: option for penalized likelihood (not at this time)
+        # with data: bootstrap; covariance, mean, MSE
+        #            (profile) likelihood: intervals/basins not sure how to return
         print('Not Implemeneted')
+        if not(isinstance(datasets, list)):
+            DesignSet=[[datasets]]
+        elif not(isinstance(datasets[0], list)):
+            DesignSet=[datasets]
+        else:
+            DesignSet=datasets
 
-    def sample(self):
+        # ParamFitSymbols = cs.SX.sym('ParamFitSymbols',self.NumParams)
+        # for e in range(len(DesignSet)):
+        #     Datasets=DesignSet[e]
+        #     for r in range(len(Datasets)):
+        #         Data=Datasets[r]
+        #         TotalLogLik=0
+        #         for i in range(len(Data['Inputs'])):
+        #             InputRow = Data['Inputs'][i]
+        #             for j in range(self.NumObserv):
+        #                 ObservCount = CurrentExperiment['Count'][i][j]
+        #                 self.LogLik
+
+
+        #NOTE: add profile likelihood, bootstrap CI's
+
+    def sample(self,experiments,parameters,replicates=1):
         # generate a data sample fromt the model according to a specific design
-        #NOTE: multiplex this, so it generate multiple datasets from multiple designs, multiple parameter values
-        print('Not Implemeneted')
+        #NOTE: multiplex multiple parameter values??
+        #NOTE: actually maybe more important to be able to replicate designs N times
+
+        if not(isinstance(experiments, list)):
+            ExperimentList=[experiments]
+        else:
+            ExperimentList=experiments
+
+        Designset=[]
+        for e in range(len(ExperimentList)):
+            CurrentExperiment=ExperimentList[e]
+            DataFormat=cp.deepcopy(CurrentExperiment)
+            del DataFormat['Count']
+            DataFormat['Observation']=[]
+            Datasets=[]
+            for r in range(replicates):
+                CurrentData=cp.deepcopy(DataFormat)
+                for i in range(len(CurrentExperiment['Inputs'])):
+                    InputRow = CurrentExperiment['Inputs'][i]
+                    ObservRow=[]
+                    for j in range(self.NumObserv):
+                        ObservCount = CurrentExperiment['Count'][i][j]
+                        Statistics=self.StatisticModel[j](parameters,InputRow)
+                        if self.Dist[j] == 'Normal':
+                            CurrentDataBlock = np.random.normal(Statistics[0], np.sqrt(Statistics[1]), ObservCount).tolist() 
+                        elif self.Dist[j] == 'Poisson':
+                            CurrentDataBlock = np.random.poisson(Statistics[0]).tolist() 
+                        elif self.Dist[j] == 'Lognormal':
+                            print('Not Implemeneted')
+                        elif self.Dist[j] == 'Binomial':
+                            print('Not Implemeneted')
+                        elif self.Dist[j] == 'Exponential':
+                            print('Not Implemeneted')
+                        elif self.Dist[j] == 'Gamma':
+                            print('Not Implemeneted')
+                        else:
+                            raise Exception('Unknown error encountered selecting observation distribution, contact developers')
+                        ObservRow.append(CurrentDataBlock)
+                    CurrentData['Observation'].append(ObservRow)
+                Datasets.append(CurrentData)
+            Designset.append(Datasets)
+                
+        if not(isinstance(experiments, list)):
+            if replicates==1:
+                return Designset[0][0]
+            else:
+                return Designset[0]
+        else:
+            return Designset
 
     #NOTE: should maybe rename this
-    def assess(self):
+    def moments(self):
         # assess model/design, returns various estimates of cov, bias, confidence regions/intervals
         # no data: asymptotic: covaraince, beale bias, maybe MSE
         #          sigma point: covariance, bias (using mean) (need to figure out how to do sigma for non-normal data), maybe MSE
         #          monte carlo: covariance, bias, MSE
-        # with data: bootstrap; covariance, mean, MSE
-        #            (profile) likelihood: intervals/basins not sure how to return
-    
-    #NOTE: maybe add a basic residual computatino method for goodness of fit assesment?? Or maybe better show how in tutorial but not here
+        
+        print('Not Implemeneted')
+        
+    def plots(self):
+        #FDS plot, standardized variance (or Ds, bayesian equivlant), residuals
+        print('Not Implemeneted')
+
+    #NOTE: maybe add a basic residual computation method for goodness of fit assesment?? Or maybe better show how in tutorial but not here
 
         print('Not Implemeneted')
     
     # UTILITY FUNCTIONS
+    def evalmodel(self):
+        #NOTE: evaluate model, predict y
+        #NOTE: also mabye predict error bars based on par cov or past dataset
+        print('Not Implemeneted')
+
     def evalFIM(self):
         #NOTE: eval fim at given inputs and dataset
         #NOTE: should this even be here??? how much in model, this isn't data dependent, only design dependent

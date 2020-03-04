@@ -1,5 +1,19 @@
 # function for power analysis with given design and model
 
+#pre N: asymptotic confidence intervals only 
+#enter an N range Nmin to Nmax (or just single N)
+#discretize with multiple N -> sigma/boostrap CI's/Cov's at each N (jitter at each N?!) [graphical, thershold]
+#                           -> FDS/D-eff(Opt-eff) plots [graphical, thershold]
+#                           -> what about T optimality designs, what about bayesian CI's??
+
+# Discretize (depends on N):    basic Adam's apportionment, 
+#                               other rounding options (naive...)
+# Sample Size Selection (N?):   assesment of confidence interval size with design replication or N selection
+#                               similar FDS/D-eff/relative D-eff plots for selecting sample size
+# Fine Tuning:                  jitter/tuning of exact design
+
+
+
 #use sigma points (or if needed monte carlo simulation) to determine 'power curve', shrinking of parameter error (bias +var) with n design replications
 #perhaps combine with rounding methods?? to allow for rounded variations of the same design.
 # rounding should probably happen here
