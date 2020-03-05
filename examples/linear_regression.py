@@ -1,7 +1,7 @@
 """ 
 Add a docstring
 """
-
+import numpy as np
 import casadi as cs
 from nloed import model
 from nloed import design
@@ -16,7 +16,7 @@ beta=cs.SX.sym('Betas',2)
 #Now we define how x and beta are linked to the distribution parameters, theta, of the normal response distribution
 #Define a 1D linear model with slope and intercept for the mean, constant variance, 
 #combine these into a function computing the response distribution parameters, theta (in this case mean and var)
-theta=cs.Function('theta',[beta,x],[beta[0] + x*beta[1], 1])
+theta=cs.Function('theta',[beta,x],[beta[0] + x*beta[1], 0.01])
 
 #Enter the above model into the list of reponse variables
 response= [('y1','Normal',theta)]
@@ -30,8 +30,13 @@ Experiment={}
 Experiment['InputNames']=xnames
 Experiment['ObservationNames']=['y1']
 Experiment['Inputs']=[[-1],[0],[1]]
-Experiment['Count']=[[2],[1],[2]]
-dataset1=linear1d.sample(Experiment,[0,1],4)
+Experiment['Count']=[[5],[1],[5]]
+dataset1=linear1d.sample(Experiment,[0,1],100)
+
+pars=linear1d.fit(dataset1,[0,1])
+
+paramCov1=np.cov(pars,rowvar=False)
+paramMean1=np.mean(pars,axis=0)
 
 dataset2=linear1d.sample([Experiment,Experiment],[0,1])
 

@@ -1,6 +1,7 @@
 import casadi as cs
 import numpy as np
 import copy as cp
+import scipy as sc
 
 class model:
     """ 
@@ -11,9 +12,10 @@ class model:
     #           implement data sampling
     #Difficult: implement various cov/bias assesment methods, also (profile) likelihood intervals/plots
     #           add other distributions binomial/bernouli, lognormal, gamma, exponential, weibull etc., negative binomial
-    #           implement plotting function
+    #           implement plotting function (move to utility.py?)
     
     #NOTE: Data/design/experiment objects may need deep copies so internal lists aren't shared??
+    #NOTE: do we really need scipy and numpy?
     #names must be unique
     #must enforce ordering of parameters in statistics function
 
@@ -103,18 +105,25 @@ class model:
             else:
                 raise Exception('Unknown Distribution: '+Observation[1])
 
-    def fit(self,datasets,parameterstart):
+    def fit(self,datasets,paramstart,paramconstraints=None,opt={'ProfileCIs':False,'ProfilePlots':False}):
         """
         fit the model to a dataset using maximum likelihood and casadi/IPOPT
         """
+        #NOTE: add some print statments to provide user with progress status
         #NOTE: could solve multiplex simultaneosly (one big opt problem) or sequentially (more flexible, perhaps slower, leaning towards this for now)
+
+        #NOTE: perhaps allow for bias-reducing penalized likelihood (based on Firth 1993, not sure if generalizes to fully nonlinear problems, seems to use FIM
         #NOTE: allow for parameter constraints to be passed (once FIM supports constraints)
-        #NOTE: should return, param fit, (profile) logliklihood CI's ??
-        #NOTE: leave it to use (and show in docs) how to use loglike to get profile liklihood region
+
+        #NOTE: should (profile) logliklihood CI's ?? plot profiles?
+        #NOTE: leave it to user (and show in docs) how to use loglike to get profile liklihood region
+
         #NOTE: multiplex this, so it fits multiple datasets
-        # with data: bootstrap; covariance, mean, MSE
+        #NOTE: bootstrap CI's/bias very expensive, depends somewhat on larger datasets and not sure how it interacts with our designs (i.e. each bootstrap is non-optimal, heavily replicated design may be okay)
         #            (profile) likelihood: intervals/basins not sure how to return
-        print('Not Implemeneted')
+
+        #NOTE: add profile likelihood, bootstrap CI's
+
         if not(isinstance(datasets, list)):
             DesignSet=[[datasets]]
         elif not(isinstance(datasets[0], list)):
@@ -122,20 +131,72 @@ class model:
         else:
             DesignSet=datasets
 
-        # ParamFitSymbols = cs.SX.sym('ParamFitSymbols',self.NumParams)
-        # for e in range(len(DesignSet)):
-        #     Datasets=DesignSet[e]
-        #     for r in range(len(Datasets)):
-        #         Data=Datasets[r]
-        #         TotalLogLik=0
-        #         for i in range(len(Data['Inputs'])):
-        #             InputRow = Data['Inputs'][i]
-        #             for j in range(self.NumObserv):
-        #                 ObservCount = CurrentExperiment['Count'][i][j]
-        #                 self.LogLik
+        DesignFitParameterList=[]
+        ParamFitSymbols = cs.SX.sym('ParamFitSymbols',self.NumParams)
+        for e in range(len(DesignSet)):
+            Datasets=DesignSet[e]
+            ReplicateFitParameterList=[]
+            for r in range(len(Datasets)):
+                Data=Datasets[r]
+                TotalLogLik=0
+                for i in range(len(Data['Inputs'])):
+                    InputRow = Data['Inputs'][i]
+                    for j in range(self.NumObserv):
+                        Observations = Data['Observation'][i][j]
+                        for k in range(len(Observations)):
+                            TotalLogLik-=self.LogLik[j](Observations[k],ParamFitSymbols,InputRow)
+
+                #NOTE: should be checking solution for convergence, should allow use to pass options to ipopt
+                # Create an IPOPT solver for maximum likelihood problem
+                IPOPTProblemStructure = {'f': TotalLogLik, 'x': ParamFitSymbols}#, 'g': cs.vertcat(*OptimConstraints)
+                IPOPTSolver = cs.nlpsol('solver', 'ipopt', IPOPTProblemStructure,{'ipopt.print_level':0,'print_time':False})
+                # Solve the NLP fitting problem with IPOPT call
+                #print('Begining optimization...')
+                IPOPTSolutionStruct = IPOPTSolver(x0=paramstart)#, lbx=[], ubx=[], lbg=[], ubg=[]
+                FitParameters = IPOPTSolutionStruct['x'].full().flatten()
+                ReplicateFitParameterList.append(list(FitParameters))
+
+                #NOTE: lots we can do here to speed this up, bates/watts 1988 interpolation of contours, kademan/bates 1990 adaptive profile stepping (derivative of ll and delta theta from last step)
+                # if opt['ProfileCIs'] or opt['ProfilePlots']:
+                #     TotalLogLikFunc = cs.Function('TotalLogLik_'+str(e)+'_'+str(r), [ParamFitSymbols], [TotalLogLik])
+                #     NuisanceParamSymbols=cs.SX.sym('NuisanceParamSymbols',self.NumParams-1)
+                #     ConfidenceLevel = 0.95
+                #     ChiSquaredLevel = sc.chi2.ppf(ConfidenceLevel, self.NumParams)
+                #     LogLikAtEstimate=TotalLogLikFunc(FitParameters)
+                #     for p in range(self.NumParams):
+                #         NuisanceSubsetList=cs.vertsplit(NuisanceParamSymbols)
+                #         NuisanceSubsetList.insert(p,cs.MX(FitParameters[p]))
+                #         LeaveOneFixedParamVec=cs.vertcat(*NuisanceSubsetList)
+                #         ProfileLikRatioSymbol = 2*(TotalLogLikFunc(LeaveOneFixedParamVec)-LogLikAtEstimate)
+                #         ProfileLikRatioFunc = cs.Function('TotalLogLik_'+str(e)+'_'+str(r), [NuisanceParamSymbols], [ProfileLikRatioSymbol])
+                           
+                #         CurrentRatio=0
+                #         StepSize = 0.01 * FitParameters[p]
+                #         while CurrentRatio<ChiSquaredLevel:
+                #             # Create an IPOPT solver for maximum likelihood problem
+                #             IPOPTProblemStructure = {'f': TotalLogLik, 'x': ParamFitSymbols}#, 'g': cs.vertcat(*OptimConstraints)
+                #             IPOPTSolver = cs.nlpsol('solver', 'ipopt', IPOPTProblemStructure,{'ipopt.print_level':0,'print_time':False})
+                #             # Solve the NLP fitting problem with IPOPT call
+                #             #print('Begining optimization...')
+                #             IPOPTSolutionStruct = IPOPTSolver(x0=paramstart)#, lbx=[], ubx=[], lbg=[], ubg=[]
+                #             FitParameters = IPOPTSolutionStruct['x'].full().flatten()
+                #             ReplicateFitParameterList.append(list(FitParameters))
 
 
-        #NOTE: add profile likelihood, bootstrap CI's
+
+                            # use bisection condition to find F level boundary
+                            #store LL value at grid point, endpoints=CI's store in list
+                            # plotting: LL profiles per parameter go on diagonal plots, profile traces for each parameter go on off-diagonal lower plots
+
+            DesignFitParameterList.append(ReplicateFitParameterList)
+        
+        if not(isinstance(datasets, list)):
+            return DesignFitParameterList[0][0]
+        elif not(isinstance(datasets[0], list)):
+            return DesignFitParameterList[0]
+        else:
+            return DesignFitParameterList
+        
 
     def sample(self,experiments,parameters,replicates=1):
         # generate a data sample fromt the model according to a specific design
@@ -190,7 +251,9 @@ class model:
             return Designset
 
     #NOTE: should maybe rename this
-    def moments(self):
+    def evaluate(self):
+        #maybe this should move to the design class(??)
+        #For D (full cov/bias), Ds (partial cov/bias), T separation using the delta method?! but need two models
         # assess model/design, returns various estimates of cov, bias, confidence regions/intervals
         # no data: asymptotic: covaraince, beale bias, maybe MSE
         #          sigma point: covariance, bias (using mean) (need to figure out how to do sigma for non-normal data), maybe MSE
@@ -201,27 +264,24 @@ class model:
     def plots(self):
         #FDS plot, standardized variance (or Ds, bayesian equivlant), residuals
         print('Not Implemeneted')
-
-    #NOTE: maybe add a basic residual computation method for goodness of fit assesment?? Or maybe better show how in tutorial but not here
-
-        print('Not Implemeneted')
+        #NOTE: maybe add a basic residual computation method for goodness of fit assesment?? Or maybe better show how in tutorial but not here
     
     # UTILITY FUNCTIONS
-    def evalmodel(self):
+    def getstatistics(self):
         #NOTE: evaluate model, predict y
-        #NOTE: also mabye predict error bars based on par cov or past dataset
+        #NOTE: also mabye predict error bars based on par cov or past dataset, delta method vs something based on likelihood CI's??
         print('Not Implemeneted')
 
-    def evalFIM(self):
+    def getFIM(self):
         #NOTE: eval fim at given inputs and dataset
         #NOTE: should this even be here??? how much in model, this isn't data dependent, only design dependent
         print('Not Implemeneted')
 
-    def evalloglik(self):
+    def getloglik(self):
         #eval the logliklihood with given params and dataset
         print('Not Implemeneted')
 
-    def evalsensitivity(self):
+    def getsensitivity(self):
         #eval observation distribution statistic sensitivities at given input and parameter values
         print('Not Implemeneted')
 

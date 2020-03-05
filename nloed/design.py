@@ -6,6 +6,9 @@ def design(models, approxinputs=None, exactinputs=None, observgroups=None, fixed
     """ 
     Add a docstring
     """
+    #NOTE: [IMPORTANT] should design be a class that power is called on, makes set up of power/samplesize/rounding much less redundant (passing models, objectives, past designs, constraints etc. -- all used for jitter objective)
+    #       downside is approximate design becomes the latent data within design class, less modular but perhas in a good way, prevents using power to round designs produce using very different settings
+
     #Fixes/asthetics:   keywords are shared across all inputs, can cause unexpected collisions
 
     #Easy Changes:      model priors weights
@@ -13,6 +16,7 @@ def design(models, approxinputs=None, exactinputs=None, observgroups=None, fixed
     #                   replicate arg for model structure
     #                   resolution option passing to IPOPT/custom options
     #                   custom grid/candidate list
+    #                   turn off observation selection for exact (forces you to observe all ouputs at each unique input level, no approx??, is this even possible in a simple way?)
     #Medium Changes:    passing in fixed design
     #                   start values for exact
     #                   Ds optimality
@@ -26,6 +30,10 @@ def design(models, approxinputs=None, exactinputs=None, observgroups=None, fixed
     #Speculative:       grid points on constraint boundary
     #                   grid refinment
     #                   L2 regularization on weights for unique design
+
+    #NOTE:should we drop T-opt form v1.0?? Bit of a stretch structure wise, need delta-method etc. to evaluate efficacy of model, need 
+
+    #NOTE: for fixed/pre-existing design, do we add it to the output design (probably not)
 
     #NOTE: should add simple if statment to check if models is a model or a list of models, allows user to pass more conveniently 
 
@@ -373,6 +381,7 @@ def design(models, approxinputs=None, exactinputs=None, observgroups=None, fixed
     for m in range(NumModels): 
          OverallObjectiveSymbol += ObjectiveFuncs[m](FIMList[m])/NumModels
 
+    #NOTE: should be checking solution for convergence, should allow use to pass options to ipopt
     # Create an IPOPT solver
     IPOPTProblemStructure = {'f': OverallObjectiveSymbol, 'x': cs.vertcat(*OptimSymbolList), 'g': cs.vertcat(*OptimConstraints)}
     print('Setting up optimization problem, this can take some time...')
