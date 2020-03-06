@@ -29,11 +29,11 @@ linear1d=model(response,xnames,betanames)
 Experiment={}
 Experiment['InputNames']=xnames
 Experiment['ObservationNames']=['y1']
-Experiment['Inputs']=[[-1],[0],[1]]
+Experiment['Inputs']=[[0],[1],[2]]
 Experiment['Count']=[[5],[1],[5]]
-dataset1=linear1d.sample(Experiment,[0,1],100)
+dataset1=linear1d.sample(Experiment,[0,1],1)
 
-pars=linear1d.fit(dataset1,[0,1])
+pars=linear1d.fit(dataset1,[0,1],opts={'Intervals':True})
 
 paramCov1=np.cov(pars,rowvar=False)
 paramMean1=np.mean(pars,axis=0)

@@ -97,7 +97,7 @@ def design(models, approxinputs=None, exactinputs=None, observgroups=None, fixed
     #set common dicts for inputs and observations, NOTE: could later allow for different orderings
     InputDict = models[0]['Model'].InputNameDict
     ObservDict = models[0]['Model'].ObservNameDict
-    #create lists for reverse lookup, index to name mapping 
+    #create lists for reverse lookup, index to name mapping NOTE: can get these from model[0] now
     InputNameList=list(InputDict.keys())
     ObservNameList=list(ObservDict.keys())
     #loop over models check dimensions and dicts, build objective functions, create fim and beta lists 
