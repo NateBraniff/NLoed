@@ -31,6 +31,10 @@ def design(models, approxinputs=None, exactinputs=None, observgroups=None, fixed
     #                   grid refinment
     #                   L2 regularization on weights for unique design
 
+    #NOTE: have matrix or past data as option, cov matrix allows for designing with bayes/regularized models, singular fims
+    #NOTE: can we allow for paramsa and inputs to be high-dim vectors to allow for glm bayesian design for P>N setting, i.e. genomic ridge (GLM) regression with interactions?? matrix products makes model easie to write, can ipopt handle efficiently?
+    #NOTE: bias estimation won't work for ridge stuff though
+
     #NOTE:should we drop T-opt form v1.0?? Bit of a stretch structure wise, need delta-method etc. to evaluate efficacy of model, need 
 
     #NOTE: for fixed/pre-existing design, do we add it to the output design (probably not)

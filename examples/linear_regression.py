@@ -33,7 +33,7 @@ Experiment['Inputs']=[[0],[1],[2]]
 Experiment['Count']=[[5],[1],[5]]
 dataset1=linear1d.sample(Experiment,[0,1],1)
 
-pars=linear1d.fit(dataset1,[0,1],opts={'Intervals':True})
+pars=linear1d.fit(dataset1,[0,1],opts={'Confidence':'Profiles'})
 
 paramCov1=np.cov(pars,rowvar=False)
 paramMean1=np.mean(pars,axis=0)
