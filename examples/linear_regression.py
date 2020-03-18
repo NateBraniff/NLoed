@@ -5,6 +5,9 @@ import numpy as np
 import casadi as cs
 from nloed import model
 from nloed import design
+import time
+
+
 
 #Declare model inputs
 x=cs.SX.sym('Xs',1)
@@ -31,10 +34,21 @@ Experiment['InputNames']=xnames
 Experiment['ObservationNames']=['y1']
 Experiment['Inputs']=[[0],[1],[2]]
 Experiment['Count']=[[5],[1],[5]]
-dataset1=linear1d.sample(Experiment,[0,1],1)
+dataset1=linear1d.sample(Experiment,[0,1],10000)
 
-pars=linear1d.fit(dataset1,[0,1],opts={'Confidence':'Profiles'})
 
+start = time.time()
+pars_old=linear1d.fit(dataset1,[0,1],opts={'Type':'old'})
+end = time.time()
+print(end - start)
+
+
+start = time.time()
+pars_new=linear1d.fit(dataset1,[0,1],opts={'Type':'new'})
+end = time.time()
+print(end - start)
+
+pars=pars_new
 paramCov1=np.cov(pars,rowvar=False)
 paramMean1=np.mean(pars,axis=0)
 

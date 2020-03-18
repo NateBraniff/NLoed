@@ -123,21 +123,16 @@ class model:
         #NOTE: add some print statments to provide user with progress status
         #NOTE: could solve multiplex simultaneosly (one big opt problem) or sequentially (more flexible, perhaps slower, leaning towards this for now)
 
-        #NOTE: perhaps allow for bias-reducing penalized likelihood (based on Firth 1993, not sure if generalizes to fully nonlinear problems, seems to use FIM
-        #NOTE: allow for parameter constraints to be passed (once FIM supports constraints)
+        #NOTE: (NOT NOW) perhaps allow for bias-reducing penalized likelihood (based on Firth 1993, not sure if generalizes to fully nonlinear problems, seems to use FIM
+        #NOTE: (NOT NOW) allow for parameter constraints to be passed (once FIM supports constraints)
 
-        #NOTE: should (profile) logliklihood CI's ?? plot profiles?
-        #NOTE: leave it to user (and show in docs) how to use loglike to get profile liklihood region
+        #NOTE: (NO WILL INTEGRATE)leave it to user (and show in docs) how to use loglike to get profile liklihood region
 
-        #NOTE: multiplex this, so it fits multiple datasets
-        #NOTE: bootstrap CI's/bias very expensive, depends somewhat on larger datasets and not sure how it interacts with our designs (i.e. each bootstrap is non-optimal, heavily replicated design may be okay)
-        #            (profile) likelihood: intervals/basins not sure how to return
-
-        #NOTE: add profile likelihood, bootstrap CI's
+        #NOTE: (DONE BUT WILL BE LESS OFTEN USED DUE TO MONTE CARLOE COV/BIAS/MSE) multiplex this, so it fits multiple datasets
 
         #profile liks:
         # use bisection condition to find F level boundary
-        #store LL value at grid point, endpoints=CI's store in list
+        # store LL value at grid point, endpoints=CI's store in list
         # plotting: LL profiles per parameter go on diagonal plots, profile traces for each parameter go on off-diagonal lower plots
 
         if not(isinstance(datasets, list)):
@@ -147,117 +142,217 @@ class model:
         else:
             DesignSet=datasets
 
-        DesignFitParameterList=[]
-        ParamFitSymbols = cs.SX.sym('ParamFitSymbols',self.NumParams)
+
+        #loop over different designs
+        if opts['Type']=='old':
+            DesignFitParameterList=[]
+        else:
+            ParamSymbolsList=[]
+            StartParams=[]
+            DesignLogLikFunctionList=[]
+            TotalLogLik=0
         for e in range(len(DesignSet)):
             Datasets=DesignSet[e]
-            ReplicateFitParameterList=[]
+            if opts['Type']=='old':
+                ReplicateFitParameterList=[]
+            else:
+                ReplicateLogLikFunctionList=[]
+            #loop over replicates within each design
             for r in range(len(Datasets)):
+                #set up the logliklihood symbols for given design and replicate
                 Data=Datasets[r]
-                TotalLogLik=0
+                ParamFitSymbols = cs.SX.sym('ParamFitSymbols'+'_'+str(e)+str(r),self.NumParams)
+                LogLik=0
                 for i in range(len(Data['Inputs'])):
                     InputRow = Data['Inputs'][i]
                     for j in range(self.NumObserv):
                         Observations = Data['Observation'][i][j]
                         for k in range(len(Observations)):
-                            TotalLogLik-=self.LogLik[j](Observations[k],ParamFitSymbols,InputRow)
+                            LogLik-=self.LogLik[j](Observations[k],ParamFitSymbols,InputRow)
 
-                #NOTE: should be checking solution for convergence, should allow use to pass options to ipopt
-                # Create an IPOPT solver for maximum likelihood problem
-                IPOPTProblemStructure = {'f': TotalLogLik, 'x': ParamFitSymbols}#, 'g': cs.vertcat(*OptimConstraints)
-                IPOPTSolver = cs.nlpsol('solver', 'ipopt', IPOPTProblemStructure,{'ipopt.print_level':0,'print_time':False})
-                # Solve the NLP fitting problem with IPOPT call
-                #print('Begining optimization...')
-                IPOPTSolutionStruct = IPOPTSolver(x0=paramstart)#, lbx=[], ubx=[], lbg=[], ubg=[]
-                FitParameters = list(IPOPTSolutionStruct['x'].full().flatten())
-                ReplicateFitParameterList.append(FitParameters)
+                if opts['Type']=='old':
+                    #NOTE: should be checking solution for convergence, should allow use to pass options to ipopt
+                    # Create an IPOPT solver for maximum likelihood problem
+                    IPOPTProblemStructure = {'f': LogLik, 'x': ParamFitSymbols}#, 'g': cs.vertcat(*OptimConstraints)
+                    IPOPTSolver = cs.nlpsol('solver', 'ipopt', IPOPTProblemStructure,{'ipopt.print_level':0,'print_time':False})
+                    # Solve the NLP fitting problem with IPOPT call
+                    #print('Begining optimization...')
+                    IPOPTSolutionStruct = IPOPTSolver(x0=paramstart)#, lbx=[], ubx=[], lbg=[], ubg=[]
+                    FitParameters = list(IPOPTSolutionStruct['x'].full().flatten())
+                    ReplicateFitParameterList.append(FitParameters)
+                else:
+                    LogLikFunc = cs.Function('LogLik_'+str(e)+'_'+str(r), [ParamFitSymbols], [LogLik])
+                    ReplicateLogLikFunctionList.append(LogLikFunc)
+                    #set up the logliklihood symbols for given design and replicate
+                    ParamSymbolsList.append(ParamFitSymbols)
+                    StartParams.extend(paramstart)
+                    TotalLogLik+=LogLik
 
-                #NOTE: things could be do here to speed up, bates/watts 1988 interpolation of contours, kademan/bates 1990 adaptive profile stepping (derivative of ll and delta theta from last step)
-                if opts['Confidence']=='Intervals' or opts['Confidence']=='Profiles' or opts['Confidence']=='Contours':
-                    #get the required confidence level #NOTE: make this a user passed option
-                    ConfidenceLevel = 0.95 
-                    #compute the corresponding chi-sqr percentile
-                    ChiSquaredLevel = st.chi2.ppf(ConfidenceLevel, self.NumParams) #NOTE: unsure of degree's of freedom here!!
-                    #set the (very) approximate increment size for steps in likelihood to reach desired precentile starting from LR=0
-                    MaxLikStep=ChiSquaredLevel/100 #NOTE: default to 100 but could be user provided
-                    #set the step size search tolerance (relative to size of parameter)
-                    ProfileTol=1e-2
+            if opts['Type']=='old': 
+                DesignFitParameterList.append(ReplicateFitParameterList)
+            else:
+                DesignLogLikFunctionList.append(ReplicateLogLikFunctionList)
+
+        if opts['Type']=='new':
+            #NOTE: should be checking solution for convergence, should allow use to pass options to ipopt
+            # Create an IPOPT solver for maximum likelihood problem
+            IPOPTProblemStructure = {'f': TotalLogLik, 'x': cs.vertcat(*ParamSymbolsList)}#, 'g': cs.vertcat(*OptimConstraints)
+            IPOPTSolver = cs.nlpsol('solver', 'ipopt', IPOPTProblemStructure,{'ipopt.print_level':0,'print_time':False})
+            # Solve the NLP fitting problem with IPOPT call
+            #print('Begining optimization...')
+            IPOPTSolutionStruct = IPOPTSolver(x0=StartParams)#, lbx=[], ubx=[], lbg=[], ubg=[]
+            FitParameters = list(IPOPTSolutionStruct['x'].full().flatten())
+
+            DesignFitParameterList=[]
+            for e in range(len(DesignSet)):
+                ReplicateFitParameterList=[]
+                for r in range(len(Datasets)):
+                    FitPramaSet= FitParameters[:self.NumParams]
+                    del FitParameters[:self.NumParams]
+                    ReplicateFitParameterList.append(FitPramaSet)
+                DesignFitParameterList.append(ReplicateFitParameterList)
 
 
-                    #set up a Casadi funciton for the total loglikelihood
-                    TotalLogLikFunc = cs.Function('TotalLogLik_'+str(e)+'_'+str(r), [ParamFitSymbols], [TotalLogLik])
-                    #compute the total likelihood value at the fit parameters
-                    LogLikAtEstimate=TotalLogLikFunc(FitParameters)
-                    #creat lists to store the profile curves, loglik profiles and intervals for each parameter
-                    CurveList=[]
-                    ProfileList=[]
-                    CIList=[]
-                    #loop over each parameter
-                    for p in range(self.NumParams):
-                        #create a symbole for the loglik ratio
-                        LikRatioSymbol = 2*(TotalLogLikFunc(ParamFitSymbols)-LogLikAtEstimate)
-                        #create a symbole for the loglik ratio dervative with respect to parameters, used to check for two big a step size
-                        LikeRatioJacobianSymbol=cs.jacobian(LikRatioSymbol,ParamFitSymbols)
-                        #create a function for the loglik ratio and its derivative
-                        LikRatioFunc = cs.Function('ProfileLikRatioFunc_'+str(p), [ParamFitSymbols], [LikRatioSymbol])
-                        LikRatioJacobianFunc = cs.Function('ProfileLikeRatioJacobianFunc_'+str(p), [ParamFitSymbols], [LikeRatioJacobianSymbol])
+        # #NOTE: things could be do here to speed up, bates/watts 1988 interpolation of contours, kademan/bates 1990 adaptive profile stepping (derivative of ll and delta theta from last step)
+        # if opts['Confidence']=='Intervals' or opts['Confidence']=='Profiles' or opts['Confidence']=='Contours':
+        #     #get the required confidence level #NOTE: make this a user passed option
+        #     ConfidenceLevel = 0.95 
+        #     #compute the corresponding chi-sqr percentile
+        #     ChiSquaredLevel = st.chi2.ppf(ConfidenceLevel, self.NumParams) #NOTE: unsure of degree's of freedom here!!
+        #     #set the (very) approximate increment size for steps in likelihood to reach desired precentile starting from LR=0
+        #     MaxLikStep=ChiSquaredLevel/100 #NOTE: default to 100 but could be user provided
+        #     #set the step size search tolerance (relative to size of parameter)
+        #     ProfileTol=1e-2
 
-                        (UpperBound,UpperCurve,UpperProfile)=self.__profiletrace(p,True,FitParameters,ParamFitSymbols,LikRatioFunc,LikRatioJacobianFunc,ChiSquaredLevel,ProfileTol,MaxLikStep)
-                        (LowerBound,LowerCurve,LowerProfile)=self.__profiletrace(p,False,FitParameters,ParamFitSymbols,LikRatioFunc,LikRatioJacobianFunc,ChiSquaredLevel,ProfileTol,MaxLikStep)
 
-                        CIList.append([LowerBound, UpperBound])
-                        CurveList.append(list(reversed(LowerCurve))+[FitParameters]+UpperCurve)
-                        ProfileList.append(list(reversed(LowerProfile))+[0]+UpperProfile)
+        #     #set up a Casadi funciton for the total loglikelihood
+        #     TotalLogLikFunc = cs.Function('TotalLogLik_'+str(e)+'_'+str(r), [ParamFitSymbols], [TotalLogLik])
+        #     #compute the total likelihood value at the fit parameters
+        #     LogLikAtEstimate=TotalLogLikFunc(FitParameters)
+        #     #creat lists to store the profile curves, loglik profiles and intervals for each parameter
+        #     CurveList=[]
+        #     ProfileList=[]
+        #     CIList=[]
+        #     #loop over each parameter
+        #     for p in range(self.NumParams):
+        #         #create a symbole for the loglik ratio
+        #         LikRatioSymbol = 2*(TotalLogLikFunc(ParamFitSymbols)-LogLikAtEstimate)
+        #         #create a symbole for the loglik ratio dervative with respect to parameters, used to check for two big a step size
+        #         LikeRatioJacobianSymbol=cs.jacobian(LikRatioSymbol,ParamFitSymbols)
+        #         #create a function for the loglik ratio and its derivative
+        #         LikRatioFunc = cs.Function('ProfileLikRatioFunc_'+str(p), [ParamFitSymbols], [LikRatioSymbol])
+        #         LikRatioJacobianFunc = cs.Function('ProfileLikeRatioJacobianFunc_'+str(p), [ParamFitSymbols], [LikeRatioJacobianSymbol])
 
-                    if opts['Confidence']=='Profiles':
-                        plt.figure()
-                        for p1 in range(self.NumParams):
-                            for p2 in range(p1,self.NumParams):
-                                print(str(p1)+'_'+str(p2))
-                                if p1==p2:
-                                    X=[CurveList[p1][ind][p1] for ind in range(len(CurveList[p1]))]
-                                    Y=ProfileList[p1]
+        #         (UpperBound,UpperCurve,UpperProfile)=self.__profiletrace(p,True,FitParameters,ParamFitSymbols,LikRatioFunc,LikRatioJacobianFunc,ChiSquaredLevel,ProfileTol,MaxLikStep)
+        #         (LowerBound,LowerCurve,LowerProfile)=self.__profiletrace(p,False,FitParameters,ParamFitSymbols,LikRatioFunc,LikRatioJacobianFunc,ChiSquaredLevel,ProfileTol,MaxLikStep)
 
-                                    plt.subplot(self.NumParams, self.NumParams, p2*self.NumParams+p1+1)
-                                    plt.plot(X, Y)
-                                    plt.xlabel(self.ParamNameList[p1])
-                                    plt.ylabel('LogLik Ratio')
-                                else:
+        #         CIList.append([LowerBound, UpperBound])
+        #         CurveList.append(list(reversed(LowerCurve))+[FitParameters]+UpperCurve)
+        #         ProfileList.append(list(reversed(LowerProfile))+[0]+UpperProfile)
 
-                                    if opts['Confidence']=='Profiles':
-                                        plt.subplot(self.NumParams, self.NumParams, p2*self.NumParams+p1+1)
-                                        X1=[CurveList[p1][ind][p1] for ind in range(len(CurveList[p1]))]
-                                        Y1=[CurveList[p1][ind][p2] for ind in range(len(CurveList[p1]))]
-                                        plt.plot(X1, Y1,label=self.ParamNameList[p1]+'profile')
+        #     if opts['Confidence']=='Profiles':
+        #         plt.figure()
+        #         for p1 in range(self.NumParams):
+        #             for p2 in range(p1,self.NumParams):
+        #                 print(str(p1)+'_'+str(p2))
+        #                 if p1==p2:
+        #                     X=[CurveList[p1][ind][p1] for ind in range(len(CurveList[p1]))]
+        #                     Y=ProfileList[p1]
 
-                                        X2=[CurveList[p2][ind][p1] for ind in range(len(CurveList[p2]))]
-                                        Y2=[CurveList[p2][ind][p2] for ind in range(len(CurveList[p2]))]
-                                        plt.plot(X2, Y2,label=self.ParamNameList[p2]+'profile')
+        #                     plt.subplot(self.NumParams, self.NumParams, p2*self.NumParams+p1+1)
+        #                     plt.plot(X, Y)
+        #                     plt.xlabel(self.ParamNameList[p1])
+        #                     plt.ylabel('LogLik Ratio')
+        #                 else:
 
-                                        plt.legend()
-                                        plt.xlabel(self.ParamNameList[p1])
-                                        plt.ylabel(self.ParamNameList[p2])
+        #                     if opts['Confidence']=='Profiles':
+        #                         plt.subplot(self.NumParams, self.NumParams, p2*self.NumParams+p1+1)
+        #                         X1=[CurveList[p1][ind][p1] for ind in range(len(CurveList[p1]))]
+        #                         Y1=[CurveList[p1][ind][p2] for ind in range(len(CurveList[p1]))]
+        #                         plt.plot(X1, Y1,label=self.ParamNameList[p1]+'profile')
 
-                                    if opts['Confidence']=='Contours':
-                                        NumGridPoints=50
-                                        X=list(np.linspace(CIList[p1][0], CIList[p1][1],NumGridPoints))
-                                        Y=list(np.linspace(CIList[p2][0], CIList[p2][1],NumGridPoints))
-                                        Z=[]
-                                        for yval in Y:
-                                            Zrow=[]
-                                            for xval in X:
-                                                Zrow.append()
+        #                         X2=[CurveList[p2][ind][p1] for ind in range(len(CurveList[p2]))]
+        #                         Y2=[CurveList[p2][ind][p2] for ind in range(len(CurveList[p2]))]
+        #                         plt.plot(X2, Y2,label=self.ParamNameList[p2]+'profile')
+
+        #                         plt.legend()
+        #                         plt.xlabel(self.ParamNameList[p1])
+        #                         plt.ylabel(self.ParamNameList[p2])
+
+        #                     if opts['Confidence']=='Contours':
+        #                         NumGridPoints=50
+        #                         X=list(np.linspace(CIList[p1][0], CIList[p1][1],NumGridPoints))
+        #                         Y=list(np.linspace(CIList[p2][0], CIList[p2][1],NumGridPoints))
+        #                         Z=[]
+        #                         for yval in Y:
+        #                             Zrow=[]
+        #                             for xval in X:
+        #                                 Zrow.append()
                                                 
-                    plt.show()
+                    # plt.show()
 
-            DesignFitParameterList.append(ReplicateFitParameterList)
-        
         if not(isinstance(datasets, list)):
             return DesignFitParameterList[0][0]
         elif not(isinstance(datasets[0], list)):
             return DesignFitParameterList[0]
         else:
             return DesignFitParameterList
+
+    def __profiletrace(self,paramind,increasebool,parametervalues,parametersymbols,loglikratiofunc,dloglikratiofunc,chisqrlevel,profiletol,maxlikstep):
+        
+        #set the trace direction
+        if increasebool:
+            Direction=1
+        else:
+            Direction=-1
+        #creart a list for the parameter's profile curve, contains parameter points along the profile
+        CurrentProfileCurve=[]
+        #create a list to store loglik ratio values along the profile curve
+        CurrentProfile=[]
+        #set the starting step size relative to the parameter value magnitude
+        StepSize=abs(parametervalues[paramind])*profiletol
+        #set the current LR to 0, as we start at the fitted value
+        CurrentRatio=0
+        #set the last ratio to 0, this is used in step size computation
+        LastRatio=0
+        #set the profile fixed value of the target parameter to the fit value, this is incremented in the loops below
+        CurrentFixedParam=parametervalues[paramind]
+        #set the current point on the profile curve to the fit point
+        CurrentCurvePoint=parametervalues
+        #compute one half of the profile, desending from the fitted value
+        while CurrentRatio<chisqrlevel:
+            #increment the current fixed value of the target parameter
+            CurrentFixedParam=CurrentFixedParam+Direction*StepSize
+            #create a list casadi symbols for the parameter vector with the target parameter fixed
+            LeaveOneFixedParamVec=cs.vertcat(*[parametersymbols[ind] if not(ind==paramind) else cs.SX(CurrentFixedParam) for ind in range(self.NumParams)])
+            #create a list of casadi symbols just of the nuisance parameters
+            NuisanceParamSymbols=cs.vertcat(*[parametersymbols[ind] for ind in range(self.NumParams) if not(ind==paramind)])
+            #generate symbols for the LR
+            ProfileOptimSymbol=loglikratiofunc(LeaveOneFixedParamVec)
+            # Create an IPOPT solver to optimize the nuisance parameters
+            IPOPTProblemStructure = {'f': ProfileOptimSymbol, 'x': NuisanceParamSymbols}#, 'g': cs.vertcat(*OptimConstraints)
+            IPOPTSolver = cs.nlpsol('solver', 'ipopt', IPOPTProblemStructure,{'ipopt.print_level':0,'print_time':False})
+            # Solve the NLP problem with IPOPT call
+            StartingNuisanceParams=[CurrentCurvePoint[ind] for ind in range(self.NumParams) if not(ind==paramind)]
+            IPOPTSolutionStruct = IPOPTSolver(x0=StartingNuisanceParams)#, lbx=[], ubx=[], lbg=[], ubg=[]
+            #update profile curve
+            OptimNuisanceParams= list(IPOPTSolutionStruct['x'].full().flatten())
+            LastCurvePoint=CurrentCurvePoint
+            CurrentCurvePoint=cp.deepcopy(OptimNuisanceParams)
+            CurrentCurvePoint.insert(paramind,CurrentFixedParam)
+            CurrentProfileCurve.append(CurrentCurvePoint)
+            #uptdate profile
+            LastRatio=CurrentRatio
+            CurrentRatio= IPOPTSolutionStruct['f'].full()[0][0]
+            CurrentProfile.append(CurrentRatio)
+            #compute step
+            dLikRatio_dParams=list(dloglikratiofunc(CurrentCurvePoint).full().flatten())
+            NormedDeltaParams=[(CurrentCurvePoint[ind]-LastCurvePoint[ind])/abs(CurrentCurvePoint[paramind]-LastCurvePoint[paramind]) for ind in range(self.NumParams)]
+            StepSize =min( maxlikstep/sum(NormedDeltaParams[ind] * dLikRatio_dParams[ind] for ind in range(self.NumParams)),abs(parametervalues[paramind])*profiletol)
+        IterpolatedBound=CurrentFixedParam+StepSize*(CurrentRatio-chisqrlevel)/(CurrentRatio-LastRatio)
+
+        return [IterpolatedBound,CurrentProfileCurve,CurrentProfile]
+
 
     def sample(self,experiments,parameters,replicates=1):
         # generate a data sample fromt the model according to a specific design
@@ -350,60 +445,7 @@ class model:
 
 # --------------- Private functions and subclasses ---------------------------------------------
 
-    def __profiletrace(self,paramind,increasebool,parametervalues,parametersymbols,loglikratiofunc,dloglikratiofunc,chisqrlevel,profiletol,maxlikstep):
-        
-        #set the trace direction
-        if increasebool:
-            Direction=1
-        else:
-            Direction=-1
-        #creart a list for the parameter's profile curve, contains parameter points along the profile
-        CurrentProfileCurve=[]
-        #create a list to store loglik ratio values along the profile curve
-        CurrentProfile=[]
-        #set the starting step size relative to the parameter value magnitude
-        StepSize=abs(parametervalues[paramind])*profiletol
-        #set the current LR to 0, as we start at the fitted value
-        CurrentRatio=0
-        #set the last ratio to 0, this is used in step size computation
-        LastRatio=0
-        #set the profile fixed value of the target parameter to the fit value, this is incremented in the loops below
-        CurrentFixedParam=parametervalues[paramind]
-        #set the current point on the profile curve to the fit point
-        CurrentCurvePoint=parametervalues
-        #compute one half of the profile, desending from the fitted value
-        while CurrentRatio<chisqrlevel:
-            #increment the current fixed value of the target parameter
-            CurrentFixedParam=CurrentFixedParam+Direction*StepSize
-            #create a list casadi symbols for the parameter vector with the target parameter fixed
-            LeaveOneFixedParamVec=cs.vertcat(*[parametersymbols[ind] if not(ind==paramind) else cs.SX(CurrentFixedParam) for ind in range(self.NumParams)])
-            #create a list of casadi symbols just of the nuisance parameters
-            NuisanceParamSymbols=cs.vertcat(*[parametersymbols[ind] for ind in range(self.NumParams) if not(ind==paramind)])
-            #generate symbols for the LR
-            ProfileOptimSymbol=loglikratiofunc(LeaveOneFixedParamVec)
-            # Create an IPOPT solver to optimize the nuisance parameters
-            IPOPTProblemStructure = {'f': ProfileOptimSymbol, 'x': NuisanceParamSymbols}#, 'g': cs.vertcat(*OptimConstraints)
-            IPOPTSolver = cs.nlpsol('solver', 'ipopt', IPOPTProblemStructure,{'ipopt.print_level':0,'print_time':False})
-            # Solve the NLP problem with IPOPT call
-            StartingNuisanceParams=[CurrentCurvePoint[ind] for ind in range(self.NumParams) if not(ind==paramind)]
-            IPOPTSolutionStruct = IPOPTSolver(x0=StartingNuisanceParams)#, lbx=[], ubx=[], lbg=[], ubg=[]
-            #update profile curve
-            OptimNuisanceParams= list(IPOPTSolutionStruct['x'].full().flatten())
-            LastCurvePoint=CurrentCurvePoint
-            CurrentCurvePoint=cp.deepcopy(OptimNuisanceParams)
-            CurrentCurvePoint.insert(paramind,CurrentFixedParam)
-            CurrentProfileCurve.append(CurrentCurvePoint)
-            #uptdate profile
-            LastRatio=CurrentRatio
-            CurrentRatio= IPOPTSolutionStruct['f'].full()[0][0]
-            CurrentProfile.append(CurrentRatio)
-            #compute step
-            dLikRatio_dParams=list(dloglikratiofunc(CurrentCurvePoint).full().flatten())
-            NormedDeltaParams=[(CurrentCurvePoint[ind]-LastCurvePoint[ind])/abs(CurrentCurvePoint[paramind]-LastCurvePoint[paramind]) for ind in range(self.NumParams)]
-            StepSize =min( maxlikstep/sum(NormedDeltaParams[ind] * dLikRatio_dParams[ind] for ind in range(self.NumParams)),abs(parametervalues[paramind])*profiletol)
-        IterpolatedBound=CurrentFixedParam+StepSize*(CurrentRatio-chisqrlevel)/(CurrentRatio-LastRatio)
 
-        return [IterpolatedBound,CurrentProfileCurve,CurrentProfile]
 
 class factorial(cs.Callback):
     def __init__(self, name, opts = {}):
