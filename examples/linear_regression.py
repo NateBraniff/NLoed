@@ -34,21 +34,15 @@ Experiment['InputNames']=xnames
 Experiment['ObservationNames']=['y1']
 Experiment['Inputs']=[[0],[1],[2]]
 Experiment['Count']=[[5],[1],[5]]
-dataset1=linear1d.sample(Experiment,[0,1],10000)
+dataset1=linear1d.sample(Experiment,[0,1],5)
 
-
-start = time.time()
-pars_old=linear1d.fit(dataset1,[0,1],opts={'Type':'old'})
-end = time.time()
-print(end - start)
 
 
 start = time.time()
-pars_new=linear1d.fit(dataset1,[0,1],opts={'Type':'new'})
+pars=linear1d.fit(dataset1,[0,1],opts={'ConfidenceInterval':True,'ConfidenceLevel':0.95,'InitialStep':0.01})
 end = time.time()
 print(end - start)
 
-pars=pars_new
 paramCov1=np.cov(pars,rowvar=False)
 paramMean1=np.mean(pars,axis=0)
 
