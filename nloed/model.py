@@ -227,13 +227,13 @@ class model:
         ZeroDimensions=len([d for d in direction if d == 0]) 
         MarginalParamSymbols = cs.SX.sym('ParamSymbols',ZeroDimensions)
         GammaSymbol = cs.SX.sym('GammaSymbol')
-        TwoNorm=sum([d**2 for d in direction])
-        NormdDirection=[d/TwoNorm for d in direction]
+        #TwoNorm=sum([d**2 for d in direction])
+        #NormdDirection=[d/TwoNorm for d in direction]
         ParamList=[]
         ParamCounter=0
         for i in range(self.NumParams):
-            if not NormdDirection[i]==0:
-                ParamList.append(NormdDirection[i]*GammaSymbol+mleparams[i])
+            if not direction[i]==0:
+                ParamList.append(direction[i]*GammaSymbol+mleparams[i])
             else:
                 ParamList.append(MarginalParamSymbols[ParamCounter])
                 ParamCounter+=1
@@ -255,44 +255,57 @@ class model:
         IPOPTSolver = cs.nlpsol('solver', 'ipopt', IPOPTProblemStructure,{'ipopt.print_level':0,'print_time':False})
 
         IPOPTJacobianSolver = IPOPTSolver.factory('Jsolver', IPOPTSolver.name_in(), ['sym:jac:f:p'])
+        IPOPTHessianSolver = IPOPTSolver.factory('Hsolver', IPOPTSolver.name_in(), ['sym:hess:f:p:p'])
 
-        NuisanceParams=[]
+        NuisanceParams=[mleparams[i] for i in range(self.NumParams) if not direction[i]==0]
         Gamma=InitialStep
         CurrentRatioGap=9999
+        #NOTE: should check to see if we go negative, loop too many time, take massive steps, want to stay in the domain of the MLE
         while  abs(CurrentRatioGap)>0.1:
             # Solve the NLP problem with IPOPT call
-            IPOPTSolutionStruct = IPOPTSolver(x0=mleparams[1],p=Gamma)#, lbx=[], ubx=[], lbg=[], ubg=[]
+            IPOPTSolutionStruct = IPOPTSolver(x0=NuisanceParams,p=Gamma)#, lbx=[], ubx=[], lbg=[], ubg=[]
             IPOPTJacobian = IPOPTJacobianSolver(x0=IPOPTSolutionStruct['x'], lam_x0=IPOPTSolutionStruct['lam_x'], lam_g0=IPOPTSolutionStruct['lam_g'],p=Gamma)
+            IPOPTHessian = IPOPTHessianSolver(x0=IPOPTSolutionStruct['x'], lam_x0=IPOPTSolutionStruct['lam_x'], lam_g0=IPOPTSolutionStruct['lam_g'],p=Gamma)
             #update profile curve
             #OptimNuisanceParams= list(IPOPTSolutionStruct['x'].full().flatten())
             CurrentRatioGap= IPOPTSolutionStruct['f'].full()[0][0]
             dCurrentRatioGap_dGamma=IPOPTJacobian['sym_jac_f_p'].full()[0][0]
+            d2CurrentRatioGap_dGamma2=IPOPTHessian['sym_hess_f_p_p'].full()[0][0]
             NuisanceParams=list(IPOPTSolutionStruct['x'].full().flatten())
-            print('Step')
-            print(str(CurrentRatioGap))
-            print(str(dCurrentRatioGap_dGamma))
-            print(str([Gamma,NuisanceParams[0]]))
-            print(str(2*(loglikfunc([Gamma,NuisanceParams[0]])+loglikfunc(mleparams))))
-            print(str(ChiSquaredLevel))
-            Gamma=Gamma-CurrentRatioGap/dCurrentRatioGap_dGamma
+            # print('Step')
+            # print(str(CurrentRatioGap))
+            # print(str(dCurrentRatioGap_dGamma))
+            # print(str([Gamma,NuisanceParams[0]]))
+            # print(str(2*(loglikfunc([Gamma,NuisanceParams[0]])+loglikfunc(mleparams))))
+            # print(str(ChiSquaredLevel))
+            #Halley's method
+            Gamma=Gamma-(2*CurrentRatioGap*dCurrentRatioGap_dGamma)/(2*dCurrentRatioGap_dGamma**2 -CurrentRatioGap*d2CurrentRatioGap_dGamma2)
+            #newton's method
+            #Gamma=Gamma-CurrentRatioGap/dCurrentRatioGap_dGamma
 
-        print(str(list(IPOPTSolutionStruct['x'].full().flatten())))
+        DirectionParameterValues=[d*Gamma for d in direction if not d==0 ]
+
+        return [DirectionParameterValues, Gamma]
 
     def __logliktrace(self,mleparams,loglikfunc,opts):
         print("Not implemented yet")
 
     def __confidenceintervals(self,mleparams,loglikfunc,opts):
 
-        direction=[1, 0]
-        self.__logliksearch(mleparams,loglikfunc,direction,opts)
+        CIList=[]
+        for p in range(self.NumParams):
 
-        # for p in range(self.NumParams):
+            Direction=[1 if i==p else 0 for i in range(self.NumParams) ]
+            DeltaUpperCI=self.__logliksearch(mleparams,loglikfunc,Direction,opts)[0][0]
+            UpperBound=mleparams[p]+DeltaUpperCI
 
-        #     Direction=[1 if i==p else 0 for i in range(self.NumParams) ]
-        #     UpperBound=self.__logliksearch(self,mleparams,loglikfunc,opts)
+            Direction=[-d for d in Direction]
+            DeltaLowerCI=self.__logliksearch(mleparams,loglikfunc,Direction,opts)[0][0]
+            LowerBound=mleparams[p]+DeltaLowerCI
 
-        #     Direction=[-d for d in Direction]
-        #     LowerBound=self.__logliksearch(self,mleparams,loglikfunc,opts)
+            CIList.append([LowerBound,UpperBound])
+
+        #print(str(CIList))
 
 
         # #NOTE: things could be do here to speed up, bates/watts 1988 interpolation of contours, kademan/bates 1990 adaptive profile stepping (derivative of ll and delta theta from last step)
