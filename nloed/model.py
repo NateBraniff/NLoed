@@ -1,7 +1,9 @@
 import casadi as cs
 import numpy as np
+import math as mt
 import copy as cp
 from scipy import stats as st
+from scipy.interpolate import splev, splrep
 import matplotlib.pyplot as plt
 
 
@@ -242,7 +244,7 @@ class model:
             
             Direction=[1 if i==p else 0 for i in range(self.NumParams) ]
             SolverList=self.__profilesetup(mleparams,loglikfunc,Direction,opts)
-            NuisanceParams=[mleparams[i] for i in range(self.NumParams) if not Direction[i]==0]
+            NuisanceParams=[mleparams[i] for i in range(self.NumParams) if Direction[i]==0]
             
             UpperGamma=self.__logliksearch(NuisanceParams,SolverList,opts,True)
             UpperBound=mleparams[p]+Direction[p]*UpperGamma
@@ -303,7 +305,7 @@ class model:
             
             Direction=[1 if i==p else 0 for i in range(self.NumParams)]
             SolverList=self.__profilesetup(mleparams,loglikfunc,Direction,opts)
-            NuisanceParams=[mleparams[i] for i in range(self.NumParams) if not Direction[i]==0]
+            NuisanceParams=[mleparams[i] for i in range(self.NumParams) if Direction[i]==0]
             
             UpperGamma=self.__logliksearch(NuisanceParams,SolverList,opts,True)
             UpperBound=mleparams[p]+Direction[p]*UpperGamma
@@ -345,62 +347,52 @@ class model:
         return [CIList,TraceList,ProfileList]
 
     def __contourplot(self,mleparams,loglikfunc,figure,opts):
-        print("Not implemented yet")
 
-    def __contourtrace(self,mleparams,loglikfunc,opts):
+        for p1 in range(self.NumParams):
+            for p2 in range(p1+1,self.NumParams):
+                self.__contourtrace([p1,p2],mleparams,loglikfunc,opts)
 
-        # Alpha = opts['ConfidenceLevel']
-        # ChiSquaredLevel = st.chi2.ppf(Alpha, self.NumParams)
-        # NumPoints = opts['SampleNumber']
+    def __contourtrace(self,coordinates,mleparams,loglikfunc,opts):
 
-        # CIList=[]
-        # ProfileList=[]
-        # TraceList=[]
-        # for p in range(self.NumParams):
-            
-        #     Direction=[1 if i==p else 0 for i in range(self.NumParams)]
-        #     SolverList=self.__profilesetup(mleparams,loglikfunc,Direction,opts)
-        #     NuisanceParams=[mleparams[i] for i in range(self.NumParams) if not Direction[i]==0]
-            
-        #     UpperGamma=self.__logliksearch(NuisanceParams,SolverList,opts,True)
-        #     UpperBound=mleparams[p]+Direction[p]*UpperGamma
+        #Alpha = opts['ConfidenceLevel']
+        #ChiSquaredLevel = st.chi2.ppf(Alpha, self.NumParams)
+        RadialNum = opts['RadialNumber']
 
-        #     LowerGamma=self.__logliksearch(NuisanceParams,SolverList,opts,False)
-        #     LowerBound=mleparams[p]+Direction[p]*LowerGamma
+        p1=coordinates[0]
+        p2=coordinates[1]
 
-        #     CIList.append([LowerBound,UpperBound])
+        AngleList=np.linspace(-mt.pi, mt.pi,RadialNum)#, endpoint=False)
+        DirectionList=[]
+        GammaList=[]
+        for a in AngleList:
 
-        #     #NOTE: this is inefficient as we could return LR value and NuisanceParams from search and pre/append them to trace/profiles
-        #     GammaList=list(np.linspace(LowerGamma, UpperGamma, num=NumPoints))
-        #     #GammaList=list(np.linspace(LowerGamma, UpperGamma, num=NumPoints+1,endpoint=False)[1:])
-        #     IPOPTSolver = SolverList[0]
+            Direction=list(np.zeros(self.NumParams-2))
+            Direction.insert(p1,mt.cos(a))
+            Direction.insert(p2,mt.sin(a))
 
-        #     ParameterTrace=[]
-        #     LRProfile=[]
-        #     for g in GammaList:
+            SolverList = self.__profilesetup(mleparams,loglikfunc,Direction,opts)
+            NuisanceParams = [mleparams[i] for i in range(self.NumParams) if Direction[i]==0]
+            RadialGamma = self.__logliksearch(NuisanceParams,SolverList,opts,True)
 
-        #         # Solve the NLP problem with IPOPT call
-        #         IPOPTSolutionStruct = IPOPTSolver(x0=NuisanceParams,p=g)#, lbx=[], ubx=[], lbg=[], ubg=[]
-        #         CurrentRatioGap= IPOPTSolutionStruct['f'].full()[0][0]
-        #         NuisanceParams=list(IPOPTSolutionStruct['x'].full().flatten())
-                
-        #         ParamList=cp.deepcopy(NuisanceParams)
-        #         ParamList.insert(p,Direction[p]*g+mleparams[p])
-        #         # ParamList=[]
-        #         # ParamCounter=0
-        #         # for i in range(self.NumParams):
-        #         #     if not Direction[i]==0:
-        #         #         ParamList.append(Direction[i]*g+mleparams[i])
-        #         #     else:
-        #         #         ParamList.append(NuisanceParams[ParamCounter])
-        #         #         ParamCounter+=1
-        #         ParameterTrace.append(ParamList)
-        #         LRProfile.append(ChiSquaredLevel-CurrentRatioGap)
-        #     ProfileList.append(LRProfile)
-        #     TraceList.append(ParameterTrace)
+            GammaList.append(RadialGamma)
+            DirectionList.append([mt.cos(a),mt.sin(a)])
 
+        SplineFit=splrep(AngleList[::6],GammaList[::6],per=True)
+        xs=np.linspace(-mt.pi, mt.pi,1000)
+        ys=splev(xs,SplineFit)
 
-        print("Not implemented yet")
+        plt.figure()
+        plt.plot(AngleList,GammaList)
+        plt.plot(AngleList[::6],GammaList[::6],'o')
+        plt.plot(xs,ys)
+        plt.show()
+
+        t=0
+
+        #NOTE: need to modify direction to it doesn't think a 2d (1,0) search is a 1d profile, perhaps with boolean list as well as dir
+        #NOTE: should maybe pass profile extrema from CI's into contours to add to fit points in interpolation
+        #        it is unlikely we will 'hit' absolute extrema unless we have very dense sampling, splines don't need an even grid
+
 
     def __profilesetup(self,mleparams,loglikfunc,direction,opts):
         
@@ -421,13 +413,20 @@ class model:
         ParamVec=cs.vertcat(*ParamList)
         MarginalLogLikRatioSymbol = 2*(loglikfunc(ParamVec)+loglikfunc(mleparams))
 
-        # Create an IPOPT solver to optimize the nuisance parameters
-        IPOPTProblemStructure = {'f': MarginalLogLikRatioSymbol+ChiSquaredLevel, 'x': MarginalParamSymbols,'p':GammaSymbol}#, 'g': cs.vertcat(*OptimConstraints)
-        IPOPTSolver = cs.nlpsol('solver', 'ipopt', IPOPTProblemStructure,{'ipopt.print_level':0,'print_time':False})
-        IPOPTJacobianSolver = IPOPTSolver.factory('Jsolver', IPOPTSolver.name_in(), ['sym:jac:f:p'])
-        IPOPTHessianSolver = IPOPTSolver.factory('Hsolver', IPOPTSolver.name_in(), ['sym:hess:f:p:p'])
+        if not ZeroDimensions==0:
+            # Create an IPOPT solver to optimize the nuisance parameters
+            IPOPTProblemStructure = {'f': MarginalLogLikRatioSymbol+ChiSquaredLevel, 'x': MarginalParamSymbols,'p':GammaSymbol}#, 'g': cs.vertcat(*OptimConstraints)
+            ProfileLogLikSolver = cs.nlpsol('PLLSolver', 'ipopt', IPOPTProblemStructure,{'ipopt.print_level':0,'print_time':False})
+            ProfileLogLikJacobianSolver = ProfileLogLikSolver.factory('PLLJSolver', ProfileLogLikSolver.name_in(), ['sym:jac:f:p'])
+            ProfileLogLikHessianSolver = ProfileLogLikSolver.factory('PLLHSolver', ProfileLogLikSolver.name_in(), ['sym:hess:f:p:p'])
+        else:
+            ProfileLogLikSolver = cs.Function('PLLSolver', [GammaSymbol], [MarginalLogLikRatioSymbol]) 
+            ProfileLogLikJacobianSymbol = cs.jacobian(MarginalLogLikRatioSymbol,GammaSymbol)
+            ProfileLogLikJacobianSolver = cs.Function('PLLJSolver', [GammaSymbol], [ProfileLogLikJacobianSymbol]) 
+            ProfileLogLikHessianSymbol = cs.jacobian(ProfileLogLikJacobianSymbol,GammaSymbol) #NOTE: not sure what second returned value of hessian is here, did this to avoid it (it may be gradient, limited docs)
+            ProfileLogLikHessianSolver = cs.Function('PLLHSolver', [GammaSymbol], [ProfileLogLikHessianSymbol]) 
 
-        return [IPOPTSolver,IPOPTJacobianSolver,IPOPTHessianSolver]
+        return [ProfileLogLikSolver,ProfileLogLikJacobianSolver,ProfileLogLikHessianSolver]
 
     def __logliksearch(self,nuisanceparams,solverlist,opts,forward=True):
 
@@ -437,9 +436,9 @@ class model:
         else:
             Gamma=-opts['InitialStep']
 
-        IPOPTSolver = solverlist[0]
-        IPOPTJacobianSolver = solverlist[1]
-        IPOPTHessianSolver = solverlist[2]
+        ProfileLogLikSolver = solverlist[0]
+        ProfileLogLikJacobianSolver = solverlist[1]
+        ProfileLogLikHessianSolver = solverlist[2]
 
         NuisanceParams=nuisanceparams
         CurrentRatioGap=9999
@@ -447,14 +446,20 @@ class model:
         #NOTE:need max step check, if steps are all in same direction perhaps set bound at inf and return warning, if oscillating error failure to converge
         while  abs(CurrentRatioGap)>Tolerance:
             # Solve the NLP problem with IPOPT call
-            IPOPTSolutionStruct = IPOPTSolver(x0=NuisanceParams,p=Gamma)#, lbx=[], ubx=[], lbg=[], ubg=[]
-            IPOPTJacobian = IPOPTJacobianSolver(x0=IPOPTSolutionStruct['x'], lam_x0=IPOPTSolutionStruct['lam_x'], lam_g0=IPOPTSolutionStruct['lam_g'],p=Gamma)
-            IPOPTHessian = IPOPTHessianSolver(x0=IPOPTSolutionStruct['x'], lam_x0=IPOPTSolutionStruct['lam_x'], lam_g0=IPOPTSolutionStruct['lam_g'],p=Gamma)
-            #update profile curve
-            CurrentRatioGap= IPOPTSolutionStruct['f'].full()[0][0]
-            dCurrentRatioGap_dGamma=IPOPTJacobian['sym_jac_f_p'].full()[0][0]
-            d2CurrentRatioGap_dGamma2=IPOPTHessian['sym_hess_f_p_p'].full()[0][0]
-            NuisanceParams=list(IPOPTSolutionStruct['x'].full().flatten())
+            if not len(nuisanceparams)==0:
+                ProfileLogLikStruct = ProfileLogLikSolver(x0=NuisanceParams,p=Gamma)#, lbx=[], ubx=[], lbg=[], ubg=[]
+                ProfileLogLikJacobianStruct = ProfileLogLikJacobianSolver(x0=ProfileLogLikStruct['x'], lam_x0=ProfileLogLikStruct['lam_x'], lam_g0=ProfileLogLikStruct['lam_g'],p=Gamma)
+                ProfileLogLikHessianStruct = ProfileLogLikHessianSolver(x0=ProfileLogLikStruct['x'], lam_x0=ProfileLogLikStruct['lam_x'], lam_g0=ProfileLogLikStruct['lam_g'],p=Gamma)
+                #update profile curve
+                NuisanceParams = list(ProfileLogLikStruct['x'].full().flatten())
+                CurrentRatioGap = ProfileLogLikStruct['f'].full()[0][0]
+                dCurrentRatioGap_dGamma = ProfileLogLikJacobianStruct['sym_jac_f_p'].full()[0][0]
+                d2CurrentRatioGap_dGamma2 = ProfileLogLikHessianStruct['sym_hess_f_p_p'].full()[0][0]
+            else:
+                CurrentRatioGap = ProfileLogLikSolver(Gamma)
+                dCurrentRatioGap_dGamma = ProfileLogLikJacobianSolver(Gamma)
+                d2CurrentRatioGap_dGamma2 = ProfileLogLikHessianSolver(Gamma)
+
             #Halley's method
             Gamma=Gamma-(2*CurrentRatioGap*dCurrentRatioGap_dGamma)/(2*dCurrentRatioGap_dGamma**2 -CurrentRatioGap*d2CurrentRatioGap_dGamma2)
 
