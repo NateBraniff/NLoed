@@ -39,7 +39,7 @@ dataset1=linear1d.sample(Experiment,[0,1],5)
 
 
 start = time.time()
-pars=linear1d.fit(dataset1,[0,1],opts={'Confidence':'Contours','ConfidenceLevel':0.95,'InitialStep':0.01,'Tolerance':0.001,'SampleNumber':10,'RadialNumber':67})
+pars=linear1d.fit(dataset1,[0,1],opts={'Confidence':'Contours','ConfidenceLevel':0.95,'InitialStep':0.01,'Tolerance':0.01,'SampleNumber':10,'RadialNumber':30})
 end = time.time()
 print(end - start)
 

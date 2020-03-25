@@ -206,7 +206,9 @@ class model:
                 if "Confidence" in opts.keys():
                     if opts['Confidence']=="Contours" or opts['Confidence']=="Profiles":
                         Figure = plt.figure()
-                        ReplicateCIList.append(self.__profileplot(FitParamSet,DesignLogLikFunctionList[e][r],Figure,opts))
+                        #[CIList,TraceList,ProfileList]=self.__profileplot(FitParamSet,DesignLogLikFunctionList[e][r],Figure,opts)
+                        CIList=self.__profileplot(FitParamSet,DesignLogLikFunctionList[e][r],Figure,opts)[0]
+                        ReplicateCIList.append(CIList)
                         if opts['Confidence']=="Contours":
                             self.__contourplot(FitParamSet,DesignLogLikFunctionList[e][r],Figure,opts)
                     elif opts['Confidence']=="Intervals":
@@ -242,13 +244,17 @@ class model:
         CIList=[]
         for p in range(self.NumParams):
             
-            Direction=[1 if i==p else 0 for i in range(self.NumParams) ]
-            SolverList=self.__profilesetup(mleparams,loglikfunc,Direction,opts)
+            FixedParams=[False]*self.NumParams
+            FixedParams[p]=True
+            Direction=[0]*self.NumParams
+            Direction[p]=1
+
+            SolverList=self.__profilesetup(mleparams,loglikfunc,FixedParams,Direction,opts)
             NuisanceParams=[mleparams[i] for i in range(self.NumParams) if Direction[i]==0]
             
-            UpperGamma=self.__logliksearch(NuisanceParams,SolverList,opts,True)
+            UpperGamma=self.__logliksearch(NuisanceParams,SolverList,opts,True)[0]
             UpperBound=mleparams[p]+Direction[p]*UpperGamma
-            LowerGamma=self.__logliksearch(NuisanceParams,SolverList,opts,False)
+            LowerGamma=self.__logliksearch(NuisanceParams,SolverList,opts,False)[0]
             LowerBound=mleparams[p]+Direction[p]*LowerGamma
 
             CIList.append([LowerBound,UpperBound])
@@ -290,7 +296,7 @@ class model:
                     plt.xlabel(self.ParamNameList[p1])
                     plt.ylabel(self.ParamNameList[p2])
 
-        return CIList
+        return [CIList,TraceList,ProfileList]
 
     def __profiletrace(self,mleparams,loglikfunc,opts):
 
@@ -303,25 +309,35 @@ class model:
         TraceList=[]
         for p in range(self.NumParams):
             
-            Direction=[1 if i==p else 0 for i in range(self.NumParams)]
-            SolverList=self.__profilesetup(mleparams,loglikfunc,Direction,opts)
-            NuisanceParams=[mleparams[i] for i in range(self.NumParams) if Direction[i]==0]
-            
-            UpperGamma=self.__logliksearch(NuisanceParams,SolverList,opts,True)
-            UpperBound=mleparams[p]+Direction[p]*UpperGamma
+            FixedParams=[False]*self.NumParams
+            FixedParams[p]=True
 
-            LowerGamma=self.__logliksearch(NuisanceParams,SolverList,opts,False)
+            Direction=[0]*self.NumParams
+            Direction[p]=1
+
+            SolverList=self.__profilesetup(mleparams,loglikfunc,FixedParams,Direction,opts)
+            NuisanceParams=[mleparams[i] for i in range(self.NumParams) if not FixedParams[i]]
+            
+            [UpperGamma,UpperParamList,UpperLRGap]=self.__logliksearch(NuisanceParams,SolverList,opts,True)
+            UpperBound=mleparams[p]+Direction[p]*UpperGamma
+            UpperParamList.insert(p,UpperBound)
+            print(str(UpperLRGap))
+
+            [LowerGamma,LowerParamList,LowerLRGap]=self.__logliksearch(NuisanceParams,SolverList,opts,False)
             LowerBound=mleparams[p]+Direction[p]*LowerGamma
+            LowerParamList.insert(p,LowerBound)
+            print(str(LowerLRGap))
 
             CIList.append([LowerBound,UpperBound])
 
-            #NOTE: this is inefficient as we could return LR value and NuisanceParams from search and pre/append them to trace/profiles
-            GammaList=list(np.linspace(LowerGamma, UpperGamma, num=NumPoints))
+            #NOTE: [FIXED, but ugly?] somewhat in accurate to hard code, upp and lower LR values to the chisquaredlevel, there is some error in th
+            #NOTE: [DONE] this is inefficient as we could return LR value and NuisanceParams from search and pre/append them to trace/profiles
+            GammaList=list(np.linspace(LowerGamma, UpperGamma, num=NumPoints+1,endpoint=False)[1:])
             #GammaList=list(np.linspace(LowerGamma, UpperGamma, num=NumPoints+1,endpoint=False)[1:])
             IPOPTSolver = SolverList[0]
 
-            ParameterTrace=[]
-            LRProfile=[]
+            ParameterTrace=[LowerParamList]
+            LRProfile=[ChiSquaredLevel-LowerLRGap]
             for g in GammaList:
 
                 # Solve the NLP problem with IPOPT call
@@ -341,6 +357,8 @@ class model:
                 #         ParamCounter+=1
                 ParameterTrace.append(ParamList)
                 LRProfile.append(ChiSquaredLevel-CurrentRatioGap)
+            ParameterTrace.append(UpperParamList)
+            LRProfile.append(ChiSquaredLevel-UpperLRGap)
             ProfileList.append(LRProfile)
             TraceList.append(ParameterTrace)
 
@@ -350,9 +368,31 @@ class model:
 
         for p1 in range(self.NumParams):
             for p2 in range(p1+1,self.NumParams):
-                self.__contourtrace([p1,p2],mleparams,loglikfunc,opts)
 
-    def __contourtrace(self,coordinates,mleparams,loglikfunc,opts):
+                # ExtrimumAngles = [mt.atan2(tracelist[p1][0][p2]-mleparams[p2],tracelist[p1][0][p1]-mleparams[p1])]
+                # ExtrimumAngles.append(mt.atan2(tracelist[p1][-1][p2]-mleparams[p2],tracelist[p1][-1][p1]-mleparams[p1]))
+                # ExtrimumAngles.append(mt.atan2(tracelist[p2][0][p2]-mleparams[p2],tracelist[p2][0][p1]-mleparams[p1]))
+                # ExtrimumAngles.append(mt.atan2(tracelist[p2][-1][p2]-mleparams[p2],tracelist[p2][-1][p1]-mleparams[p1]))
+
+                # ExtrimumGamma = [mt.sqrt((tracelist[p1][0][p1]-mleparams[p1])**2+(tracelist[p1][0][p2]-mleparams[p2])**2)]
+                # ExtrimumGamma.append(mt.sqrt((tracelist[p1][-1][p1]-mleparams[p1])**2+(tracelist[p1][-1][p2]-mleparams[p2])**2))
+                # ExtrimumGamma.append(mt.sqrt((tracelist[p2][0][p1]-mleparams[p1])**2+(tracelist[p2][0][p2]-mleparams[p2])**2))
+                # ExtrimumGamma.append(mt.sqrt((tracelist[p2][-1][p1]-mleparams[p1])**2+(tracelist[p2][-1][p2]-mleparams[p2])**2))
+
+                # ExtrimumDirection = [[tracelist[p1][0][p1],tracelist[p1][0][p2]]]
+                # ExtrimumDirection.append([tracelist[p1][-1][p1],tracelist[p1][-1][p2]])
+                # ExtrimumDirection.append([tracelist[p2][0][p1],tracelist[p2][0][p2]])
+                # ExtrimumDirection.append([tracelist[p2][-1][p1],tracelist[p2][-1][p2]])
+
+                # SortIndex = np.argsort( ExtrimumAngles )
+                # ExtrimumAngles = [ ExtrimumAngles[i] for i in SortIndex]
+                # ExtrimumGamma = [ExtrimumGamma[i] for i in SortIndex]
+                # ExtrimumDirection = [ExtrimumDirection[i] for i in SortIndex]
+                # Extrimum=[ExtrimumAngles,ExtrimumGamma,ExtrimumDirection]
+
+                self.__contourtrace(mleparams,loglikfunc,[p1,p2],opts)
+
+    def __contourtrace(self,mleparams,loglikfunc,coordinates,opts):
 
         #Alpha = opts['ConfidenceLevel']
         #ChiSquaredLevel = st.chi2.ppf(Alpha, self.NumParams)
@@ -361,31 +401,90 @@ class model:
         p1=coordinates[0]
         p2=coordinates[1]
 
-        AngleList=np.linspace(-mt.pi, mt.pi,RadialNum)#, endpoint=False)
-        DirectionList=[]
+        FixedParams=[False]*self.NumParams
+        FixedParams[p1]=True
+        FixedParams[p2]=True
+
+        NuisanceParams = [mleparams[i] for i in range(self.NumParams) if FixedParams[i]==0]
+
+        # if extrimum:
+        #     ExtrimumAngles = extrimum[0]
+        #     ExtrimumGamma = extrimum[1]
+        #     ExtrimumDirection = extrimum[2]
+
+        #AngleGrid=np.linspace(-mt.pi, mt.pi,RadialNum)#, endpoint=False)
+        #AngleList=[]
+        AngleList=list(np.linspace(-mt.pi, mt.pi,RadialNum))
+        BoundaryPointList=[]
         GammaList=[]
-        for a in AngleList:
+        #ExtrimumCounter=0
+        #LastAngle=AngleGrid[0]
+        for Angle in AngleList:
+            #Angle = AngleGrid[a]
 
-            Direction=list(np.zeros(self.NumParams-2))
-            Direction.insert(p1,mt.cos(a))
-            Direction.insert(p2,mt.sin(a))
+            # if extrimum and ExtrimumCounter <4 and LastAngle <= ExtrimumAngles[ExtrimumCounter] and ExtrimumAngles[ExtrimumCounter] < Angle:
+            #     if ExtrimumGamma[ExtrimumCounter]:
+            #         print('large gamma')
+                
+            #     AngleList.append(ExtrimumAngles[ExtrimumCounter])
+            #     GammaList.append(ExtrimumGamma[ExtrimumCounter])
+            #     BoundaryPointList.append(ExtrimumDirection[ExtrimumCounter])
+            #     ExtrimumCounter+=1
 
-            SolverList = self.__profilesetup(mleparams,loglikfunc,Direction,opts)
-            NuisanceParams = [mleparams[i] for i in range(self.NumParams) if Direction[i]==0]
-            RadialGamma = self.__logliksearch(NuisanceParams,SolverList,opts,True)
+            AngleCosine=mt.cos(Angle)
+            AngleSine=mt.sin(Angle)
 
+            Direction=[0]*self.NumParams
+            Direction[p1]=AngleCosine
+            Direction[p2]=AngleSine
+
+            SolverList = self.__profilesetup(mleparams,loglikfunc,FixedParams,Direction,opts)
+            RadialGamma = self.__logliksearch(NuisanceParams,SolverList,opts,True)[0]
+
+            # if RadialGamma>1:
+            #     print('large gamma')
+
+            #AngleList.append(Angle)
             GammaList.append(RadialGamma)
-            DirectionList.append([mt.cos(a),mt.sin(a)])
+            BoundaryPointList.append([AngleCosine*RadialGamma+mleparams[p1], AngleSine*RadialGamma+mleparams[p2]])
+            #LastAngle=Angle
 
-        SplineFit=splrep(AngleList[::6],GammaList[::6],per=True)
-        xs=np.linspace(-mt.pi, mt.pi,1000)
-        ys=splev(xs,SplineFit)
+        AngleGridTEST=np.linspace(-mt.pi, mt.pi,100)
+        BoundaryPointListTEST=[]
+        GammaListTEST=[]
+        for a in range(len(AngleGridTEST)):
+            Angle = AngleGridTEST[a]
+
+            Direction=[0]*self.NumParams
+            Direction[p1]=mt.cos(Angle)
+            Direction[p2]=mt.sin(Angle)
+
+            SolverList = self.__profilesetup(mleparams,loglikfunc,FixedParams,Direction,opts)
+            RadialGamma = self.__logliksearch(NuisanceParams,SolverList,opts,True)[0]
+
+            GammaListTEST.append(RadialGamma)
+            BoundaryPointListTEST.append([mt.cos(Angle)*RadialGamma+mleparams[p1], mt.sin(Angle)*RadialGamma+mleparams[p2]])
+
+        xxtest=[BoundaryPointListTEST[i][0] for i in range(len(AngleGridTEST))]
+        yytest=[BoundaryPointListTEST[i][1] for i in range(len(AngleGridTEST))]
+        xxalg=[BoundaryPointList[i][0] for i in range(len(AngleList))]
+        yyalg=[BoundaryPointList[i][1] for i in range(len(AngleList))]
+
+        SplineFit=splrep(AngleList,GammaList,per=True)
+        AngleFit=np.linspace(-mt.pi, mt.pi,1000)
+        AngleCosineFit=[mt.cos(a) for a in AngleFit]
+        AngleSineFit=[mt.sin(a) for a in AngleFit]
+        GammaFit=splev(AngleFit,SplineFit)
+        Xfit=[AngleCosineFit[i]*GammaFit[i]+mleparams[p1] for i in range(len(AngleFit))]
+        Yfit=[AngleSineFit[i]*GammaFit[i]+mleparams[p2] for i in range(len(AngleFit))]
 
         plt.figure()
-        plt.plot(AngleList,GammaList)
-        plt.plot(AngleList[::6],GammaList[::6],'o')
-        plt.plot(xs,ys)
+        plt.plot(xxalg,yyalg,'ro')
+        plt.plot(xxtest,yytest,'b')
+        plt.plot(Xfit,Yfit,'g--')
+
         plt.show()
+        
 
         t=0
 
@@ -394,18 +493,19 @@ class model:
         #        it is unlikely we will 'hit' absolute extrema unless we have very dense sampling, splines don't need an even grid
 
 
-    def __profilesetup(self,mleparams,loglikfunc,direction,opts):
+    def __profilesetup(self,mleparams,loglikfunc,fixedparams,direction,opts):
         
         Alpha = opts['ConfidenceLevel']
         ChiSquaredLevel = st.chi2.ppf(Alpha, self.NumParams)
 
-        ZeroDimensions=len([d for d in direction if d == 0]) 
-        MarginalParamSymbols = cs.SX.sym('ParamSymbols',ZeroDimensions)
+        NumFixedParams=sum(fixedparams)
+        NumFreeParams=self.NumParams-NumFixedParams
+        MarginalParamSymbols = cs.SX.sym('ParamSymbols',NumFreeParams)
         GammaSymbol = cs.SX.sym('GammaSymbol')
         ParamList=[]
         ParamCounter=0
         for i in range(self.NumParams):
-            if not direction[i]==0:
+            if fixedparams[i]:
                 ParamList.append(direction[i]*GammaSymbol+mleparams[i])
             else:
                 ParamList.append(MarginalParamSymbols[ParamCounter])
@@ -413,15 +513,15 @@ class model:
         ParamVec=cs.vertcat(*ParamList)
         MarginalLogLikRatioSymbol = 2*(loglikfunc(ParamVec)+loglikfunc(mleparams))
 
-        if not ZeroDimensions==0:
+        if not NumFreeParams==0:
             # Create an IPOPT solver to optimize the nuisance parameters
             IPOPTProblemStructure = {'f': MarginalLogLikRatioSymbol+ChiSquaredLevel, 'x': MarginalParamSymbols,'p':GammaSymbol}#, 'g': cs.vertcat(*OptimConstraints)
             ProfileLogLikSolver = cs.nlpsol('PLLSolver', 'ipopt', IPOPTProblemStructure,{'ipopt.print_level':0,'print_time':False})
             ProfileLogLikJacobianSolver = ProfileLogLikSolver.factory('PLLJSolver', ProfileLogLikSolver.name_in(), ['sym:jac:f:p'])
             ProfileLogLikHessianSolver = ProfileLogLikSolver.factory('PLLHSolver', ProfileLogLikSolver.name_in(), ['sym:hess:f:p:p'])
         else:
-            ProfileLogLikSolver = cs.Function('PLLSolver', [GammaSymbol], [MarginalLogLikRatioSymbol]) 
-            ProfileLogLikJacobianSymbol = cs.jacobian(MarginalLogLikRatioSymbol,GammaSymbol)
+            ProfileLogLikSolver = cs.Function('PLLSolver', [GammaSymbol], [MarginalLogLikRatioSymbol+ChiSquaredLevel]) 
+            ProfileLogLikJacobianSymbol = cs.jacobian(MarginalLogLikRatioSymbol+ChiSquaredLevel,GammaSymbol)
             ProfileLogLikJacobianSolver = cs.Function('PLLJSolver', [GammaSymbol], [ProfileLogLikJacobianSymbol]) 
             ProfileLogLikHessianSymbol = cs.jacobian(ProfileLogLikJacobianSymbol,GammaSymbol) #NOTE: not sure what second returned value of hessian is here, did this to avoid it (it may be gradient, limited docs)
             ProfileLogLikHessianSolver = cs.Function('PLLHSolver', [GammaSymbol], [ProfileLogLikHessianSymbol]) 
@@ -436,6 +536,7 @@ class model:
         else:
             Gamma=-opts['InitialStep']
 
+        NumFreeParams=len(nuisanceparams)
         ProfileLogLikSolver = solverlist[0]
         ProfileLogLikJacobianSolver = solverlist[1]
         ProfileLogLikHessianSolver = solverlist[2]
@@ -446,7 +547,7 @@ class model:
         #NOTE:need max step check, if steps are all in same direction perhaps set bound at inf and return warning, if oscillating error failure to converge
         while  abs(CurrentRatioGap)>Tolerance:
             # Solve the NLP problem with IPOPT call
-            if not len(nuisanceparams)==0:
+            if not NumFreeParams==0:
                 ProfileLogLikStruct = ProfileLogLikSolver(x0=NuisanceParams,p=Gamma)#, lbx=[], ubx=[], lbg=[], ubg=[]
                 ProfileLogLikJacobianStruct = ProfileLogLikJacobianSolver(x0=ProfileLogLikStruct['x'], lam_x0=ProfileLogLikStruct['lam_x'], lam_g0=ProfileLogLikStruct['lam_g'],p=Gamma)
                 ProfileLogLikHessianStruct = ProfileLogLikHessianSolver(x0=ProfileLogLikStruct['x'], lam_x0=ProfileLogLikStruct['lam_x'], lam_g0=ProfileLogLikStruct['lam_g'],p=Gamma)
@@ -456,14 +557,15 @@ class model:
                 dCurrentRatioGap_dGamma = ProfileLogLikJacobianStruct['sym_jac_f_p'].full()[0][0]
                 d2CurrentRatioGap_dGamma2 = ProfileLogLikHessianStruct['sym_hess_f_p_p'].full()[0][0]
             else:
-                CurrentRatioGap = ProfileLogLikSolver(Gamma)
-                dCurrentRatioGap_dGamma = ProfileLogLikJacobianSolver(Gamma)
-                d2CurrentRatioGap_dGamma2 = ProfileLogLikHessianSolver(Gamma)
+                CurrentRatioGap = ProfileLogLikSolver(Gamma).full()[0][0]
+                dCurrentRatioGap_dGamma = ProfileLogLikJacobianSolver(Gamma).full()[0][0]
+                d2CurrentRatioGap_dGamma2 = ProfileLogLikHessianSolver(Gamma).full()[0][0]
 
             #Halley's method
             Gamma=Gamma-(2*CurrentRatioGap*dCurrentRatioGap_dGamma)/(2*dCurrentRatioGap_dGamma**2 -CurrentRatioGap*d2CurrentRatioGap_dGamma2)
 
-        return Gamma
+
+        return [Gamma,NuisanceParams,CurrentRatioGap]
 
     def sample(self,experiments,parameters,replicates=1):
         # generate a data sample fromt the model according to a specific design
