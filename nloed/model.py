@@ -12,17 +12,15 @@ class model:
     Add a docstring
     """
 
-    #Moderate:  implement ML fitting
-    #           implement data sampling
+    #           [DONE, for normal data] implement data sampling
     #Difficult: implement various cov/bias assesment methods, also (profile) likelihood intervals/plots
     #           add other distributions binomial/bernouli, lognormal, gamma, exponential, weibull etc., negative binomial
     #           implement plotting function (move to utility.py?)
-    #NOTE: How to handle profile that goes negative for strictly positive parameter values???? perhaps error out and suggest reparameterization???
+    #NOTE: [maybe a gentle check, i.e. did you mean this? no constraints]How to handle profile that goes negative for strictly positive parameter values???? perhaps error out and suggest reparameterization???
     #NOTE: can we allow custom pdf's (with some extra work by the user)
-    #NOTE: could to A and E optimality (E using SDP form: min t subject to I<t*I, or maybe even just a max(eig(A)) if its smooth)
+    #NOTE: [Yes] Add A-opt, D-s Opt, A-s Opt???, Bias??? for exponential family (and log normal?) 
     #NOTE: https://math.stackexchange.com/questions/269723/largest-eigenvalue-semidefinite-programming
     #NOTE: Data/design/experiment objects may need deep copies so internal lists aren't shared??
-    #NOTE: do we really need scipy and numpy?
     #names must be unique
     #must enforce ordering of parameters in statistics function
 
@@ -116,26 +114,28 @@ class model:
             else:
                 raise Exception('Unknown Distribution: '+Observation[1])
 
-    def fit(self,datasets,paramstart,paramconstraints=None,opts={'Intervals':False,'Contours':False,'Profiles':False}):
+    def fit(self,datasets,paramstart,opts=None):
         """
-        fit the model to a dataset using maximum likelihood and casadi/IPOPT
+        a function to fit the model to a dataset using maximum likelihood
+        also provides optional marginal confidence intervals
+        and plots of marginal projected confidence contours and logliklihood profiles
+
+        Args:
+            datasets: either; a dictionary for one dataset OR a list of dictionaries, each design replicates OR a list of lists of dict's where each index in the outer lists has a unique design
+            paramstart: a list of starting values for the parameters
+            opts: a dictionary of user defined options
+
+        Return:
+            ReturnValue: either; a list of lists structure with parameter fit lists, has the same shape/order as the input, OR, the same strcture but with fits and intervals as the leaf object
+
         """
+        #NOTE: should possibly switch order so we have replicates, designs, dataset??
         #NOTE: need to check for asymptotets/neg constraint violation in profile plot, set max steps/through error suggesting transformation respectively
         #NOTE: code write this so that ML is a casadi function of inputs, params, and observations just once, then pass datasets to generate symbols within loop and solve, may be faster
         #NOTE: add some print statments to provide user with progress status
         #NOTE: could solve multiplex simultaneosly (one big opt problem) or sequentially (more flexible, perhaps slower, leaning towards this for now)
 
-        #NOTE: (NOT NOW) perhaps allow for bias-reducing penalized likelihood (based on Firth 1993, not sure if generalizes to fully nonlinear problems, seems to use FIM
-        #NOTE: (NOT NOW) allow for parameter constraints to be passed (once FIM supports constraints)
-
-        #NOTE: (NO WILL INTEGRATE)leave it to user (and show in docs) how to use loglike to get profile liklihood region
-
         #NOTE: (DONE BUT WILL BE LESS OFTEN USED DUE TO MONTE CARLOE COV/BIAS/MSE) multiplex this, so it fits multiple datasets
-
-        #profile liks:
-        # use bisection condition to find F level boundary
-        # store LL value at grid point, endpoints=CI's store in list
-        # plotting: LL profiles per parameter go on diagonal plots, profile traces for each parameter go on off-diagonal lower plots
 
         if not(isinstance(datasets, list)):
             DesignSet=[[datasets]]
@@ -239,334 +239,6 @@ class model:
 
         return ReturnValue
 
-    def __confidenceintervals(self,mleparams,loglikfunc,opts):
-
-        CIList=[]
-        for p in range(self.NumParams):
-            
-            FixedParams=[False]*self.NumParams
-            FixedParams[p]=True
-            Direction=[0]*self.NumParams
-            Direction[p]=1
-
-            SolverList=self.__profilesetup(mleparams,loglikfunc,FixedParams,Direction,opts)
-            NuisanceParams=[mleparams[i] for i in range(self.NumParams) if Direction[i]==0]
-            
-            UpperGamma=self.__logliksearch(NuisanceParams,SolverList,opts,True)[0]
-            UpperBound=mleparams[p]+Direction[p]*UpperGamma
-            LowerGamma=self.__logliksearch(NuisanceParams,SolverList,opts,False)[0]
-            LowerBound=mleparams[p]+Direction[p]*LowerGamma
-
-            CIList.append([LowerBound,UpperBound])
-
-        return CIList
-
-    def __profileplot(self,mleparams,loglikfunc,figure,opts):
-        Alpha = opts['ConfidenceLevel']
-        ChiSquaredLevel = st.chi2.ppf(Alpha, self.NumParams)
-
-        [CIList,TraceList,ProfileList]=self.__profiletrace(mleparams,loglikfunc,opts)
-
-        for p1 in range(self.NumParams):
-            for p2 in range(p1,self.NumParams):
-                #print(str(p1)+'_'+str(p2))
-                if p1==p2:
-                    X=[TraceList[p1][ind][p1] for ind in range(len(TraceList[p1]))]
-                    Y=ProfileList[p1]
-
-                    X0=[X[0],X[-1]]
-                    Y0=[ChiSquaredLevel,ChiSquaredLevel]
-
-                    plt.subplot(self.NumParams, self.NumParams, p2*self.NumParams+p1+1)
-                    plt.plot(X, Y)
-                    plt.plot(X0, Y0, 'r--')
-                    plt.xlabel(self.ParamNameList[p1])
-                    plt.ylabel('LogLik Ratio')
-                else:
-                    plt.subplot(self.NumParams, self.NumParams, p2*self.NumParams+p1+1)
-                    X1=[TraceList[p1][ind][p1] for ind in range(len(TraceList[p1]))]
-                    Y1=[TraceList[p1][ind][p2] for ind in range(len(TraceList[p1]))]
-                    plt.plot(X1, Y1,label=self.ParamNameList[p1]+'profile')
-
-                    X2=[TraceList[p2][ind][p1] for ind in range(len(TraceList[p2]))]
-                    Y2=[TraceList[p2][ind][p2] for ind in range(len(TraceList[p2]))]
-                    plt.plot(X2, Y2,label=self.ParamNameList[p2]+'profile')
-
-                    plt.legend()
-                    plt.xlabel(self.ParamNameList[p1])
-                    plt.ylabel(self.ParamNameList[p2])
-
-        return [CIList,TraceList,ProfileList]
-
-    def __profiletrace(self,mleparams,loglikfunc,opts):
-
-        Alpha = opts['ConfidenceLevel']
-        ChiSquaredLevel = st.chi2.ppf(Alpha, self.NumParams)
-        NumPoints = opts['SampleNumber']
-
-        CIList=[]
-        ProfileList=[]
-        TraceList=[]
-        for p in range(self.NumParams):
-            
-            FixedParams=[False]*self.NumParams
-            FixedParams[p]=True
-
-            Direction=[0]*self.NumParams
-            Direction[p]=1
-
-            SolverList=self.__profilesetup(mleparams,loglikfunc,FixedParams,Direction,opts)
-            NuisanceParams=[mleparams[i] for i in range(self.NumParams) if not FixedParams[i]]
-            
-            [UpperGamma,UpperParamList,UpperLRGap]=self.__logliksearch(NuisanceParams,SolverList,opts,True)
-            UpperBound=mleparams[p]+Direction[p]*UpperGamma
-            UpperParamList.insert(p,UpperBound)
-            print(str(UpperLRGap))
-
-            [LowerGamma,LowerParamList,LowerLRGap]=self.__logliksearch(NuisanceParams,SolverList,opts,False)
-            LowerBound=mleparams[p]+Direction[p]*LowerGamma
-            LowerParamList.insert(p,LowerBound)
-            print(str(LowerLRGap))
-
-            CIList.append([LowerBound,UpperBound])
-
-            #NOTE: [FIXED, but ugly?] somewhat in accurate to hard code, upp and lower LR values to the chisquaredlevel, there is some error in th
-            #NOTE: [DONE] this is inefficient as we could return LR value and NuisanceParams from search and pre/append them to trace/profiles
-            GammaList=list(np.linspace(LowerGamma, UpperGamma, num=NumPoints+1,endpoint=False)[1:])
-            #GammaList=list(np.linspace(LowerGamma, UpperGamma, num=NumPoints+1,endpoint=False)[1:])
-            IPOPTSolver = SolverList[0]
-
-            ParameterTrace=[LowerParamList]
-            LRProfile=[ChiSquaredLevel-LowerLRGap]
-            for g in GammaList:
-
-                # Solve the NLP problem with IPOPT call
-                IPOPTSolutionStruct = IPOPTSolver(x0=NuisanceParams,p=g)#, lbx=[], ubx=[], lbg=[], ubg=[]
-                CurrentRatioGap= IPOPTSolutionStruct['f'].full()[0][0]
-                NuisanceParams=list(IPOPTSolutionStruct['x'].full().flatten())
-                
-                ParamList=cp.deepcopy(NuisanceParams)
-                ParamList.insert(p,Direction[p]*g+mleparams[p])
-                # ParamList=[]
-                # ParamCounter=0
-                # for i in range(self.NumParams):
-                #     if not Direction[i]==0:
-                #         ParamList.append(Direction[i]*g+mleparams[i])
-                #     else:
-                #         ParamList.append(NuisanceParams[ParamCounter])
-                #         ParamCounter+=1
-                ParameterTrace.append(ParamList)
-                LRProfile.append(ChiSquaredLevel-CurrentRatioGap)
-            ParameterTrace.append(UpperParamList)
-            LRProfile.append(ChiSquaredLevel-UpperLRGap)
-            ProfileList.append(LRProfile)
-            TraceList.append(ParameterTrace)
-
-        return [CIList,TraceList,ProfileList]
-
-    def __contourplot(self,mleparams,loglikfunc,figure,opts):
-
-        for p1 in range(self.NumParams):
-            for p2 in range(p1+1,self.NumParams):
-
-                # ExtrimumAngles = [mt.atan2(tracelist[p1][0][p2]-mleparams[p2],tracelist[p1][0][p1]-mleparams[p1])]
-                # ExtrimumAngles.append(mt.atan2(tracelist[p1][-1][p2]-mleparams[p2],tracelist[p1][-1][p1]-mleparams[p1]))
-                # ExtrimumAngles.append(mt.atan2(tracelist[p2][0][p2]-mleparams[p2],tracelist[p2][0][p1]-mleparams[p1]))
-                # ExtrimumAngles.append(mt.atan2(tracelist[p2][-1][p2]-mleparams[p2],tracelist[p2][-1][p1]-mleparams[p1]))
-
-                # ExtrimumGamma = [mt.sqrt((tracelist[p1][0][p1]-mleparams[p1])**2+(tracelist[p1][0][p2]-mleparams[p2])**2)]
-                # ExtrimumGamma.append(mt.sqrt((tracelist[p1][-1][p1]-mleparams[p1])**2+(tracelist[p1][-1][p2]-mleparams[p2])**2))
-                # ExtrimumGamma.append(mt.sqrt((tracelist[p2][0][p1]-mleparams[p1])**2+(tracelist[p2][0][p2]-mleparams[p2])**2))
-                # ExtrimumGamma.append(mt.sqrt((tracelist[p2][-1][p1]-mleparams[p1])**2+(tracelist[p2][-1][p2]-mleparams[p2])**2))
-
-                # ExtrimumDirection = [[tracelist[p1][0][p1],tracelist[p1][0][p2]]]
-                # ExtrimumDirection.append([tracelist[p1][-1][p1],tracelist[p1][-1][p2]])
-                # ExtrimumDirection.append([tracelist[p2][0][p1],tracelist[p2][0][p2]])
-                # ExtrimumDirection.append([tracelist[p2][-1][p1],tracelist[p2][-1][p2]])
-
-                # SortIndex = np.argsort( ExtrimumAngles )
-                # ExtrimumAngles = [ ExtrimumAngles[i] for i in SortIndex]
-                # ExtrimumGamma = [ExtrimumGamma[i] for i in SortIndex]
-                # ExtrimumDirection = [ExtrimumDirection[i] for i in SortIndex]
-                # Extrimum=[ExtrimumAngles,ExtrimumGamma,ExtrimumDirection]
-
-                self.__contourtrace(mleparams,loglikfunc,[p1,p2],opts)
-
-    def __contourtrace(self,mleparams,loglikfunc,coordinates,opts):
-
-        #Alpha = opts['ConfidenceLevel']
-        #ChiSquaredLevel = st.chi2.ppf(Alpha, self.NumParams)
-        RadialNum = opts['RadialNumber']
-
-        p1=coordinates[0]
-        p2=coordinates[1]
-
-        FixedParams=[False]*self.NumParams
-        FixedParams[p1]=True
-        FixedParams[p2]=True
-
-        NuisanceParams = [mleparams[i] for i in range(self.NumParams) if FixedParams[i]==0]
-
-        # if extrimum:
-        #     ExtrimumAngles = extrimum[0]
-        #     ExtrimumGamma = extrimum[1]
-        #     ExtrimumDirection = extrimum[2]
-
-        #AngleGrid=np.linspace(-mt.pi, mt.pi,RadialNum)#, endpoint=False)
-        #AngleList=[]
-        AngleList=list(np.linspace(-mt.pi, mt.pi,RadialNum))
-        BoundaryPointList=[]
-        GammaList=[]
-        #ExtrimumCounter=0
-        #LastAngle=AngleGrid[0]
-        for Angle in AngleList:
-            #Angle = AngleGrid[a]
-
-            # if extrimum and ExtrimumCounter <4 and LastAngle <= ExtrimumAngles[ExtrimumCounter] and ExtrimumAngles[ExtrimumCounter] < Angle:
-            #     if ExtrimumGamma[ExtrimumCounter]:
-            #         print('large gamma')
-                
-            #     AngleList.append(ExtrimumAngles[ExtrimumCounter])
-            #     GammaList.append(ExtrimumGamma[ExtrimumCounter])
-            #     BoundaryPointList.append(ExtrimumDirection[ExtrimumCounter])
-            #     ExtrimumCounter+=1
-
-            AngleCosine=mt.cos(Angle)
-            AngleSine=mt.sin(Angle)
-
-            Direction=[0]*self.NumParams
-            Direction[p1]=AngleCosine
-            Direction[p2]=AngleSine
-
-            SolverList = self.__profilesetup(mleparams,loglikfunc,FixedParams,Direction,opts)
-            RadialGamma = self.__logliksearch(NuisanceParams,SolverList,opts,True)[0]
-
-            # if RadialGamma>1:
-            #     print('large gamma')
-
-            #AngleList.append(Angle)
-            GammaList.append(RadialGamma)
-            BoundaryPointList.append([AngleCosine*RadialGamma+mleparams[p1], AngleSine*RadialGamma+mleparams[p2]])
-            #LastAngle=Angle
-
-        AngleGridTEST=np.linspace(-mt.pi, mt.pi,100)
-        BoundaryPointListTEST=[]
-        GammaListTEST=[]
-        for a in range(len(AngleGridTEST)):
-            Angle = AngleGridTEST[a]
-
-            Direction=[0]*self.NumParams
-            Direction[p1]=mt.cos(Angle)
-            Direction[p2]=mt.sin(Angle)
-
-            SolverList = self.__profilesetup(mleparams,loglikfunc,FixedParams,Direction,opts)
-            RadialGamma = self.__logliksearch(NuisanceParams,SolverList,opts,True)[0]
-
-            GammaListTEST.append(RadialGamma)
-            BoundaryPointListTEST.append([mt.cos(Angle)*RadialGamma+mleparams[p1], mt.sin(Angle)*RadialGamma+mleparams[p2]])
-
-        xxtest=[BoundaryPointListTEST[i][0] for i in range(len(AngleGridTEST))]
-        yytest=[BoundaryPointListTEST[i][1] for i in range(len(AngleGridTEST))]
-        xxalg=[BoundaryPointList[i][0] for i in range(len(AngleList))]
-        yyalg=[BoundaryPointList[i][1] for i in range(len(AngleList))]
-
-        SplineFit=splrep(AngleList,GammaList,per=True)
-        AngleFit=np.linspace(-mt.pi, mt.pi,1000)
-        AngleCosineFit=[mt.cos(a) for a in AngleFit]
-        AngleSineFit=[mt.sin(a) for a in AngleFit]
-        GammaFit=splev(AngleFit,SplineFit)
-        Xfit=[AngleCosineFit[i]*GammaFit[i]+mleparams[p1] for i in range(len(AngleFit))]
-        Yfit=[AngleSineFit[i]*GammaFit[i]+mleparams[p2] for i in range(len(AngleFit))]
-
-        plt.figure()
-        plt.plot(xxalg,yyalg,'ro')
-        plt.plot(xxtest,yytest,'b')
-        plt.plot(Xfit,Yfit,'g--')
-
-        plt.show()
-        
-
-        t=0
-
-        #NOTE: need to modify direction to it doesn't think a 2d (1,0) search is a 1d profile, perhaps with boolean list as well as dir
-        #NOTE: should maybe pass profile extrema from CI's into contours to add to fit points in interpolation
-        #        it is unlikely we will 'hit' absolute extrema unless we have very dense sampling, splines don't need an even grid
-
-
-    def __profilesetup(self,mleparams,loglikfunc,fixedparams,direction,opts):
-        
-        Alpha = opts['ConfidenceLevel']
-        ChiSquaredLevel = st.chi2.ppf(Alpha, self.NumParams)
-
-        NumFixedParams=sum(fixedparams)
-        NumFreeParams=self.NumParams-NumFixedParams
-        MarginalParamSymbols = cs.SX.sym('ParamSymbols',NumFreeParams)
-        GammaSymbol = cs.SX.sym('GammaSymbol')
-        ParamList=[]
-        ParamCounter=0
-        for i in range(self.NumParams):
-            if fixedparams[i]:
-                ParamList.append(direction[i]*GammaSymbol+mleparams[i])
-            else:
-                ParamList.append(MarginalParamSymbols[ParamCounter])
-                ParamCounter+=1
-        ParamVec=cs.vertcat(*ParamList)
-        MarginalLogLikRatioSymbol = 2*(loglikfunc(ParamVec)+loglikfunc(mleparams))
-
-        if not NumFreeParams==0:
-            # Create an IPOPT solver to optimize the nuisance parameters
-            IPOPTProblemStructure = {'f': MarginalLogLikRatioSymbol+ChiSquaredLevel, 'x': MarginalParamSymbols,'p':GammaSymbol}#, 'g': cs.vertcat(*OptimConstraints)
-            ProfileLogLikSolver = cs.nlpsol('PLLSolver', 'ipopt', IPOPTProblemStructure,{'ipopt.print_level':0,'print_time':False})
-            ProfileLogLikJacobianSolver = ProfileLogLikSolver.factory('PLLJSolver', ProfileLogLikSolver.name_in(), ['sym:jac:f:p'])
-            ProfileLogLikHessianSolver = ProfileLogLikSolver.factory('PLLHSolver', ProfileLogLikSolver.name_in(), ['sym:hess:f:p:p'])
-        else:
-            ProfileLogLikSolver = cs.Function('PLLSolver', [GammaSymbol], [MarginalLogLikRatioSymbol+ChiSquaredLevel]) 
-            ProfileLogLikJacobianSymbol = cs.jacobian(MarginalLogLikRatioSymbol+ChiSquaredLevel,GammaSymbol)
-            ProfileLogLikJacobianSolver = cs.Function('PLLJSolver', [GammaSymbol], [ProfileLogLikJacobianSymbol]) 
-            ProfileLogLikHessianSymbol = cs.jacobian(ProfileLogLikJacobianSymbol,GammaSymbol) #NOTE: not sure what second returned value of hessian is here, did this to avoid it (it may be gradient, limited docs)
-            ProfileLogLikHessianSolver = cs.Function('PLLHSolver', [GammaSymbol], [ProfileLogLikHessianSymbol]) 
-
-        return [ProfileLogLikSolver,ProfileLogLikJacobianSolver,ProfileLogLikHessianSolver]
-
-    def __logliksearch(self,nuisanceparams,solverlist,opts,forward=True):
-
-        Tolerance=opts['Tolerance']
-        if forward:
-            Gamma=opts['InitialStep']
-        else:
-            Gamma=-opts['InitialStep']
-
-        NumFreeParams=len(nuisanceparams)
-        ProfileLogLikSolver = solverlist[0]
-        ProfileLogLikJacobianSolver = solverlist[1]
-        ProfileLogLikHessianSolver = solverlist[2]
-
-        NuisanceParams=nuisanceparams
-        CurrentRatioGap=9999
-        #NOTE: should check to see if we go negative, loop too many time, take massive steps, want to stay in the domain of the MLE
-        #NOTE:need max step check, if steps are all in same direction perhaps set bound at inf and return warning, if oscillating error failure to converge
-        while  abs(CurrentRatioGap)>Tolerance:
-            # Solve the NLP problem with IPOPT call
-            if not NumFreeParams==0:
-                ProfileLogLikStruct = ProfileLogLikSolver(x0=NuisanceParams,p=Gamma)#, lbx=[], ubx=[], lbg=[], ubg=[]
-                ProfileLogLikJacobianStruct = ProfileLogLikJacobianSolver(x0=ProfileLogLikStruct['x'], lam_x0=ProfileLogLikStruct['lam_x'], lam_g0=ProfileLogLikStruct['lam_g'],p=Gamma)
-                ProfileLogLikHessianStruct = ProfileLogLikHessianSolver(x0=ProfileLogLikStruct['x'], lam_x0=ProfileLogLikStruct['lam_x'], lam_g0=ProfileLogLikStruct['lam_g'],p=Gamma)
-                #update profile curve
-                NuisanceParams = list(ProfileLogLikStruct['x'].full().flatten())
-                CurrentRatioGap = ProfileLogLikStruct['f'].full()[0][0]
-                dCurrentRatioGap_dGamma = ProfileLogLikJacobianStruct['sym_jac_f_p'].full()[0][0]
-                d2CurrentRatioGap_dGamma2 = ProfileLogLikHessianStruct['sym_hess_f_p_p'].full()[0][0]
-            else:
-                CurrentRatioGap = ProfileLogLikSolver(Gamma).full()[0][0]
-                dCurrentRatioGap_dGamma = ProfileLogLikJacobianSolver(Gamma).full()[0][0]
-                d2CurrentRatioGap_dGamma2 = ProfileLogLikHessianSolver(Gamma).full()[0][0]
-
-            #Halley's method
-            Gamma=Gamma-(2*CurrentRatioGap*dCurrentRatioGap_dGamma)/(2*dCurrentRatioGap_dGamma**2 -CurrentRatioGap*d2CurrentRatioGap_dGamma2)
-
-
-        return [Gamma,NuisanceParams,CurrentRatioGap]
-
     def sample(self,experiments,parameters,replicates=1):
         # generate a data sample fromt the model according to a specific design
         #NOTE: multiplex multiple parameter values??
@@ -658,6 +330,332 @@ class model:
 
 # --------------- Private functions and subclasses ---------------------------------------------
 
+    def __confidenceintervals(self,mleparams,loglikfunc,opts):
+        """ 
+        This function computes marginal parameter confidence intervals for the model
+        around the MLE estimate using the profile likelihood
+
+        Args:
+            mleparams: mle parameter estimates, recieved from fitting
+            loglikfunc: a casadi logliklihood function for a given dataset
+            opts: an options dictionary for passing user options
+
+        Returns:
+            CIList: list of lists of upper and lower bounds for each parameter
+        """
+        #create a list to store intervals
+        CIList=[]
+        #loop over parameters in model
+        for p in range(self.NumParams):
+            #fix parameter along which profile is taken
+            FixedParams=[False]*self.NumParams
+            FixedParams[p]=True
+            #set direction so that it has unit length in profile direction
+            Direction=[0]*self.NumParams
+            Direction[p]=1
+            #setup the profile solver
+            SolverList=self.__profilesetup(mleparams,loglikfunc,FixedParams,Direction,opts)
+            #extract starting values for marginal parameters (those to be optimized during profile)
+            MarginalParam=[mleparams[i] for i in range(self.NumParams) if Direction[i]==0]
+            #search to find the radius length in the specified profile direction, positive search
+            UpperRadius=self.__logliksearch(MarginalParam,SolverList,opts,True)[0]
+            #compute the location of the upper parameter bound
+            UpperBound=mleparams[p]+Direction[p]*UpperRadius
+            #search to find the radius length in the specified profile direction, negative search
+            LowerRadius=self.__logliksearch(MarginalParam,SolverList,opts,False)[0]
+            #compute the location of the lower parameter bound
+            LowerBound=mleparams[p]+Direction[p]*LowerRadius
+            CIList.append([LowerBound,UpperBound])
+        return CIList
+
+    def __profileplot(self,mleparams,loglikfunc,figure,opts):
+        """ 
+        This function plots profile parameter traces for each parameter value
+
+        Args:
+            mleparams: mle parameter estimates, recieved from fitting
+            loglikfunc: a casadi logliklihood function for a given dataset
+            figure: the figure object on which plotting occurs
+            opts: an options dictionary for passing user options
+
+        Returns:
+            CIList: list of lists of upper and lower bounds for each parameter
+            TraceList: list of list of lists of parameter vector values along profile trace for each parameter
+            ProfileList: List of lists of logliklihood ratio values for each parameter along the profile trace
+        """
+        #extract the alpha level and compute the chisquared threshold, or use default of 0.95
+        if "ConfidenceLevel" in opts.keys():
+            Alpha = opts['ConfidenceLevel']
+        else:
+            Alpha=0.95
+        ChiSquaredLevel = st.chi2.ppf(Alpha, self.NumParams)
+        #run profile trave to get the CI's, parameter traces, and LR profile
+        [CIList,TraceList,ProfileList]=self.__profiletrace(mleparams,loglikfunc,opts)
+        #loop over each pair of parameters
+        for p1 in range(self.NumParams):
+            for p2 in range(p1,self.NumParams):
+                #check if parameter pair matches
+                if p1==p2:
+                    #if on the diagonal, generate a profile plot
+                    #get data for the profile
+                    X=[TraceList[p1][ind][p1] for ind in range(len(TraceList[p1]))]
+                    Y=ProfileList[p1]
+                    #get data for the threshold
+                    X0=[X[0],X[-1]]
+                    Y0=[ChiSquaredLevel,ChiSquaredLevel]
+                    #plot the profile and threshold
+                    plt.subplot(self.NumParams, self.NumParams, p2*self.NumParams+p1+1)
+                    plt.plot(X, Y)
+                    plt.plot(X0, Y0, 'r--')
+                    plt.xlabel(self.ParamNameList[p1])
+                    plt.ylabel('LogLik Ratio')
+                else:
+                    #if off-diagonal generate a pair of parameter profile trace plots
+                    #plot the profile parameter trace for p1
+                    plt.subplot(self.NumParams, self.NumParams, p2*self.NumParams+p1+1)
+                    X1=[TraceList[p1][ind][p1] for ind in range(len(TraceList[p1]))]
+                    Y1=[TraceList[p1][ind][p2] for ind in range(len(TraceList[p1]))]
+                    plt.plot(X1, Y1,label=self.ParamNameList[p1]+'profile')
+                    #plot the profile parameter trace for p2
+                    X2=[TraceList[p2][ind][p1] for ind in range(len(TraceList[p2]))]
+                    Y2=[TraceList[p2][ind][p2] for ind in range(len(TraceList[p2]))]
+                    plt.plot(X2, Y2,label=self.ParamNameList[p2]+'profile')
+                    plt.legend()
+                    plt.xlabel(self.ParamNameList[p1])
+                    plt.ylabel(self.ParamNameList[p2])
+        #return CI, trace and profilem (for extensibility)
+        return [CIList,TraceList,ProfileList]
+
+    def __profiletrace(self,mleparams,loglikfunc,opts):
+        """ 
+        This function compute the profile logliklihood parameter trace for each parameter in the model
+
+        Args:
+            mleparams: mle parameter estimates, recieved from fitting
+            loglikfunc: a casadi logliklihood function for a given dataset
+            opts: an options dictionary for passing user options
+
+        Returns:
+            CIList: list of lists of upper and lower bounds for each parameter
+            TraceList: list of list of lists of parameter vector values along profile trace for each parameter
+            ProfileList: List of lists of logliklihood ratio values for each parameter along the profile trace
+        """
+        #extract the alpha level and compute the chisquared threshold, or use default of 0.95
+        if "ConfidenceLevel" in opts.keys():
+            Alpha = opts['ConfidenceLevel']
+        else:
+            Alpha=0.95
+        ChiSquaredLevel = st.chi2.ppf(Alpha, self.NumParams)
+        #extract the number of points to compute along the trace, or use default of 10
+        if "SampleNumber" in opts.keys():
+            NumPoints = opts['SampleNumber']
+        else:
+            NumPoints=10
+        #create lists to store the CI's, profile logliklkhood values and parameter traces
+        CIList=[]
+        ProfileList=[]
+        TraceList=[]
+        #loop over each parameter in the model
+        for p in range(self.NumParams):
+            #indicate the parameter, along which the profile is taken, is fixed
+            FixedParams=[False]*self.NumParams
+            FixedParams[p]=True
+            #set the direction of the profile so that it has unit length
+            Direction=[0]*self.NumParams
+            Direction[p]=1
+            #generate the profile solvers
+            SolverList=self.__profilesetup(mleparams,loglikfunc,FixedParams,Direction,opts)
+            #set the starting values of the marginal parameters from the mle estimates
+            MarginalParams=[mleparams[i] for i in range(self.NumParams) if not FixedParams[i]]
+            #preform a profile search to find the upper bound on the radius for the profile trace
+            [UpperRadius,UpperParamList,UpperLLRGap]=self.__logliksearch(MarginalParams,SolverList,opts,True)
+            #compute the parameter upper bound
+            UpperBound=mleparams[p]+Direction[p]*UpperRadius
+            #insert the profile parameter (upper) in the marginal parameter vector (upper), creates a complete parameter vector
+            UpperParamList.insert(p,UpperBound)
+            #preform a profile search to find the lower bound on the radius for the profile trace
+            [LowerRadius,LowerParamList,LowerLLRGap]=self.__logliksearch(MarginalParams,SolverList,opts,False)
+            #compute the parameter lower bound
+            LowerBound=mleparams[p]+Direction[p]*LowerRadius
+            #insert the profile parameter (lower) in the marginal parameter vector (lower), creates a complete parameter vector
+            LowerParamList.insert(p,LowerBound)
+            #record the uppper and lower bounds in the CI list
+            CIList.append([LowerBound,UpperBound])
+            #Create a grid of radia from the lower radius bound to the upper radius bound with the number of points requested in the profile
+            RadiusList=list(np.linspace(LowerRadius, UpperRadius, num=NumPoints+1,endpoint=False)[1:])
+            #extract the marginal logliklihood solver, to compute the profile
+            IPOPTSolver = SolverList[0]
+            #insert the lower parameter bound and the logliklihood ratio in the trace list and profile list respectivly 
+            ParameterTrace=[LowerParamList]
+            LRProfile=[ChiSquaredLevel-LowerLLRGap]
+            #loop over the radius grid 
+            for r in RadiusList:
+                # Solve the for the marginal maximumlikelihood estimate
+                ProfileSolutionStruct = IPOPTSolver(x0=MarginalParams,p=r)#, lbx=[], ubx=[], lbg=[], ubg=[]
+                #extract the current logliklihood ratio gap (between the chi-sqaured level and current loglik ratio)
+                CurrentRatioGap= ProfileSolutionStruct['f'].full()[0][0]
+                #extract the marginal parameter vector
+                #NOTE: need to test how low dim. (1-3 params) get handled in this code, will cause errors for 1 param models !!
+                MarginalParams=list(ProfileSolutionStruct['x'].full().flatten())
+                #copy and insert the profile parameter in the marginal vector
+                ParamList=cp.deepcopy(MarginalParams)
+                ParamList.insert(p,Direction[p]*r+mleparams[p])
+                #insert the full parameter vector in the trace lists
+                ParameterTrace.append(ParamList)
+                #insert the likelihood ratio for the current radius
+                LRProfile.append(ChiSquaredLevel-CurrentRatioGap)
+            #insert the upper bound in the parameter trace after looping over the grid
+            ParameterTrace.append(UpperParamList)
+            #insert the upper loglik ratio in the profile list
+            LRProfile.append(ChiSquaredLevel-UpperLLRGap)
+            #insert the final loglik profile in the profile list , recording the current parameter's trace
+            ProfileList.append(LRProfile)
+            #insert the final parameter trace into the trace list, recording the current parameter's profile
+            TraceList.append(ParameterTrace)
+        #return the intervals, parameter trace and loglik ratio profile
+        return [CIList,TraceList,ProfileList]
+
+    def __contourplot(self,mleparams,loglikfunc,figure,opts):
+        """ 
+        This function plots the projections of the confidence volum into a 2d plane for each pair of parameters
+        this creates marginal confidence contours for each pair of parameters
+
+        Args:
+            mleparams: mle parameter estimates, recieved from fitting
+            loglikfunc: a casadi logliklihood function for a given dataset
+            figure: the figure object on which plotting occurs
+            opts: an options dictionary for passing user options
+        """
+        for p1 in range(self.NumParams):
+            for p2 in range(p1+1,self.NumParams):
+
+                [Xfit,Yfit]=self.__contourtrace(mleparams,loglikfunc,[p1,p2],opts)
+
+                plt.subplot(self.NumParams, self.NumParams, p2*self.NumParams+p1+1)
+                plt.plot(Xfit, Yfit,label=self.ParamNameList[p1]+' '+self.ParamNameList[p2]+' contour')
+                plt.legend()
+                plt.xlabel(self.ParamNameList[p1])
+                plt.ylabel(self.ParamNameList[p2])
+
+    def __contourtrace(self,mleparams,loglikfunc,coordinates,opts):
+
+        #Alpha = opts['ConfidenceLevel']
+        #ChiSquaredLevel = st.chi2.ppf(Alpha, self.NumParams)
+        RadialNum = opts['RadialNumber']
+
+        p1=coordinates[0]
+        p2=coordinates[1]
+
+        FixedParams=[False]*self.NumParams
+        FixedParams[p1]=True
+        FixedParams[p2]=True
+
+        NuisanceParams = [mleparams[i] for i in range(self.NumParams) if FixedParams[i]==0]
+
+        AngleList=list(np.linspace(-mt.pi, mt.pi,RadialNum))
+        GammaList=[]
+        for Angle in AngleList:
+
+            AngleCosine=mt.cos(Angle)
+            AngleSine=mt.sin(Angle)
+
+            Direction=[0]*self.NumParams
+            Direction[p1]=AngleCosine
+            Direction[p2]=AngleSine
+
+            SolverList = self.__profilesetup(mleparams,loglikfunc,FixedParams,Direction,opts)
+            RadialGamma = self.__logliksearch(NuisanceParams,SolverList,opts,True)[0]
+
+
+            GammaList.append(RadialGamma)
+
+        SplineFit=splrep(AngleList,GammaList,per=True)
+        AngleFit=np.linspace(-mt.pi, mt.pi,1000)
+        AngleCosineFit=[mt.cos(a) for a in AngleFit]
+        AngleSineFit=[mt.sin(a) for a in AngleFit]
+        GammaFit=splev(AngleFit,SplineFit)
+        Xfit=[AngleCosineFit[i]*GammaFit[i]+mleparams[p1] for i in range(len(AngleFit))]
+        Yfit=[AngleSineFit[i]*GammaFit[i]+mleparams[p2] for i in range(len(AngleFit))]
+
+        return [Xfit,Yfit]
+
+        #NOTE: should maybe pass profile extrema from CI's into contours to add to fit points in interpolation
+        #        it is unlikely we will 'hit' absolute extrema unless we have very dense sampling, splines don't need an even grid
+
+
+    def __profilesetup(self,mleparams,loglikfunc,fixedparams,direction,opts):
+        
+        Alpha = opts['ConfidenceLevel']
+        ChiSquaredLevel = st.chi2.ppf(Alpha, self.NumParams)
+
+        NumFixedParams=sum(fixedparams)
+        NumFreeParams=self.NumParams-NumFixedParams
+        MarginalParamSymbols = cs.SX.sym('ParamSymbols',NumFreeParams)
+        GammaSymbol = cs.SX.sym('GammaSymbol')
+        ParamList=[]
+        ParamCounter=0
+        for i in range(self.NumParams):
+            if fixedparams[i]:
+                ParamList.append(direction[i]*GammaSymbol+mleparams[i])
+            else:
+                ParamList.append(MarginalParamSymbols[ParamCounter])
+                ParamCounter+=1
+        ParamVec=cs.vertcat(*ParamList)
+        MarginalLogLikRatioSymbol = 2*(loglikfunc(ParamVec)+loglikfunc(mleparams))
+
+        if not NumFreeParams==0:
+            # Create an IPOPT solver to optimize the nuisance parameters
+            IPOPTProblemStructure = {'f': MarginalLogLikRatioSymbol+ChiSquaredLevel, 'x': MarginalParamSymbols,'p':GammaSymbol}#, 'g': cs.vertcat(*OptimConstraints)
+            ProfileLogLikSolver = cs.nlpsol('PLLSolver', 'ipopt', IPOPTProblemStructure,{'ipopt.print_level':0,'print_time':False})
+            ProfileLogLikJacobianSolver = ProfileLogLikSolver.factory('PLLJSolver', ProfileLogLikSolver.name_in(), ['sym:jac:f:p'])
+            ProfileLogLikHessianSolver = ProfileLogLikSolver.factory('PLLHSolver', ProfileLogLikSolver.name_in(), ['sym:hess:f:p:p'])
+        else:
+            ProfileLogLikSolver = cs.Function('PLLSolver', [GammaSymbol], [MarginalLogLikRatioSymbol+ChiSquaredLevel]) 
+            ProfileLogLikJacobianSymbol = cs.jacobian(MarginalLogLikRatioSymbol+ChiSquaredLevel,GammaSymbol)
+            ProfileLogLikJacobianSolver = cs.Function('PLLJSolver', [GammaSymbol], [ProfileLogLikJacobianSymbol]) 
+            ProfileLogLikHessianSymbol = cs.jacobian(ProfileLogLikJacobianSymbol,GammaSymbol) #NOTE: not sure what second returned value of hessian is here, did this to avoid it (it may be gradient, limited docs)
+            ProfileLogLikHessianSolver = cs.Function('PLLHSolver', [GammaSymbol], [ProfileLogLikHessianSymbol]) 
+
+        return [ProfileLogLikSolver,ProfileLogLikJacobianSolver,ProfileLogLikHessianSolver]
+
+    def __logliksearch(self,nuisanceparams,solverlist,opts,forward=True):
+
+        Tolerance=opts['Tolerance']
+        if forward:
+            Gamma=opts['InitialStep']
+        else:
+            Gamma=-opts['InitialStep']
+
+        NumFreeParams=len(nuisanceparams)
+        ProfileLogLikSolver = solverlist[0]
+        ProfileLogLikJacobianSolver = solverlist[1]
+        ProfileLogLikHessianSolver = solverlist[2]
+
+        NuisanceParams=nuisanceparams
+        CurrentRatioGap=9999
+        #NOTE: should check to see if we go negative, loop too many time, take massive steps, want to stay in the domain of the MLE
+        #NOTE:need max step check, if steps are all in same direction perhaps set bound at inf and return warning, if oscillating error failure to converge
+        while  abs(CurrentRatioGap)>Tolerance:
+            # Solve the NLP problem with IPOPT call
+            if not NumFreeParams==0:
+                ProfileLogLikStruct = ProfileLogLikSolver(x0=NuisanceParams,p=Gamma)#, lbx=[], ubx=[], lbg=[], ubg=[]
+                ProfileLogLikJacobianStruct = ProfileLogLikJacobianSolver(x0=ProfileLogLikStruct['x'], lam_x0=ProfileLogLikStruct['lam_x'], lam_g0=ProfileLogLikStruct['lam_g'],p=Gamma)
+                ProfileLogLikHessianStruct = ProfileLogLikHessianSolver(x0=ProfileLogLikStruct['x'], lam_x0=ProfileLogLikStruct['lam_x'], lam_g0=ProfileLogLikStruct['lam_g'],p=Gamma)
+                #update profile curve
+                NuisanceParams = list(ProfileLogLikStruct['x'].full().flatten())
+                CurrentRatioGap = ProfileLogLikStruct['f'].full()[0][0]
+                dCurrentRatioGap_dGamma = ProfileLogLikJacobianStruct['sym_jac_f_p'].full()[0][0]
+                d2CurrentRatioGap_dGamma2 = ProfileLogLikHessianStruct['sym_hess_f_p_p'].full()[0][0]
+            else:
+                CurrentRatioGap = ProfileLogLikSolver(Gamma).full()[0][0]
+                dCurrentRatioGap_dGamma = ProfileLogLikJacobianSolver(Gamma).full()[0][0]
+                d2CurrentRatioGap_dGamma2 = ProfileLogLikHessianSolver(Gamma).full()[0][0]
+
+            #Halley's method
+            Gamma=Gamma-(2*CurrentRatioGap*dCurrentRatioGap_dGamma)/(2*dCurrentRatioGap_dGamma**2 -CurrentRatioGap*d2CurrentRatioGap_dGamma2)
+
+
+        return [Gamma,NuisanceParams,CurrentRatioGap]
 
 
 class factorial(cs.Callback):

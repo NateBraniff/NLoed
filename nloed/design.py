@@ -17,16 +17,16 @@ def design(models, approxinputs=None, exactinputs=None, observgroups=None, fixed
     #                   resolution option passing to IPOPT/custom options
     #                   custom grid/candidate list
     #                   turn off observation selection for exact (forces you to observe all ouputs at each unique input level, no approx??, is this even possible in a simple way?)
-    #Medium Changes:    passing in fixed design
+    #Medium Changes:    passing in fixed design (or data, useful for MC simulations with past data or just previous fixed design)
     #                   start values for exact
     #                   Ds optimality
     #Hard Changes:      partition into subfunctions
     #                   exact/approx constraints
     #                   bayesian parameter prior with sigma points
     #                   Custom optimality
-    #                   T optimality
-    #                   Beal/Hunter curvature/bias optimality
-    #                   Constrained parameter optimality
+    #                   [NO] T optimality
+    #                   Bias optimality, consistent with order of FIM (is bias 2nd order, can we do 2nd order cov)
+    #                   [No] Constrained parameter optimality
     #Speculative:       grid points on constraint boundary
     #                   grid refinment
     #                   L2 regularization on weights for unique design
