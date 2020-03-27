@@ -80,6 +80,32 @@ def design(models, approxinputs=None, exactinputs=None, observgroups=None, fixed
     #NOTE: leaning towards approx, or auto configure for both
     #NOTE: should sort design output so it has a common ordering (ie by x1, then x2 etc.), should group non-unique elements and merge their weights
 
+    #OLD DISCUSSION
+    #Should this be a class?? would make rounding easier
+
+    # rough specs
+    # inputs: model list ,grouping matrix, beta info, past data
+    # return: ys, xs, weights (not ready for actual experiment because you need to do power/rounding analysis)
+
+    # Goals
+    # can enter either past data or maybe fisher info from past data as starting point to improve an experiment
+    # grouping response variables that need to be sampled together, paritioning overall sample number across groups
+    #       (ie 80% and 20%, or if 0% will find optimal weights, perhaps fast weight to specifiy equal weights)
+    # [DONE] having x split into two types, grided values with weights xi vs continuous ranges which are constant within a group
+    # OptimConstraintsaints on x, linear and nonlinear
+    # grid refinment for grided x, starting values for non-grided
+    # optional optimality criteria, D, Ds (need to group parameters), A, custom (but simple casadi function of fisher info)
+    # average designs for multiple models, with priors over the models
+    # bayesian (normal prior) using sigma points for all or subset of the parameters
+    # possible support for rounding design into an experiment
+
+    # Questions
+    # Do we scale the FIM?, only D maybe Ds is invariant under linear re-scaling (maybe all rescaling), but not others or custom, however is more numerically stable
+    # Also do we log the opt(FIM)? for numerical stability, this maybe generally useful
+    # how to select sigma points
+    # how to do constrained and curvature/bias optimality measures
+
+
     #check that either exact xor approx has been passed 
     if not( approxinputs) and not(exactinputs):
         raise Exception('The design function requires at least one of the approximate or exact values to be passed!')
@@ -488,29 +514,3 @@ def sortinputs(newrow,rows,rowpntr=0,colpntr=0):
                 rowpntr=max(rowpntr,sortinputs(newrow,rows,rowpntr,colpntr+1))
             i+=1
     return rowpntr
-
-
-
-#Should this be a class?? would make rounding easier
-
-# rough specs
-# inputs: model list ,grouping matrix, beta info, past data
-# return: ys, xs, weights (not ready for actual experiment because you need to do power/rounding analysis)
-
-# Goals
-# can enter either past data or maybe fisher info from past data as starting point to improve an experiment
-# grouping response variables that need to be sampled together, paritioning overall sample number across groups
-#       (ie 80% and 20%, or if 0% will find optimal weights, perhaps fast weight to specifiy equal weights)
-# [DONE] having x split into two types, grided values with weights xi vs continuous ranges which are constant within a group
-# OptimConstraintsaints on x, linear and nonlinear
-# grid refinment for grided x, starting values for non-grided
-# optional optimality criteria, D, Ds (need to group parameters), A, custom (but simple casadi function of fisher info)
-# average designs for multiple models, with priors over the models
-# bayesian (normal prior) using sigma points for all or subset of the parameters
-# possible support for rounding design into an experiment
-
-# Questions
-# Do we scale the FIM?, only D maybe Ds is invariant under linear re-scaling (maybe all rescaling), but not others or custom, however is more numerically stable
-# Also do we log the opt(FIM)? for numerical stability, this maybe generally useful
-# how to select sigma points
-# how to do constrained and curvature/bias optimality measures
