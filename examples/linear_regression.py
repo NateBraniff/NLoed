@@ -39,9 +39,11 @@ dataset1=linear1d.sample(Experiment,[0,1],5)
 
 
 start = time.time()
-pars=linear1d.fit(dataset1,[0,1],opts={'Confidence':'Contours','ConfidenceLevel':0.95,'InitialStep':0.01,'Tolerance':0.01,'SampleNumber':10,'RadialNumber':30})
+parsfits=linear1d.fit(dataset1,[0,1],opts={'Confidence':'Contours','ConfidenceLevel':0.95,'InitialStep':0.01,'Tolerance':0.01,'SampleNumber':10,'RadialNumber':30})
 end = time.time()
 print(end - start)
+
+pars=parsfits[0]
 
 paramCov1=np.cov(pars,rowvar=False)
 paramMean1=np.mean(pars,axis=0)
@@ -68,4 +70,6 @@ print(opt_exact)
 
 opt_exact=design([model],exactinputs=exact)
 print(opt_exact)
+
+print('Done')
 

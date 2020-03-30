@@ -6,13 +6,11 @@ from scipy import stats as st
 from scipy.interpolate import splev, splrep
 import matplotlib.pyplot as plt
 
-
 class model:
     """ 
-    Add a docstring
+    A class for statisical models in the NLoed package
     """
-
-    #           [DONE, for normal data] implement data sampling
+    #Easy:      [DONE, for normal data] implement data sampling
     #Difficult: implement various cov/bias assesment methods, also (profile) likelihood intervals/plots
     #           add other distributions binomial/bernouli, lognormal, gamma, exponential, weibull etc., negative binomial
     #           implement plotting function (move to utility.py?)
@@ -21,11 +19,10 @@ class model:
     #NOTE: [Yes] Add A-opt, D-s Opt, A-s Opt???, Bias??? for exponential family (and log normal?) 
     #NOTE: https://math.stackexchange.com/questions/269723/largest-eigenvalue-semidefinite-programming
     #NOTE: Data/design/experiment objects may need deep copies so internal lists aren't shared??
-    #names must be unique
-    #must enforce ordering of parameters in statistics function
-
+    #NOTE: all names must be unique
+    #NOTE: must enforce ordering of parameters in statistics function
+    #NOTE: we need checks on inputs of fit and sample functions!!!
     def __init__(self, observationlist, inputnames, paramnames):
-        
         #check for unique names
         if not(len(set(inputnames))  ==  len(inputnames)):
             raise Exception('Model input names must be unique!')
@@ -35,32 +32,38 @@ class model:
         self.NumObserv = len(observationlist)
         self.NumParams = max(observationlist[0][2].size_in(0)) #somewhat unsafe, using max assumes its nx1 or 1xn
         self.NumInputs = max(observationlist[0][2].size_in(1))
+        #check if we have the same number of input names as inputs
         if not(len(set(inputnames))  ==  len(inputnames)):
             raise Exception('Model depends on '+str(self.NumInputs)+' inputs but there are '+str(len(inputnames))+' input names!')
+        #check if we have same number of parameter names as parameters
         if not(self.NumParams  ==  len(paramnames)):
             raise Exception('Model depends on '+str(self.NumParams)+' parameters but there are '+str(len(paramnames))+' parameter names!')
-        #read names into a dictionary, can be used to link names to index of list functions
-        self.InputNameDict = {}
-        self.ParamNameDict = {}
+        #create lists of input/param/param names, can be used to look up names with indices (observ names filled in below)
         self.InputNameList = inputnames
         self.ParamNameList= paramnames
+        self.ObservNameList = [] 
+        #create dicts for input/param names, can be used to look up indices with names
+        self.InputNameDict = {}
+        self.ParamNameDict = {}
+        self.ObservNameDict = {}
+        #populate the input name dict
         for i in range(self.NumInputs):
             self.InputNameDict[inputnames[i]] = i
+        #populate the param name dict
         for i in range(self.NumParams):
             self.ParamNameDict[paramnames[i]] = i
-        self.ObservNameDict = {}
-        self.ObservNameList = []
-        #lists to contains needed Casadi functions for evaluation, design and fitting
+        #create a list to store the observation variable distribution type
         self.Dist = []
-        self.StatisticModel = []
+        #create a list to store casadi functions predicting the observ. var sampling distirbution parameters
         self.Model = []
+        #create a list to store casadi functions computing the elemental loglikelihood for each observation variable
         self.LogLik = []
+        #create a list to store casadi functions computing the elemental fisher info. matrix for each observation variable
         self.FIM = []
-
         #create symbols for parameters and inputs, needed for function defs below
         ParamSymbols = cs.SX.sym('ParamSymbols',self.NumParams)
         InputSymbols = cs.SX.sym('InputSymbols',self.NumInputs)
-
+        #loop over the observation variables
         for i in range(self.NumObserv):
             Observation = observationlist[i]
             #store the distribution type for later
@@ -74,7 +77,7 @@ class model:
             #create a observationlist symbol
             ObervSymbol = cs.SX.sym(Observation[0],1)
             #store the function for the model (links observationlist distribution parameters to the parameters-of-interest)
-            self.StatisticModel.append(Observation[2])
+            self.Model.append(Observation[2])
             if Observation[1]  == 'Normal':
                 #get the distribution statistics
                 Mean = Observation[2](ParamSymbols,InputSymbols)[0]
@@ -116,59 +119,58 @@ class model:
 
     def fit(self,datasets,paramstart,opts=None):
         """
-        a function to fit the model to a dataset using maximum likelihood
-        also provides optional marginal confidence intervals
-        and plots of marginal projected confidence contours and logliklihood profiles
+        This function fits the model to a dataset using maximum likelihood
+        it also provides optional marginal confidence intervals
+        and plots of logliklihood profiles/traces and marginal projected confidence contours
 
         Args:
-            datasets: either; a dictionary for one dataset OR a list of dictionaries, each design replicates OR a list of lists of dict's where each index in the outer lists has a unique design
+            datasets: either; a dictionary for one dataset OR a list of dictionaries, each design replicats OR a list of lists of dict's where each index in the outer lists has a unique design
             paramstart: a list of starting values for the parameters
-            opts: a dictionary of user defined options
+            opts: optional, a dictionary of user defined options
 
         Return:
-            ReturnValue: either; a list of lists structure with parameter fit lists, has the same shape/order as the input, OR, the same strcture but with fits and intervals as the leaf object
-
+            ParameterFitStruct: either; a list of lists structure with parameter fit lists, has the same shape/order as the input, OR, the same strcture but with fits and intervals as the leaf object
         """
+        #NOTE: needs checks on inputs
         #NOTE: NEED testing for multiple observation input structures, multiple dimensions of parameters ideally, 1,2,3 and 7+
         #NOTE: add some print statments to provide user with progress status
         #NOTE: currently solve multiplex simultaneosly (one big opt problem) but sequentially may be more robust to separation (discrete data), or randomly non-identifiable datasets (need to test)
-
-        #this block allows the user to pass a dataset, list of datasets, list of lists etc. for Design x Replicate fitting
+        #this block allows the user to pass a dataset, list of datasets, list of lists etc. for Design x Replicat fitting
         if not(isinstance(datasets, list)):
             #if a single dataset is passed vis the dataset input, wrap it in two lists so it matches general case
-            DesignSet=[[datasets]]
+            DesignSet = [[datasets]]
         elif not(isinstance(datasets[0], list)):
             #else if dataset input is a list of replciated datasets, wrap it in a single list to match general case
-            DesignSet=[datasets]
+            DesignSet = [datasets]
         else:
-            #else if input dataset input is a list of design, each with a list of replicates, just pass on th input
-            DesignSet=datasets
+            #else if input dataset input is a list of design, each with a list of replicats, just pass on th input
+            DesignSet = datasets
         #create a list to store parameter casadi symbols used for ML optimization
-        ParamSymbolsList=[]
-        #create a list to store starting parameters (they are all determined by paramstart, but dim. depends on design x replicate size)
-        StartParams=[]
+        ParamSymbolsList = []
+        #create a list to store starting parameters (they are all determined by paramstart, but dim. depends on design x replicat size)
+        StartParams = []
         #create a list to store casadi generic loglikelihood functions for each design
-        DesignLogLikFunctionList=[]
+        DesignLogLikFunctionList = []
         #create a total loglikelihood summation store, initialize to zero
-        TotalLogLik=0
+        TotalLogLik = 0
         #create an archetypal vector of paramter symbols, used to build casadi loglikelihood functions for each design
         ParamArchetypeSymbols = cs.SX.sym('ParamArchetypeSymbols',self.NumParams)
         #loop over different designs (outer most list)
         for e in range(len(DesignSet)):
-            #get the set of replicates for this design
-            ReplicatSet=DesignSet[e]
-            #create a list to store loglikelihood functions for each specific replicate of the design
-            ReplicatLogLikFunctionList=[]
-            #for each design use the first replicate 
-            Data=ReplicatSet[0]
+            #get the set of replicats for this design
+            ReplicatSet = DesignSet[e]
+            #create a list to store loglikelihood functions for each specific replicat of the design
+            ReplicatLogLikFunctionList = []
+            #for each design use the first replicat 
+            Data = ReplicatSet[0]
             #create a summation variable for the loglikelihood for a dataset of the current design
-            LogLik=0
+            LogLik = 0
             #create a vector of all observations in the design
             Observations = [element for row in Data['Observation'] for group in row for element in group]
             #create a vector of casadi symbols for the observations
             ObservSymbol = cs.SX.sym('ObservSymbol_'+str(e),len(Observations))
             #create a counter to index the total number of observations
-            SampleCount=0
+            SampleCount = 0
             #loop over the dataset inputs
             for i in range(len(Data['Inputs'])):
                 #get the curren input settings
@@ -180,119 +182,166 @@ class model:
                     #NOTE: NEED TO CHECK THIS WORKS FOR MULTI OBSERV DATA
                     for k in range(len(Data['Observation'][i][j])):
                         #create a symbol for the loglikelihood for the given input and observation variable
-                        LogLik+=self.LogLik[j](ObservSymbol[SampleCount],ParamArchetypeSymbols,InputRow)
+                        LogLik += self.LogLik[j](ObservSymbol[SampleCount],ParamArchetypeSymbols,InputRow)
                         #increment the observation counter
-                        SampleCount+=1
+                        SampleCount += 1
             #create a casadi function for the loglikelihood of the current design (observations are free/input symbols)
             ArchetypeLogLikFunc = cs.Function('ArchetypeLogLikFunc', [ObservSymbol,ParamArchetypeSymbols], [LogLik])
-                
             #loop over replicats within each design
             for r in range(len(ReplicatSet)):
-                #NOTE: could abstract below into a Casadi function to avoid input/observ loop on each dataset and replicate
-                #get the dataset from the replicate list
-                Dataset=ReplicatSet[r]
+                #NOTE: could abstract below into a Casadi function to avoid input/observ loop on each dataset and replicat
+                #get the dataset from the replicat list
+                Dataset = ReplicatSet[r]
                 #create a vector of parameter symbols for this specific dataset, each dataset gets its own, these are used for ML optimization
                 ParamFitSymbols = cs.SX.sym('ParamFitSymbols'+'_'+str(e)+str(r),self.NumParams)
                 #extract the vector of observations in the same format as in the ArchetypeLogLikFunc function input
                 Observations = cs.vertcat(*[cs.SX(element) for row in Dataset['Observation'] for group in row for element in group])
                 #create a symbol for the datasets loglikelihood function by pass in the observations for the free symbols in ObservSymbol
-                LogLik=ArchetypeLogLikFunc(Observations,ParamFitSymbols)
+                LogLik = ArchetypeLogLikFunc(Observations,ParamFitSymbols)
                 #create a function for
                 LogLikFunc = cs.Function('LogLik_'+str(e)+'_'+str(r), [ParamFitSymbols], [LogLik])
                 ReplicatLogLikFunctionList.append(LogLikFunc)
-                #set up the logliklihood symbols for given design and replicate
+                #set up the logliklihood symbols for given design and replicat
                 ParamSymbolsList.append(ParamFitSymbols)
+                #record the starting parameters for the given replicat and dataset
                 StartParams.extend(paramstart)
-                TotalLogLik+=LogLik
+                #add the loglikelihood to the total 
+                #NOTE: this relies on the distirbutivity of serperable optimization problem, should confirm
+                TotalLogLik += LogLik
+            #append the list of replciate loglik functions to the design list
             DesignLogLikFunctionList.append(ReplicatLogLikFunctionList)
-
-
-        #NOTE: STOPPED READ THROUGH HERE, NEED RENAME/COMMENTS IN FIT, SAMPLE, CONSTRUCTOR FRIDAY, MAR-27-20 (double check loglike vs neg loglik throughout)
         #NOTE: this approach is much more fragile to separation (glms with discrete response), randomly weakly identifiable datasets
         #NOTE: should be checking solution for convergence, should allow user to pass options to ipopt
         #NOTE: allow bfgs for very large nonlinear fits, may be faster
-        # Create an IPOPT solver for maximum likelihood problem
-        IPOPTProblemStructure = {'f': -TotalLogLik, 'x': cs.vertcat(*ParamSymbolsList)}#, 'g': cs.vertcat(*OptimConstraints)
-        IPOPTSolver = cs.nlpsol('solver', 'ipopt', IPOPTProblemStructure,{'ipopt.print_level':5,'print_time':False})
+        # Create an IPOPT solver for overall maximum likelihood problem, we pass negative TotalLogLik because IPOPT minimizes
+        TotalParamFitStructure = {'f': -TotalLogLik, 'x': cs.vertcat(*ParamSymbolsList)}#, 'g': cs.vertcat(*OptimConstraints)
+        ParamFitSolver = cs.nlpsol('solver', 'ipopt', TotalParamFitStructure,{'ipopt.print_level':5,'print_time':False})
         # Solve the NLP fitting problem with IPOPT call
-        #print('Begining optimization...')
-        IPOPTSolutionStruct = IPOPTSolver(x0=StartParams)#, lbx=[], ubx=[], lbg=[], ubg=[]
-        FitParameters = list(IPOPTSolutionStruct['x'].full().flatten())
-
-        DesignFitParameterList=[]
-        DesignCIList=[]
+        ParamFitSolutionStruct = ParamFitSolver(x0=StartParams)#, lbx=[], ubx=[], lbg=[], ubg=[]
+        #extract the fit parameters from the solution structure
+        FitParameters = list(ParamFitSolutionStruct['x'].full().flatten())
+        #NOTE: this is (very slightly) in efficient to do this loop twice but it makes it more readable
+        #NOTE: some extra space taken up by CI lists if not requested but not a big deal
+        #create a list to store fits params for each design
+        DesignFitParameterList = []
+        #create a list to store param CI's for each design
+        DesignCIList = []
+        #loop over each design
         for e in range(len(DesignSet)):
-            #get the set of replicates for this design
-            ReplicateFitParameterList=[]
-            ReplicateCIList=[]
+            #create a list to store fits params for each replicat
+            ReplicatFitParameterList=[]
+            #create a list to store param CI's for each replicat
+            ReplicatCIList=[]
+            #loop over each replicat of the given design
             for r in range(len(DesignSet[e])):
+                #extract the fit parameters from the optimization solution vector
                 FitParamSet= FitParameters[:self.NumParams]
-
+                #check if 'confidence' key word is passed in the options dictionary
                 if "Confidence" in opts.keys():
+                    #check if graphing options; contour plots or profile trace plots, are requested
                     if opts['Confidence']=="Contours" or opts['Confidence']=="Profiles":
+                        #if so, create a figure to plot on
                         Figure = plt.figure()
-                        #[CIList,TraceList,ProfileList]=self.__profileplot(FitParamSet,DesignLogLikFunctionList[e][r],Figure,opts)
-                        CIList=self.__profileplot(FitParamSet,DesignLogLikFunctionList[e][r],Figure,opts)[0]
-                        ReplicateCIList.append(CIList)
+                        #run profileplots to plot the profile traces and return CI's
+                        CIList = self.__profileplot(FitParamSet,DesignLogLikFunctionList[e][r],Figure,opts)[0]
+                        #add the CI's to the replicate CI list
+                        ReplicatCIList.append(CIList)
+                        #if contour plots are requested specifically, run contour function to plot the projected confidence contours
                         if opts['Confidence']=="Contours":
                             self.__contourplot(FitParamSet,DesignLogLikFunctionList[e][r],Figure,opts)
                     elif opts['Confidence']=="Intervals":
-                        ReplicateCIList.append(self.__confidenceintervals(FitParamSet,DesignLogLikFunctionList[e][r],opts))
-
+                        #if confidence intervals are requested, run confidenceintervals to get CI's and add them to replicat list
+                        ReplicatCIList.append(self.__confidenceintervals(FitParamSet,DesignLogLikFunctionList[e][r],opts))
+                #remove the current extracted parameters from the solution vector
                 del FitParameters[:self.NumParams]
-                ReplicateFitParameterList.append(FitParamSet)
-            DesignFitParameterList.append(ReplicateFitParameterList)
-            DesignCIList.append(ReplicateCIList)
-
+                #add the extracted parameters to the replicat parameter lsit
+                ReplicatFitParameterList.append(FitParamSet)
+            #add the replicat list to the design list
+            DesignFitParameterList.append(ReplicatFitParameterList)
+            #add replicat CI list to design CI list
+            DesignCIList.append(ReplicatCIList)
+        #if we need to plot profile traces or contours 
         if "Confidence" in opts.keys() and (opts['Confidence']=="Contours" or opts['Confidence']=="Profiles"):
             plt.show()
-
+        #depending on dimension of input datasets (i.e. single, replcated design, multiple rep'd designs), package output to match
         if not(isinstance(datasets, list)):
+            #if a single dataset dict. was passed, return a param vec and CI list accordingly
             DesignFitParameterList = DesignFitParameterList[0][0]
             DesignCIList = DesignCIList[0][0]
         elif not(isinstance(datasets[0], list)):
+            #if a list a replicated design was passed, return a a list of param vecs and CI lists accordingly
             DesignFitParameterList = DesignFitParameterList[0]
             DesignCIList = DesignCIList[0]
         else:
+            #if a list designs, each listing replicats, was passed, return a a list of lists of param vecs and CI lists accordingly
             DesignFitParameterList = DesignFitParameterList
             DesignCIList = DesignCIList
-
+        #check if CI's were generated, is so return both param fits and CI's in a list, else a just param fits
+        #NOTE: this may be a bit awkward, should possibly keep it standardized
         if "Confidence" in opts.keys() and (opts['Confidence']=="Intervals" or opts['Confidence']=="Contours" or opts['Confidence']=="Profiles"):
-            ReturnValue = [DesignFitParameterList, DesignCIList]
+            ParameterFitStruct = [DesignFitParameterList, DesignCIList]
         else:
-            ReturnValue = DesignFitParameterList
+            ParameterFitStruct = DesignFitParameterList
+        #return the appropriate return structure
+        return ParameterFitStruct
 
-        return ReturnValue
+    def sample(self,designs,parameters,replicats=1):
+        """
+        This function generates datasets for a given design or list of designs, with a given set of parameters, with an optional number of replicates
 
-    def sample(self,experiments,parameters,replicates=1):
-        # generate a data sample fromt the model according to a specific design
+        Args:
+            designs: either; a single design dictionary, OR, a list of design dictionaries
+            parameters: the parameter values at which to generate the data
+            replicates: optional, an integer indicating the number of datasets to generate for each design, default is 1
+
+        Return:
+            DesignDataSets: either; a singel dataset for the given design, OR, a list of dataset replicats for the given design, OR, a list of list of dataset replicats for each design
+        """
+        #NOTE: needs checks on inputs
         #NOTE: multiplex multiple parameter values??
-        #NOTE: actually maybe more important to be able to replicate designs N times
-
-        if not(isinstance(experiments, list)):
-            ExperimentList=[experiments]
+        #NOTE: actually maybe more important to be able to replicat designs N times
+        #check if designs is a single design or a list of designs
+        if not(isinstance(designs,list)):
+            #if single, wrap it in a list to match general case
+            DesignList = [designs]
         else:
-            ExperimentList=experiments
-
-        Designset=[]
-        for e in range(len(ExperimentList)):
-            CurrentExperiment=ExperimentList[e]
-            DataFormat=cp.deepcopy(CurrentExperiment)
-            del DataFormat['Count']
-            DataFormat['Observation']=[]
-            Datasets=[]
-            for r in range(replicates):
-                CurrentData=cp.deepcopy(DataFormat)
-                for i in range(len(CurrentExperiment['Inputs'])):
-                    InputRow = CurrentExperiment['Inputs'][i]
-                    ObservRow=[]
+            #else pass it as it is
+            DesignList = designs
+        #create a list to store lists of datasets for each design
+        DesignDataSets = []
+        #loop over the designs
+        for e in range(len(DesignList)):
+            #extract the current design
+            CurrentDesign = DesignList[e]
+            #deep copy the current design to create an archetype for that design's datasets
+            DatasetArchetype = cp.deepcopy(CurrentDesign)
+            #delete the 'count' field in the design, as we are using it as a template for datasets
+            del DatasetArchetype['Count']
+            #create 'observations' field in the archetype datset
+            DatasetArchetype['Observation'] = []
+            #create a list for replciated datasets of the current design
+            ReplicatDataSets = []
+            #loop over the number of replicates
+            for r in range(replicats):
+                #create a deep copy of the dataset archetype for the current dataset
+                CurrentDataSet = cp.deepcopy(DatasetArchetype)
+                #loop over the (unique) input rows in the design
+                for i in range(len(CurrentDesign['Inputs'])):
+                    #get the input row
+                    InputRow = CurrentDesign['Inputs'][i]
+                    #create a list for the current input row's observations
+                    ObservRow = []
+                    #loop over the observation variables
                     for j in range(self.NumObserv):
-                        ObservCount = CurrentExperiment['Count'][i][j]
-                        Statistics=self.StatisticModel[j](parameters,InputRow)
+                        #get the count of observations for the given observ. var at the given input row
+                        ObservCount = CurrentDesign['Count'][i][j]
+                        #compute the sample distirbution statistics using the model
+                        SampleStatistics = self.Model[j](parameters,InputRow)
+                        #select the appropriate distribution, and generate the sample vec of appropriate length
                         if self.Dist[j] == 'Normal':
-                            CurrentDataBlock = np.random.normal(Statistics[0], np.sqrt(Statistics[1]), ObservCount).tolist() 
+                            CurrentObservVec = np.random.normal(SampleStatistics[0], np.sqrt(SampleStatistics[1]), ObservCount).tolist() 
                         elif self.Dist[j] == 'Poisson':
-                            CurrentDataBlock = np.random.poisson(Statistics[0]).tolist() 
+                            CurrentObservVec = np.random.poisson(SampleStatistics[0]).tolist() 
                         elif self.Dist[j] == 'Lognormal':
                             print('Not Implemeneted')
                         elif self.Dist[j] == 'Binomial':
@@ -303,21 +352,28 @@ class model:
                             print('Not Implemeneted')
                         else:
                             raise Exception('Unknown error encountered selecting observation distribution, contact developers')
-                        ObservRow.append(CurrentDataBlock)
-                    CurrentData['Observation'].append(ObservRow)
-                Datasets.append(CurrentData)
-            Designset.append(Datasets)
-                
-        if not(isinstance(experiments, list)):
-            if replicates==1:
-                return Designset[0][0]
+                        #add the current observation vector, for the current observ. var., to the observ row
+                        ObservRow.append(list(CurrentObservVec))
+                    #add the observation row to the current dataset
+                    CurrentDataSet['Observation'].append(ObservRow)
+                #add the current dataset to the replicat list
+                ReplicatDataSets.append(CurrentDataSet)
+            #add the replicat list to the design list
+            DesignDataSets.append(ReplicatDataSets)
+        #check if a single design was passed
+        if not(isinstance(designs, list)):
+            if replicats==1:
+                #if a single design was passed and there replicate count is 1, return a single dataset
+                return DesignDataSets[0][0]
             else:
-                return Designset[0]
+                #else if a single design was passed, but with >1 reps, return a list of datasets
+                return DesignDataSets[0]
         else:
-            return Designset
+            #else if multiple designs were passed (with/without reps), return a list of list of datasets
+            return DesignDataSets
 
     #NOTE: should maybe rename this
-    def evaluate(self):
+    def simulatedesign(self):
         #maybe this should move to the design class(??)
         #For D (full cov/bias), Ds (partial cov/bias), T separation using the delta method?! but need two models
         # assess model/design, returns various estimates of cov, bias, confidence regions/intervals
@@ -327,29 +383,46 @@ class model:
         
         print('Not Implemeneted')
         
-    def plots(self):
-        #FDS plot, standardized variance (or Ds, bayesian equivlant), residuals
-        print('Not Implemeneted')
-        #NOTE: maybe add a basic residual computation method for goodness of fit assesment?? Or maybe better show how in tutorial but not here
-    
     # UTILITY FUNCTIONS
-    def getstatistics(self):
+    def evalmodel(self,parameter,inputs,observ=None,covariance=None,opts=None):
         #NOTE: evaluate model, predict y
-        #NOTE: also mabye predict error bars based on par cov or past dataset, delta method vs something based on likelihood CI's??
-        print('Not Implemeneted')
+        #NOTE: optional pass cov matrix, for use with delta method/MC error bars on predictions
+        if not observ:
+            ObservList = list(range(self.NumObserv))
+        else:
+            ObservList = observ
 
-    def getFIM(self):
-        #NOTE: eval fim at given inputs and dataset
-        #NOTE: should this even be here??? how much in model, this isn't data dependent, only design dependent
-        print('Not Implemeneted')
+        StatisticList = []
+        for o in ObservList:
+            StatisticList.append( self.Model[o](parameter,inputs) )
+            if 'ErrorBars' in opts:
+                if opts['ErrorBars'] == 'Delta':
+                    print('Not Implemeneted')
+                elif opts['ErrorBars'] == 'MonteCarlo':
+                    print('Not Implemeneted')
 
-    def getloglik(self):
-        #eval the logliklihood with given params and dataset
-        print('Not Implemeneted')
+        return StatisticList
 
-    def getsensitivity(self):
+    def evalsensitivity(self):
         #eval observation distribution statistic sensitivities at given input and parameter values
         print('Not Implemeneted')
+
+    # def evalfim(self):
+    #     #NOTE: eval fim at given inputs and dataset
+    #     #NOTE: should this even be here??? how much in model, this isn't data dependent, only design dependent
+    #     print('Not Implemeneted')
+
+    # def evalloglik(self):
+    #     #eval the logliklihood with given params and dataset
+    #     print('Not Implemeneted')
+
+    # def plots(self):
+    #     #FDS plot, standardized variance (or Ds, bayesian equivlant), residuals
+    #     print('Not Implemeneted')
+    #     #NOTE: maybe add a basic residual computation method for goodness of fit assesment?? Or maybe better show how in tutorial but not here
+    
+
+
 
 # --------------- Private functions and subclasses ---------------------------------------------
 
