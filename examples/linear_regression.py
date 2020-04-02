@@ -3,7 +3,7 @@ Add a docstring
 """
 import numpy as np
 import casadi as cs
-from nloed import model
+from nloed.model import Model
 from nloed import design
 import time
 
@@ -27,7 +27,13 @@ xnames=['x1']
 betanames=['beta0','beta1']
 
 #Instantiate class
-linear1d=model(response,xnames,betanames)
+linear1d=Model(response,xnames,betanames)
+
+pred_struct1=linear1d.eval_model([1,1],1)
+pred_struct2=linear1d.eval_model([1,1],1,param_covariance=[[1,0],[0,1]])
+pred_struct3=linear1d.eval_model([1,1],1,sensitivity=True)
+pred_struct4=linear1d.eval_model([1,1],1,[[1,0],[0,1]],True,options={'ErrorMethod':'Delta'})
+pred_struct5=linear1d.eval_model([1,1],1,[[1,0],[0,1]],True,options={'ErrorMethod':'MonetCarlo'})
 
 Experiment={}
 Experiment['InputNames']=xnames
@@ -39,7 +45,7 @@ dataset1=linear1d.sample(Experiment,[0,1],5)
 
 
 start = time.time()
-parsfits=linear1d.fit(dataset1,[0,1],opts={'Confidence':'Contours','ConfidenceLevel':0.95,'InitialStep':0.01,'Tolerance':0.01,'SampleNumber':10,'RadialNumber':30})
+parsfits=linear1d.fit(dataset1,[0,1],options={'Confidence':'Contours'})
 end = time.time()
 print(end - start)
 
@@ -50,25 +56,25 @@ paramMean1=np.mean(pars,axis=0)
 
 dataset2=linear1d.sample([Experiment,Experiment],[0,1])
 
-model={'Model':linear1d, 'Parameters': [0.5, 1],'Objective':'D'}
+modelinfo={'Model':linear1d, 'Parameters': [0.5, 1],'Objective':'D'}
 approx={'Inputs':['x1'],'Bounds':[(-1,1)]}
 obs={'Observations':[['y1']]}
 
-opt_approx=design([model],approxinputs=approx,observgroups=obs)
+opt_approx=design([modelinfo],approxinputs=approx,observgroups=obs)
 print(opt_approx)
 
-opt_approx=design([model],approx)
+opt_approx=design([modelinfo],approx)
 print(opt_approx)
 
-model={'Model':linear1d, 'Parameters': [0.5, 1],'Objective':'D'}
+modelinfo={'Model':linear1d, 'Parameters': [0.5, 1],'Objective':'D'}
 struct=[['x1_lvl1'],['x1_lvl2'],['x1_lvl3']]
 exact={'Inputs':['x1'],'Bounds':[(-1,1)],'Structure':struct}
 obs={'Observations':[['y1']]}
 
-opt_exact=design([model],exactinputs=exact,observgroups=obs)
+opt_exact=design([modelinfo],exactinputs=exact,observgroups=obs)
 print(opt_exact)
 
-opt_exact=design([model],exactinputs=exact)
+opt_exact=design([modelinfo],exactinputs=exact)
 print(opt_exact)
 
 print('Done')
