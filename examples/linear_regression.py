@@ -3,11 +3,10 @@ Add a docstring
 """
 import numpy as np
 import casadi as cs
+import pandas as pd
 from nloed.model import Model
 from nloed import design
 import time
-
-
 
 #Declare model inputs
 x=cs.SX.sym('Xs',1)
@@ -29,17 +28,18 @@ betanames=['beta0','beta1']
 #Instantiate class
 linear1d=Model(response,xnames,betanames)
 
-pred_struct1=linear1d.eval_model([1,1],1)
-pred_struct2=linear1d.eval_model([1,1],1,param_covariance=[[1,0],[0,1]])
-pred_struct3=linear1d.eval_model([1,1],1,sensitivity=True)
-pred_struct4=linear1d.eval_model([1,1],1,[[1,0],[0,1]],True,options={'ErrorMethod':'Delta'})
-pred_struct5=linear1d.eval_model([1,1],1,[[1,0],[0,1]],True,options={'ErrorMethod':'MonetCarlo'})
+# pred_structA=linear1d.eval_model([1,1],[1],[[1,0],[0,1]],True,options={'ErrorMethod':'Delta'})
+# pred_structB=linear1d.eval_model([1,1],[1],[[1,0],[0,1]],True,options={'ErrorMethod':'MonteCarlo','SampleSize':10000})
+# print(pred_structA['y1']['Mean']['Bounds'])
+# print(pred_structB['y1']['Mean']['Bounds'])
 
-Experiment={}
-Experiment['InputNames']=xnames
-Experiment['ObservationNames']=['y1']
-Experiment['Inputs']=[[0],[1],[2]]
-Experiment['Count']=[[5],[1],[5]]
+# pred_struct4=linear1d.eval_model([1,1],[[i] for i in range(10)],[[1,0],[0,1]],True,options={'ErrorMethod':'Delta'})
+# pred_struct5=linear1d.eval_model([1,1],[[i] for i in range(10)],[[1,0],[0,1]],True,options={'ErrorMethod':'MonteCarlo'})
+# pred_struct1=linear1d.eval_model([1,1],1)
+# pred_struct2=linear1d.eval_model([1,1],1,param_covariance=[[1,0],[0,1]])
+# pred_struct3=linear1d.eval_model([1,1],1,sensitivity=True)
+
+Experiment=pd.DataFrame({'x1':[0,1,2],'y1':[5,1,5]})
 dataset1=linear1d.sample(Experiment,[0,1],5)
 
 

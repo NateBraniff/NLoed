@@ -1,5 +1,6 @@
 import casadi as cs
 import numpy as np
+import pandas as pd
 import math as mt
 import copy as cp
 from scipy import stats as st
@@ -22,6 +23,9 @@ class Model:
     #NOTE: all names must be unique
     #NOTE: must enforce ordering of parameters in statistics function
     #NOTE: we need checks on inputs of fit and sample functions!!!
+
+    stat_name_dict={'Normal':['Mean','Variance'],'Poisson':['Lambda'],'Lognormal':['Mu','Sigma2']}
+
     def __init__(self,  observ_struct,  input_names,  param_names):
         #check for unique names
         if not(len(set(input_names)) == len(input_names)):
@@ -315,7 +319,7 @@ class Model:
         #NOTE: multiplex multiple parameter values??
         #NOTE: actually maybe more important to be able to replicat designs N times
         #check if designs is a single design or a list of designs
-        if not(isinstance(design_struct, list)):
+        if isinstance(design_struct, pd.DataFrame):
             #if single,  wrap it in a list to match general case
             design_list = [design_struct]
         else:
@@ -324,57 +328,33 @@ class Model:
         #create a list to store lists of datasets for each design
         design_datasets = []
         #loop over the designs
-        for e in range(len(design_list)):
-            #extract the current design
-            design = design_list[e]
-            #deep copy the current design to create an archetype for that design's datasets
-            archetype_dataset = cp.deepcopy(design)
-            #delete the 'count' field in the design,  as we are using it as a template for datasets
-            del archetype_dataset['Count']
-            #create 'observations' field in the archetype datset
-            archetype_dataset['Observation'] = []
+        for design in design_list:
+
+            #ensure the design is sorted by inputs and has standard column ordering (inputs, observs)
+            unique_design = design.groupby(self.input_name_list,as_index=False).sum()[self.input_name_list+self.observ_name_list]
+            #expand the unique design so theire is a row for each; unique input combination X observ variable
+            expanded_design = unique_design.melt(id_vars=self.input_name_list,var_name='Variable',value_name='Replicats')
+            expanded_design.sort_values(self.input_name_list,inplace=True)
+            expanded_design.reset_index(drop=True,inplace=True)
+            #expand design further so that design has a row for each; unique input combination X observ var  X replicate
+            itemized_design = expanded_design.reindex(expanded_design.index.repeat(expanded_design['Replicats']))
+            itemized_design.drop('Replicats',axis=1,inplace=True)
+            itemized_design.reset_index(drop=True)
+
             #create a list for replciated datasets of the current design
             replicat_datasets = []
             #loop over the number of replicates
             for r in range(replicats):
-                #create a deep copy of the dataset archetype for the current dataset
-                dataset = cp.deepcopy(archetype_dataset)
-                #loop over the (unique) input rows in the design
-                for i in range(len(design['Inputs'])):
-                    #get the input row
-                    input_row = design['Inputs'][i]
-                    #create a list for the current input row's observations
-                    observ_row = []
-                    #loop over the observation variables
-                    for j in range(self.num_observ):
-                        #get the count of observations for the given observ. var at the given input row
-                        observ_count = design['Count'][i][j]
-                        #select the appropriate distribution,  and generate the sample vec of appropriate length
-                        if self.distribution[j] == 'Normal':
-                            #compute the sample distirbution statistics using the model
-                            [mean,variance] = self.model[j](param, input_row)
-                            observ = np.random.normal(mean,  np.sqrt(variance),  observ_count).tolist() 
-                        elif self.distribution[j] == 'Poisson':
-                            lambda_ = self.model[j](param, input_row)
-                            observ = np.random.poisson(lambda_).tolist() 
-                        elif self.distribution[j] == 'Lognormal':
-                            print('Not Implemeneted')
-                        elif self.distribution[j] == 'Binomial':
-                            print('Not Implemeneted')
-                        elif self.distribution[j] == 'Exponential':
-                            print('Not Implemeneted')
-                        elif self.distribution[j] == 'Gamma':
-                            print('Not Implemeneted')
-                        else:
-                            raise Exception('Unknown error encountered selecting observation distribution,  contact developers')
-                        #add the current observation vector,  for the current observ. var.,  to the observ row
-                        observ_row.append(list(observ))
-                    #add the observation row to the current dataset
-                    dataset['Observation'].append(observ_row)
-                #add the current dataset to the replicat list
+                dataset=itemized_design.copy()
+                observation_list = []
+                for index,row in itemized_design.iterrows():
+                    input_row = row[self.input_name_list].to_numpy()
+                    observ_name = row['Variable']
+                    observation_list.append(self._sample_distribution( observ_name, input_row, param))
+                dataset['Observation'] = observation_list
                 replicat_datasets.append(dataset)
-            #add the replicat list to the design list
             design_datasets.append(replicat_datasets)
+                
         #check if a single design was passed
         if not(isinstance(design_struct,  list)):
             if replicats==1:
@@ -386,6 +366,43 @@ class Model:
         else:
             #else if multiple designs were passed (with/without reps),  return a list of list of datasets
             return design_datasets
+
+    def _sample_distribution(self, input_row, observ_name, param):
+        """
+        This function samples the appropriate distribution for the observation varibale name passed, at 
+        the input value passed, with the specified parameter values
+
+        Args:
+            input_row: a vector specifying the input settings
+            observ_name: the name of the observation variable to be sampled
+            param: the parameter settings at which to take the sample
+
+        Return:
+            observation: the (random) sample of the observation variable
+        """
+        #NOTE: should maybe allow for seed to be passed for debugging
+        observ_index=self.observ_name_dict[observ_name]
+        distribution_name=self.distribution[observ_index]
+
+        if distribution_name == 'Normal':
+            #compute the sample distirbution statistics using the model
+            [mean,variance] = self.model[observ_index](param, input_row)
+            observation = np.random.normal(mean,  np.sqrt(variance)).item()
+        elif distribution_name == 'Poisson':
+            lambda_ = self.model[observ_index](param, input_row)
+            observation = np.random.poisson(lambda_).item()
+        elif distribution_name == 'Lognormal':
+            print('Not Implemeneted')
+        elif distribution_name == 'Binomial':
+            print('Not Implemeneted')
+        elif distribution_name == 'Exponential':
+            print('Not Implemeneted')
+        elif distribution_name == 'Gamma':
+            print('Not Implemeneted')
+        else:
+            raise Exception('Unknown error encountered selecting observation distribution,  contact developers')
+
+        return observation
 
     #NOTE: should maybe rename this
     def eval_design(self):
@@ -399,9 +416,15 @@ class Model:
         print('Not Implemeneted')
         
     # UTILITY FUNCTIONS
-    def eval_model(self, param, inputs, param_covariance=None, sensitivity=False, observ_indices=None, options=None):
+    def eval_model(self, param, input_list, param_covariance=None, sensitivity=False, observ_indices=None, options=None):
         #NOTE: evaluate model,  predict y
         #NOTE: optional pass cov matrix,  for use with delta method/MC error bars on predictions
+        #NOTE: should multiplex over inputs
+        if not isinstance(input_list, list):
+            input_list = [[input_list]]
+        elif not isinstance(input_list[0], list):
+            input_list = [input_list]
+
         if not observ_indices:
             observ_list = list(range(self.num_observ))
         else:
@@ -425,46 +448,49 @@ class Model:
         else:
             alpha=0.95
 
-        statistic_list = []
-        sensitivity_list = []
-        error_bounds_list = []
+        covariance_array = np.array(param_covariance)
+
+        prediction_dict = {}
+        prediction_dict['Inputs'] = input_list
         for o in observ_list:
-            stat_row = []
-            sensitivity_row = []
-            bound_row=[]
-            for s in range(len(self.model)):
-                statistic = self.model[o][s](param, inputs).full()[0][0]
-                stat_row.append(statistic)
-                if sensitivity:
-                    sensitivity_vec = self.sensitivity[o][s](param, inputs).full()[0][0]
-                    sensitivity_row.append(sensitivity_vec)
+            statistics = [ [stat.full()[0][0]
+                            for stat in self.model[o](param, inputs)]
+                            for inputs in input_list]
+            if error_method == "MonteCarlo":
+                param_sample = np.random.multivariate_normal(param,  covariance_array,  num_mc_samples).tolist()
+                mc_sample =  [[[stat.full()[0][0]
+                                for stat in self.model[o](par, inputs)]
+                                for par in param_sample]
+                                for inputs in input_list]
+            observ_dict = {}
+            for s in range(len(self.sensitivity)):
+                stat_dict={}
+
+                stat_list = [stat[s] for stat in statistics]
+                stat_dict['Value'] = stat_list
+
+                if sensitivity or error_method == "Delta":
+                    sensitivity_list = [list(self.sensitivity[o][s](param, inputs).full()[0]) for inputs in input_list]
+                    stat_dict['Sensitivity'] = sensitivity_list
                 if param_covariance:
                     if error_method == "Delta":
-                        if not sensitivity:
-                            sensitivity_vec = self.sensitivity[o][s](param, inputs).full()[0][0]
-                        delta= np.sqrt(sensitivity_vec.T @ param_covariance @sensitivity_vec)
-                        bounds=[statistic-delta,statistic+delta]
+                        standard_dev_multiplier = -st.norm.ppf((1-alpha)/2)
+                        delta_list = [standard_dev_multiplier*(np.sqrt(np.array(sensitivity_vec) @ covariance_array @ np.array(sensitivity_vec).T))
+                                        for sensitivity_vec in sensitivity_list]
+                        #NOTE: need to scale this to alpha interval, right now just a single standard dev
+                        bounds_list = [[stat_list[i]-delta_list[i],stat_list[i]+delta_list[i]]
+                                        for i in range(len(stat_list))]
                     elif error_method == "MonteCarlo":
-                        stat_func=self.model[o][s]
-                        param_sample = np.random.normal(param,  param_covariance,  num_mc_samples).tolist() 
-                        mc_sample = []
-                        for par in param_sample:
-                            mc_sample.append(stat_func(par, inputs))
-                        bounds = np.percentile(mc_sample, [100*(1-alpha)/2, 100*(1.5-alpha/2)])
+                        bounds_list = [np.percentile(
+                            [mc_sample[i][j][s] for j in range(num_mc_samples)],[100*(1-alpha)/2, 100*(0.5+alpha/2)]
+                            ) for i in range(len(stat_list))]
                     else:
                         raise Exception('No such option; '+str(error_method)+' exists for field \'ErrorMethod\'!')
-                    bound_row.append(bounds)
-            statistic_list.append(stat_row)
-            sensitivity_list.append(sensitivity_row)
-            error_bounds_list.append(bound_row)
+                    stat_dict['Bounds'] = bounds_list
+                observ_dict[self.stat_name_dict[self.distribution[o]][s]] = stat_dict
+            prediction_dict[self.observ_name_list[0]]= observ_dict
 
-        prediction_struct=[statistic_list]
-        if sensitivity:
-            prediction_struct.append(sensitivity_list)
-        if param_covariance:
-            prediction_struct.append(error_bounds_list)
-
-        return prediction_struct
+        return prediction_dict
 
     # def evalfim(self):
     #     #NOTE: eval fim at given inputs and dataset
