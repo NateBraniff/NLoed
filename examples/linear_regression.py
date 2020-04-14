@@ -28,6 +28,16 @@ betanames=['beta0','beta1']
 #Instantiate class
 linear1d=Model(response,xnames,betanames)
 
+experimient1 = pd.DataFrame({'x1':[0,1,2],'y1':[5,1,5]})
+dataset1 = linear1d.sample(experimient1,[0,1],5)
+
+
+# start = time.time()
+pars=linear1d.fit(dataset1,[0,1],options={'Confidence':'Contours'})
+# end = time.time()
+# print(end - start)
+
+
 # pred_structA=linear1d.eval_model([1,1],[1],[[1,0],[0,1]],True,options={'ErrorMethod':'Delta'})
 # pred_structB=linear1d.eval_model([1,1],[1],[[1,0],[0,1]],True,options={'ErrorMethod':'MonteCarlo','SampleSize':10000})
 # print(pred_structA['y1']['Mean']['Bounds'])
@@ -39,22 +49,15 @@ linear1d=Model(response,xnames,betanames)
 # pred_struct2=linear1d.eval_model([1,1],1,param_covariance=[[1,0],[0,1]])
 # pred_struct3=linear1d.eval_model([1,1],1,sensitivity=True)
 
-Experiment=pd.DataFrame({'x1':[0,1,2],'y1':[5,1,5]})
-dataset1=linear1d.sample(Experiment,[0,1],5)
 
 
 
-start = time.time()
-parsfits=linear1d.fit(dataset1,[0,1],options={'Confidence':'Contours'})
-end = time.time()
-print(end - start)
 
-pars=parsfits[0]
 
-paramCov1=np.cov(pars,rowvar=False)
-paramMean1=np.mean(pars,axis=0)
+# paramCov1=np.cov(pars,rowvar=False)
+# paramMean1=np.mean(pars,axis=0)
 
-dataset2=linear1d.sample([Experiment,Experiment],[0,1])
+# dataset2=linear1d.sample([Experiment,Experiment],[0,1])
 
 modelinfo={'Model':linear1d, 'Parameters': [0.5, 1],'Objective':'D'}
 approx={'Inputs':['x1'],'Bounds':[(-1,1)]}

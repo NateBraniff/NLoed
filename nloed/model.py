@@ -149,20 +149,27 @@ class Model:
         Return:
             ParameterFitStruct: either; a list of lists structure with parameter fit lists,  has the same shape/order as the input,  OR,  the same strcture but with fits and intervals as the leaf object
         """
-        #NOTE: needs checks on inputs
+        #NOTE: needs checks on inputs, var names, designs must be exact reps
         #NOTE: NEED testing for multiple observation input structures,  multiple dimensions of parameters ideally,  1, 2, 3 and 7+
         #NOTE: add some print statments to provide user with progress status
         #NOTE: currently solve multiplex simultaneosly (one big opt problem) but sequentially may be more robust to separation (discrete data),  or randomly non-identifiable datasets (need to test)
         #this block allows the user to pass a dataset, list of datasets,  list of lists etc. for Design x Replicat fitting
-        if not(isinstance(dataset_struct,  list)):
+        if isinstance(dataset_struct, pd.DataFrame):
             #if a single dataset is passed vis the dataset_struct input,  wrap it in two lists so it matches general case
             design_datasets = [[dataset_struct]]
-        elif not(isinstance(dataset_struct[0],  list)):
+        elif isinstance(dataset_struct[0], pd.DataFrame):
             #else if dataset_struct input is a list of replciated datasets,  wrap it in a single list to match general case
             design_datasets = [dataset_struct]
         else:
             #else if dataset_struct input is a list of designs, each with a list of replicats,  just pass on th input
             design_datasets = dataset_struct
+        #get number of designs
+        num_designs = len(design_datasets)
+        #get number of replicats for each design
+        num_replicat_list = [len(rep_list) for rep_list in design_datasets]
+        #set confidence interval boolean
+        interval_bool = "Confidence" in options.keys() and\
+             (options['Confidence']=="Intervals" or options['Confidence']=="Contours" or options['Confidence']=="Profiles")
         #create a list to store parameter casadi symbols used for ML optimization
         param_symbols_list = []
         #create a list to store starting parameters (they are all determined by start_param,  but dim. depends on design x replicat size)
@@ -174,35 +181,29 @@ class Model:
         #create an archetypal vector of paramter symbols, used to build casadi loglikelihood functions for each design
         archetype_param_symbols = cs.SX.sym('archetype_param_symbols', self.num_param)
         #loop over different designs (outer most list)
-        for e in range(len(design_datasets)):
+        for e in range(num_designs):
             #get the set of replicats for this design
             replicat_datasets = design_datasets[e]
             #create a list to store loglikelihood functions for each specific replicat of the design
             replicat_loglik_func_list = []
-            #for each design use the first replicat 
-            archetype_data = replicat_datasets[0]
             #create a summation variable for the loglikelihood for a loglik_symbolset of the current design
             archetype_loglik_symbol = 0
+            #for each design use the first replicat 
+            archetype_dataset = replicat_datasets[0]
+            # get onbservation count for this design
+            num_observations = len(archetype_dataset.index)
             #create a vector of all observations in the design
-            example_observ_list = [element for row in archetype_data['Observation'] for group in row for element in group]
+            #example_observ_vec = archetype_dataset['Observation'].to_numpy()
             #create a vector of casadi symbols for the observations
-            archetype_observ_symbol = cs.SX.sym('archetype_observ_symbol'+str(e), len(example_observ_list))
-            #create a counter to index the total number of observations
-            sample_count = 0
+            archetype_observ_symbol = cs.SX.sym('archetype_observ_symbol'+str(e), num_observations)
             #loop over the dataset inputs
-            for i in range(len(archetype_data['Inputs'])):
+            for index,row in archetype_dataset.iterrows():
                 #get the curren input settings
-                input_row = archetype_data['Inputs'][i]
-                #loop over the observation varaibles
-                for j in range(self.num_observ):
-                    #for the given dataset loop over (the potentially replicated) observations for the given observation variable 
-                    #if no observations are taken at the given observation variable len=0 and we skip
-                    #NOTE: NEED TO CHECK THIS WORKS FOR MULTI OBSERV DATA
-                    for k in range(len(archetype_data['Observation'][i][j])):
-                        #create a symbol for the loglikelihood for the given input and observation variable
-                        archetype_loglik_symbol += self.loglik[j](archetype_observ_symbol[sample_count], archetype_param_symbols, input_row)
-                        #increment the observation counter
-                        sample_count += 1
+                input_row = row[self.input_name_list].to_numpy()
+                #get the observation variable index
+                observ_var_index = self.observ_name_dict[row['Variable']]
+                #create a symbol for the loglikelihood for the given input and observation variable
+                archetype_loglik_symbol += self.loglik[observ_var_index](archetype_observ_symbol[index], archetype_param_symbols, input_row)
             #create a casadi function for the loglikelihood of the current design (observations are free/input symbols)
             archetype_loglik_func = cs.Function('archetype_loglik_func'+str(e),  [archetype_observ_symbol, archetype_param_symbols],  [archetype_loglik_symbol])
             #loop over replicats within each design
@@ -213,11 +214,12 @@ class Model:
                 #create a vector of parameter symbols for this specific dataset,  each dataset gets its own,  these are used for ML optimization
                 fit_param_symbols = cs.SX.sym('fit_param_symbols'+'_'+str(e)+str(r), self.num_param)
                 #extract the vector of observations in the same format as in the archetype_loglik_func function input
-                observ_list = cs.vertcat(*[cs.SX(element) for row in dataset['Observation'] for group in row for element in group])
+                observ_vec = dataset['Observation'].to_numpy() 
                 #create a symbol for the datasets loglikelihood function by pass in the observations for the free symbols in ObservSymbol
-                dataset_loglik_symbol = archetype_loglik_func(observ_list, fit_param_symbols)
-                #create a function for
+                dataset_loglik_symbol = archetype_loglik_func(observ_vec, fit_param_symbols)
+                #create a function for the datasets loglikelihood function
                 dataset_loglik_func = cs.Function('dataset_loglik_func_'+str(e)+'_'+str(r),  [fit_param_symbols],  [dataset_loglik_symbol])
+                #add it to the list of replicate loglik functions
                 replicat_loglik_func_list.append(dataset_loglik_func)
                 #set up the logliklihood symbols for given design and replicat
                 param_symbols_list.append(fit_param_symbols)
@@ -237,71 +239,90 @@ class Model:
         # Solve the NLP fitting problem with IPOPT call
         param_fit_solution_struct = param_fitting_solver(x0=start_params_list)#,  lbx=[],  ubx=[],  lbg=[],  ubg=[]
         #extract the fit parameters from the solution structure
-        fit_param = list(param_fit_solution_struct['x'].full().flatten())
+        fit_param = param_fit_solution_struct['x'].full().flatten().reshape((-1,self.num_param))
         #NOTE: this is (very slightly) in efficient to do this loop twice but it makes it more readable
-        #NOTE: some extra space taken up by CI lists if not requested but not a big deal
-        #create a list to store fits params for each design
-        design_param_fit_list = []
-        #create a list to store param CI's for each design
-        design_param_interval_list = []
-        #loop over each design
-        for e in range(len(design_datasets)):
-            #create a list to store fits params for each replicat
-            replicat_param_fit_list=[]
-            #create a list to store param CI's for each replicat
-            replicat_param_interval_list=[]
-            #loop over each replicat of the given design
-            for r in range(len(design_datasets[e])):
-                #extract the fit parameters from the optimization solution vector
-                fit_param_set= fit_param[:self.num_param]
-                #check if 'confidence' key word is passed in the options dictionary
-                if "Confidence" in options.keys():
-                    #check if graphing options; contour plots or profile trace plots,  are requested
-                    if options['Confidence']=="Contours" or options['Confidence']=="Profiles":
-                        #if so, create a figure to plot on
-                        fig = plt.figure()
-                        #run profileplots to plot the profile traces and return CI's
-                        interval_list = self.__profileplot(fit_param_set, design_loglik_func_list[e][r], fig, options)[0]
-                        #add the CI's to the replicate CI list
-                        replicat_param_interval_list.append(interval_list)
-                        #if contour plots are requested specifically, run contour function to plot the projected confidence contours
-                        if options['Confidence']=="Contours":
-                            self.__contourplot(fit_param_set, design_loglik_func_list[e][r], fig, options)
-                    elif options['Confidence']=="Intervals":
-                        #if confidence intervals are requested, run confidenceintervals to get CI's and add them to replicat list
-                        replicat_param_interval_list.append(self.__confidence_intervals(fit_param_set, design_loglik_func_list[e][r], options))
-                #remove the current extracted parameters from the solution vector
-                del fit_param[:self.num_param]
-                #add the extracted parameters to the replicat parameter lsit
-                replicat_param_fit_list.append(fit_param_set)
-            #add the replicat list to the design list
-            design_param_fit_list.append(replicat_param_fit_list)
-            #add replicat CI list to design CI list
-            design_param_interval_list.append(replicat_param_interval_list)
-        #if we need to plot profile traces or contours 
-        if "Confidence" in options.keys() and (options['Confidence']=="Contours" or options['Confidence']=="Profiles"):
-            plt.show()
-        #depending on dimension of input datasets (i.e. single, replcated design, multiple rep'd designs),  package output to match
-        if not(isinstance(dataset_struct,  list)):
-            #if a single dataset dict. was passed, return a param vec and CI list accordingly
-            design_param_fit_list = design_param_fit_list[0][0]
-            design_param_interval_list = design_param_interval_list[0][0]
-        elif not(isinstance(dataset_struct[0],  list)):
-            #if a list a replicated design was passed, return a a list of param vecs and CI lists accordingly
-            design_param_fit_list = design_param_fit_list[0]
-            design_param_interval_list = design_param_interval_list[0]
-        else:
-            #if a list designs,  each listing replicats, was passed, return a a list of lists of param vecs and CI lists accordingly
-            design_param_fit_list = design_param_fit_list
-            design_param_interval_list = design_param_interval_list
-        #check if CI's were generated, is so return both param fits and CI's in a list, else a just param fits
-        #NOTE: this may be a bit awkward, should possibly keep it standardized
-        if "Confidence" in options.keys() and (options['Confidence']=="Intervals" or options['Confidence']=="Contours" or options['Confidence']=="Profiles"):
-            param_fit_struct = [design_param_fit_list,  design_param_interval_list]
-        else:
-            param_fit_struct = design_param_fit_list
+
+        t=0
+        #  design_indices = [design_indx+1 for design_indx in range(num_designs) for i in num_replicat_list[design_indx]]
+        
+        # if interval_bool:
+        #     export_column_multiindex = pd.MultiIndex.from_array([['Estimate','Lower','Upper'],replicate_indices)],names=['Value', 'Parameter'])
+        # else:
+
+        
+        # replicate_indices = [i+1 for num_reps in num_replicat_list for i in range(num_reps)]
+
+        # export_row_multiindex = pd.MultiIndex.from_array([design_indices,replicate_indices)],names=['Design', 'Replicat'])
+
+
+        # df = pd.DataFrame('-', idx, col)
+
+
+        # #NOTE: some extra space taken up by CI lists if not requested but not a big deal
+        # #create a list to store fits params for each design
+        # #design_param_fit_list = []
+        # #create a list to store param CI's for each design
+        # #design_param_interval_list = []
+        # #loop over each design
+        # for e in range(len(design_datasets)):
+        #     #create a list to store fits params for each replicat
+        #     #replicat_param_fit_list=[]
+        #     #create a list to store param CI's for each replicat
+        #     #replicat_param_interval_list=[]
+        #     #loop over each replicat of the given design
+        #     for r in range(len(design_datasets[e])):
+        #         #extract the fit parameters from the optimization solution vector
+        #         fit_param_set= fit_param[:self.num_param]
+        #         #check if 'confidence' key word is passed in the options dictionary
+        #         if "Confidence" in options.keys():
+        #             #check if graphing options; contour plots or profile trace plots,  are requested
+        #             if options['Confidence']=="Contours" or options['Confidence']=="Profiles":
+        #                 #if so, create a figure to plot on
+        #                 fig = plt.figure()
+        #                 #run profileplots to plot the profile traces and return CI's
+        #                 interval_list = self.__profileplot(fit_param_set, design_loglik_func_list[e][r], fig, options)[0]
+        #                 #add the CI's to the replicate CI list
+        #                 #replicat_param_interval_list.append(interval_list)
+        #                 #if contour plots are requested specifically, run contour function to plot the projected confidence contours
+        #                 if options['Confidence']=="Contours":
+        #                     self.__contourplot(fit_param_set, design_loglik_func_list[e][r], fig, options)
+        #             elif options['Confidence']=="Intervals":
+        #                 #if confidence intervals are requested, run confidenceintervals to get CI's and add them to replicat list
+        #                 interval_list = self.__confidence_intervals(fit_param_set, design_loglik_func_list[e][r], options)
+        #                 #replicat_param_interval_list.append()
+        #         #remove the current extracted parameters from the solution vector
+        #         del fit_param[:self.num_param]
+        #         #add the extracted parameters to the replicat parameter lsit
+        #         replicat_param_fit_list.append(fit_param_set)
+        #     #add the replicat list to the design list
+        #     #design_param_fit_list.append(replicat_param_fit_list)
+        #     #add replicat CI list to design CI list
+        #     #design_param_interval_list.append(replicat_param_interval_list)
+
+        # #if we need to plot profile traces or contours 
+        # if "Confidence" in options.keys() and (options['Confidence']=="Contours" or options['Confidence']=="Profiles"):
+        #     plt.show()
+        # #depending on dimension of input datasets (i.e. single, replcated design, multiple rep'd designs),  package output to match
+        # if not(isinstance(dataset_struct,  list)):
+        #     #if a single dataset dict. was passed, return a param vec and CI list accordingly
+        #     design_param_fit_list = design_param_fit_list[0][0]
+        #     design_param_interval_list = design_param_interval_list[0][0]
+        # elif not(isinstance(dataset_struct[0],  list)):
+        #     #if a list a replicated design was passed, return a a list of param vecs and CI lists accordingly
+        #     design_param_fit_list = design_param_fit_list[0]
+        #     design_param_interval_list = design_param_interval_list[0]
+        # else:
+        #     #if a list designs,  each listing replicats, was passed, return a a list of lists of param vecs and CI lists accordingly
+        #     design_param_fit_list = design_param_fit_list
+        #     design_param_interval_list = design_param_interval_list
+        # #check if CI's were generated, is so return both param fits and CI's in a list, else a just param fits
+        # #NOTE: this may be a bit awkward, should possibly keep it standardized
+        # if "Confidence" in options.keys() and (options['Confidence']=="Intervals" or options['Confidence']=="Contours" or options['Confidence']=="Profiles"):
+        #     param_fit_struct = [design_param_fit_list,  design_param_interval_list]
+        # else:
+        #     param_fit_struct = design_param_fit_list
         #return the appropriate return structure
-        return param_fit_struct
+        return fit_param
 
     def sample(self, design_struct, param, replicats=1):
         """
@@ -329,7 +350,6 @@ class Model:
         design_datasets = []
         #loop over the designs
         for design in design_list:
-
             #ensure the design is sorted by inputs and has standard column ordering (inputs, observs)
             unique_design = design.groupby(self.input_name_list,as_index=False).sum()[self.input_name_list+self.observ_name_list]
             #expand the unique design so theire is a row for each; unique input combination X observ variable
@@ -339,8 +359,7 @@ class Model:
             #expand design further so that design has a row for each; unique input combination X observ var  X replicate
             itemized_design = expanded_design.reindex(expanded_design.index.repeat(expanded_design['Replicats']))
             itemized_design.drop('Replicats',axis=1,inplace=True)
-            itemized_design.reset_index(drop=True)
-
+            itemized_design.reset_index(drop=True,inplace=True)
             #create a list for replciated datasets of the current design
             replicat_datasets = []
             #loop over the number of replicates
@@ -350,7 +369,7 @@ class Model:
                 for index,row in itemized_design.iterrows():
                     input_row = row[self.input_name_list].to_numpy()
                     observ_name = row['Variable']
-                    observation_list.append(self._sample_distribution( observ_name, input_row, param))
+                    observation_list.append(self._sample_distribution(input_row, observ_name, param))
                 dataset['Observation'] = observation_list
                 replicat_datasets.append(dataset)
             design_datasets.append(replicat_datasets)
@@ -381,8 +400,8 @@ class Model:
             observation: the (random) sample of the observation variable
         """
         #NOTE: should maybe allow for seed to be passed for debugging
-        observ_index=self.observ_name_dict[observ_name]
-        distribution_name=self.distribution[observ_index]
+        observ_index = self.observ_name_dict[observ_name]
+        distribution_name = self.distribution[observ_index]
 
         if distribution_name == 'Normal':
             #compute the sample distirbution statistics using the model
