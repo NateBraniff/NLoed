@@ -135,7 +135,7 @@ class Model:
             else:
                 raise Exception('Unknown Distribution: '+observ_distribution)
 
-    def fit(self, dataset_struct, start_param, options=None):
+    def fit(self, dataset_struct, start_param, options={}):
         """
         This function fits the model to a dataset using maximum likelihood
         it also provides optional marginal confidence intervals
@@ -163,39 +163,42 @@ class Model:
         else:
             #else if dataset_struct input is a list of designs, each with a list of replicats,  just pass on th input
             design_datasets = dataset_struct
+        #set confidence interval boolean
+        interval_bool = "Confidence" in options.keys() and\
+             (options['Confidence']=="Intervals" or options['Confidence']=="Contours" or options['Confidence']=="Profiles")
+        #set plotting boolean
+        plot_bool = "Confidence" in options.keys() and (options['Confidence']=="Contours" or options['Confidence']=="Profiles")
+        #check if invalid value passed
+        if not interval_bool and "Confidence" in options.keys():
+            raise Exception('Invalid value passed to option field \'Confidence\'!')
         #get number of designs
         num_designs = len(design_datasets)
         #get number of replicats for each design
         num_replicat_list = [len(rep_list) for rep_list in design_datasets]
-        #set confidence interval boolean
-        interval_bool = "Confidence" in options.keys() and\
-             (options['Confidence']=="Intervals" or options['Confidence']=="Contours" or options['Confidence']=="Profiles")
+        #get total number of datasets
+        num_datasets = sum(num_replicat_list)
         #create a list to store parameter casadi symbols used for ML optimization
         param_symbols_list = []
         #create a list to store starting parameters (they are all determined by start_param,  but dim. depends on design x replicat size)
         start_params_list = []
         #create a list to store casadi generic loglikelihood functions for each design
-        design_loglik_func_list = []
+        loglik_func_list = []
         #create a total loglikelihood summation store, initialize to zero
         total_loglik_symbol = 0
         #create an archetypal vector of paramter symbols, used to build casadi loglikelihood functions for each design
         archetype_param_symbols = cs.SX.sym('archetype_param_symbols', self.num_param)
         #loop over different designs (outer most list)
-        for e in range(num_designs):
+        for d in range(num_designs):
             #get the set of replicats for this design
-            replicat_datasets = design_datasets[e]
-            #create a list to store loglikelihood functions for each specific replicat of the design
-            replicat_loglik_func_list = []
+            replicat_datasets = design_datasets[d]
             #create a summation variable for the loglikelihood for a loglik_symbolset of the current design
             archetype_loglik_symbol = 0
             #for each design use the first replicat 
             archetype_dataset = replicat_datasets[0]
             # get onbservation count for this design
             num_observations = len(archetype_dataset.index)
-            #create a vector of all observations in the design
-            #example_observ_vec = archetype_dataset['Observation'].to_numpy()
             #create a vector of casadi symbols for the observations
-            archetype_observ_symbol = cs.SX.sym('archetype_observ_symbol'+str(e), num_observations)
+            archetype_observ_symbol = cs.SX.sym('archetype_observ_symbol'+str(d), num_observations)
             #loop over the dataset inputs
             for index,row in archetype_dataset.iterrows():
                 #get the curren input settings
@@ -205,22 +208,20 @@ class Model:
                 #create a symbol for the loglikelihood for the given input and observation variable
                 archetype_loglik_symbol += self.loglik[observ_var_index](archetype_observ_symbol[index], archetype_param_symbols, input_row)
             #create a casadi function for the loglikelihood of the current design (observations are free/input symbols)
-            archetype_loglik_func = cs.Function('archetype_loglik_func'+str(e),  [archetype_observ_symbol, archetype_param_symbols],  [archetype_loglik_symbol])
+            archetype_loglik_func = cs.Function('archetype_loglik_func'+str(d),  [archetype_observ_symbol, archetype_param_symbols],  [archetype_loglik_symbol])
             #loop over replicats within each design
-            for r in range(len(replicat_datasets)):
+            for r in range(num_replicat_list[d]):
                 #NOTE: could abstract below into a Casadi function to avoid input/observ loop on each dataset and replicat
                 #get the dataset from the replicat list
                 dataset = replicat_datasets[r]
                 #create a vector of parameter symbols for this specific dataset,  each dataset gets its own,  these are used for ML optimization
-                fit_param_symbols = cs.SX.sym('fit_param_symbols'+'_'+str(e)+str(r), self.num_param)
+                fit_param_symbols = cs.SX.sym('fit_param_symbols'+'_'+str(d)+str(r), self.num_param)
                 #extract the vector of observations in the same format as in the archetype_loglik_func function input
                 observ_vec = dataset['Observation'].to_numpy() 
                 #create a symbol for the datasets loglikelihood function by pass in the observations for the free symbols in ObservSymbol
                 dataset_loglik_symbol = archetype_loglik_func(observ_vec, fit_param_symbols)
-                #create a function for the datasets loglikelihood function
-                dataset_loglik_func = cs.Function('dataset_loglik_func_'+str(e)+'_'+str(r),  [fit_param_symbols],  [dataset_loglik_symbol])
                 #add it to the list of replicate loglik functions
-                replicat_loglik_func_list.append(dataset_loglik_func)
+                loglik_func_list.append(cs.Function('dataset_loglik_func_'+str(d)+'_'+str(r),  [fit_param_symbols],  [dataset_loglik_symbol]))
                 #set up the logliklihood symbols for given design and replicat
                 param_symbols_list.append(fit_param_symbols)
                 #record the starting parameters for the given replicat and dataset
@@ -228,8 +229,6 @@ class Model:
                 #add the loglikelihood to the total 
                 #NOTE: this relies on the distirbutivity of serperable optimization problem,  should confirm
                 total_loglik_symbol += dataset_loglik_symbol
-            #append the list of replciate loglik functions to the design list
-            design_loglik_func_list.append(replicat_loglik_func_list)
         #NOTE: this approach is much more fragile to separation (glms with discrete response),  randomly weakly identifiable datasets
         #NOTE: should be checking solution for convergence, should allow user to pass options to ipopt
         #NOTE: allow bfgs for very large nonlinear fits, may be faster
@@ -239,90 +238,50 @@ class Model:
         # Solve the NLP fitting problem with IPOPT call
         param_fit_solution_struct = param_fitting_solver(x0=start_params_list)#,  lbx=[],  ubx=[],  lbg=[],  ubg=[]
         #extract the fit parameters from the solution structure
-        fit_param = param_fit_solution_struct['x'].full().flatten().reshape((-1,self.num_param))
-        #NOTE: this is (very slightly) in efficient to do this loop twice but it makes it more readable
-
-        t=0
-        #  design_indices = [design_indx+1 for design_indx in range(num_designs) for i in num_replicat_list[design_indx]]
-        
-        # if interval_bool:
-        #     export_column_multiindex = pd.MultiIndex.from_array([['Estimate','Lower','Upper'],replicate_indices)],names=['Value', 'Parameter'])
-        # else:
-
-        
-        # replicate_indices = [i+1 for num_reps in num_replicat_list for i in range(num_reps)]
-
-        # export_row_multiindex = pd.MultiIndex.from_array([design_indices,replicate_indices)],names=['Design', 'Replicat'])
-
-
-        # df = pd.DataFrame('-', idx, col)
-
-
-        # #NOTE: some extra space taken up by CI lists if not requested but not a big deal
-        # #create a list to store fits params for each design
-        # #design_param_fit_list = []
-        # #create a list to store param CI's for each design
-        # #design_param_interval_list = []
-        # #loop over each design
-        # for e in range(len(design_datasets)):
-        #     #create a list to store fits params for each replicat
-        #     #replicat_param_fit_list=[]
-        #     #create a list to store param CI's for each replicat
-        #     #replicat_param_interval_list=[]
-        #     #loop over each replicat of the given design
-        #     for r in range(len(design_datasets[e])):
-        #         #extract the fit parameters from the optimization solution vector
-        #         fit_param_set= fit_param[:self.num_param]
-        #         #check if 'confidence' key word is passed in the options dictionary
-        #         if "Confidence" in options.keys():
-        #             #check if graphing options; contour plots or profile trace plots,  are requested
-        #             if options['Confidence']=="Contours" or options['Confidence']=="Profiles":
-        #                 #if so, create a figure to plot on
-        #                 fig = plt.figure()
-        #                 #run profileplots to plot the profile traces and return CI's
-        #                 interval_list = self.__profileplot(fit_param_set, design_loglik_func_list[e][r], fig, options)[0]
-        #                 #add the CI's to the replicate CI list
-        #                 #replicat_param_interval_list.append(interval_list)
-        #                 #if contour plots are requested specifically, run contour function to plot the projected confidence contours
-        #                 if options['Confidence']=="Contours":
-        #                     self.__contourplot(fit_param_set, design_loglik_func_list[e][r], fig, options)
-        #             elif options['Confidence']=="Intervals":
-        #                 #if confidence intervals are requested, run confidenceintervals to get CI's and add them to replicat list
-        #                 interval_list = self.__confidence_intervals(fit_param_set, design_loglik_func_list[e][r], options)
-        #                 #replicat_param_interval_list.append()
-        #         #remove the current extracted parameters from the solution vector
-        #         del fit_param[:self.num_param]
-        #         #add the extracted parameters to the replicat parameter lsit
-        #         replicat_param_fit_list.append(fit_param_set)
-        #     #add the replicat list to the design list
-        #     #design_param_fit_list.append(replicat_param_fit_list)
-        #     #add replicat CI list to design CI list
-        #     #design_param_interval_list.append(replicat_param_interval_list)
-
-        # #if we need to plot profile traces or contours 
-        # if "Confidence" in options.keys() and (options['Confidence']=="Contours" or options['Confidence']=="Profiles"):
-        #     plt.show()
-        # #depending on dimension of input datasets (i.e. single, replcated design, multiple rep'd designs),  package output to match
-        # if not(isinstance(dataset_struct,  list)):
-        #     #if a single dataset dict. was passed, return a param vec and CI list accordingly
-        #     design_param_fit_list = design_param_fit_list[0][0]
-        #     design_param_interval_list = design_param_interval_list[0][0]
-        # elif not(isinstance(dataset_struct[0],  list)):
-        #     #if a list a replicated design was passed, return a a list of param vecs and CI lists accordingly
-        #     design_param_fit_list = design_param_fit_list[0]
-        #     design_param_interval_list = design_param_interval_list[0]
-        # else:
-        #     #if a list designs,  each listing replicats, was passed, return a a list of lists of param vecs and CI lists accordingly
-        #     design_param_fit_list = design_param_fit_list
-        #     design_param_interval_list = design_param_interval_list
-        # #check if CI's were generated, is so return both param fits and CI's in a list, else a just param fits
-        # #NOTE: this may be a bit awkward, should possibly keep it standardized
-        # if "Confidence" in options.keys() and (options['Confidence']=="Intervals" or options['Confidence']=="Contours" or options['Confidence']=="Profiles"):
-        #     param_fit_struct = [design_param_fit_list,  design_param_interval_list]
-        # else:
-        #     param_fit_struct = design_param_fit_list
-        #return the appropriate return structure
-        return fit_param
+        fit_param_matrix = param_fit_solution_struct['x'].full().flatten().reshape((-1,self.num_param))
+        #create row index for parameter dataframe export, specifies design index for each datset
+        design_index = [design_indx+1 for design_indx in range(num_designs) for i in range(num_replicat_list[design_indx])]
+        #check if a  confidence value was passed as an option, requires confidence intervals at least
+        if interval_bool:
+            #create a multiindex for the columns of parameter dataframe export
+            # first level define estimate and lower/upper bound, second is param values
+            column_index = pd.MultiIndex.from_product([['Estimate','Lower','Upper'],self.param_name_list],names=['Value', 'Parameter'])
+            #create an empty list to store lower/upper bounds for intervals
+            bound_list = []
+            #loop over each design
+            for d in range(num_datasets):
+                #get the parameter estimates for current dataset
+                param_vec = fit_param_matrix[d,:]
+                #check if graphing options; contour plots or profile trace plots,  are requested
+                if options['Confidence']=="Contours" or options['Confidence']=="Profiles":
+                    #if so, create a figure to plot on
+                    fig = plt.figure()
+                    #run profileplots to plot the profile traces and return CI's
+                    interval_list = self.__profileplot(param_vec, loglik_func_list[d], fig, options)[0]
+                    #if contour plots are requested specifically, run contour function to plot the projected confidence contours
+                    if options['Confidence']=="Contours":
+                        self.__contourplot(param_vec, loglik_func_list[d], fig, options)
+                elif options['Confidence']=="Intervals":
+                    #if confidence intervals are requested, run confidenceintervals to get CI's and add them to replicat list
+                    interval_list = self.__confidence_intervals(param_vec, loglik_func_list[d], options)
+                #store the current boundary vector in the bound_list
+                bound_list.append( np.asarray(interval_list).T.flatten())
+            #if requested, show the plots
+            if plot_bool:
+                #NOTE: need to give order of plots to user, perhaps with title
+                plt.show()
+            #combine the bound vectors in boundlist into a single numpy matrix
+            bound_param_matrix = np.stack(bound_list)
+            #concatenate the fit_param_matrix matrix of fit parameters with the bound_param_matrix of parameter interval boundaries
+            param_output_matrix = np.concatenate([fit_param_matrix, bound_param_matrix], axis=1)
+        else:
+            #if no intervals are requested, set column indext to single level, with just parameter names
+            column_index = self.param_name_list
+            param_output_matrix = fit_param_matrix
+        #create ouput dataframe with all request parameter information
+        param_data = pd.DataFrame(param_output_matrix, index=design_index, columns=column_index)
+        #return the dataframe
+        return param_data
 
     def sample(self, design_struct, param, replicats=1):
         """
@@ -422,6 +381,76 @@ class Model:
             raise Exception('Unknown error encountered selecting observation distribution,  contact developers')
 
         return observation
+        
+    # UTILITY FUNCTIONS
+    def eval_model(self, input_list, param, observ_names=None, covariance_matrix=None, sensitivity=False,  options={} ):
+        #NOTE: evaluate model,  predict y
+        #NOTE: optional pass cov matrix,  for use with delta method/MC error bars on predictions
+        #NOTE: should multiplex over inputs
+        if isinstance(input_list, pd.DataFrame):
+            input_list = [[input_list]]
+        elif isinstance(input_list[0], pd.DataFrame):
+            input_list = [input_list]
+
+        # if not observ_names:
+        #     observ_names = self.observ_name_list
+
+        # if 'ErrorMethod' in options.keys():
+        #     error_method = options["ErrorMethod"]
+        # else:
+        #     error_method='Delta'
+
+        # if 'SampleSize' in options.keys():
+        #     num_mc_samples = options["SampleSize"]
+        # else:
+        #     num_mc_samples=10000
+
+        # if 'ErrorBars' in options.keys():
+        #     alpha = options["ConfidenceLevel"]
+        # else:
+        #     alpha=0.95
+
+        # prediction_dict = {}
+        # prediction_dict['Inputs'] = input_list
+        # for o in observ_list:
+        #     statistics = [ [stat.full()[0][0]
+        #                     for stat in self.model[o](param, inputs)]
+        #                     for inputs in input_list]
+        #     if error_method == "MonteCarlo":
+        #         param_sample = np.random.multivariate_normal(param,  covariance_array,  num_mc_samples).tolist()
+        #         mc_sample =  [[[stat.full()[0][0]
+        #                         for stat in self.model[o](par, inputs)]
+        #                         for par in param_sample]
+        #                         for inputs in input_list]
+        #     observ_dict = {}
+        #     for s in range(len(self.sensitivity)):
+        #         stat_dict={}
+
+        #         stat_list = [stat[s] for stat in statistics]
+        #         stat_dict['Value'] = stat_list
+
+        #         if sensitivity or error_method == "Delta":
+        #             sensitivity_list = [list(self.sensitivity[o][s](param, inputs).full()[0]) for inputs in input_list]
+        #             stat_dict['Sensitivity'] = sensitivity_list
+        #         if param_covariance:
+        #             if error_method == "Delta":
+        #                 standard_dev_multiplier = -st.norm.ppf((1-alpha)/2)
+        #                 delta_list = [standard_dev_multiplier*(np.sqrt(np.array(sensitivity_vec) @ covariance_array @ np.array(sensitivity_vec).T))
+        #                                 for sensitivity_vec in sensitivity_list]
+        #                 #NOTE: need to scale this to alpha interval, right now just a single standard dev
+        #                 bounds_list = [[stat_list[i]-delta_list[i],stat_list[i]+delta_list[i]]
+        #                                 for i in range(len(stat_list))]
+        #             elif error_method == "MonteCarlo":
+        #                 bounds_list = [np.percentile(
+        #                     [mc_sample[i][j][s] for j in range(num_mc_samples)],[100*(1-alpha)/2, 100*(0.5+alpha/2)]
+        #                     ) for i in range(len(stat_list))]
+        #             else:
+        #                 raise Exception('No such option; '+str(error_method)+' exists for field \'ErrorMethod\'!')
+        #             stat_dict['Bounds'] = bounds_list
+        #         observ_dict[self.stat_name_dict[self.distribution[o]][s]] = stat_dict
+        #     prediction_dict[self.observ_name_list[0]]= observ_dict
+
+        # return prediction_dict
 
     #NOTE: should maybe rename this
     def eval_design(self):
@@ -433,83 +462,6 @@ class Model:
         #          monte carlo: covariance,  bias,  MSE
         
         print('Not Implemeneted')
-        
-    # UTILITY FUNCTIONS
-    def eval_model(self, param, input_list, param_covariance=None, sensitivity=False, observ_indices=None, options=None):
-        #NOTE: evaluate model,  predict y
-        #NOTE: optional pass cov matrix,  for use with delta method/MC error bars on predictions
-        #NOTE: should multiplex over inputs
-        if not isinstance(input_list, list):
-            input_list = [[input_list]]
-        elif not isinstance(input_list[0], list):
-            input_list = [input_list]
-
-        if not observ_indices:
-            observ_list = list(range(self.num_observ))
-        else:
-            observ_list = observ_indices
-
-        if not options:
-            options={}
-
-        if 'ErrorMethod' in options.keys():
-            error_method = options["ErrorMethod"]
-        else:
-            error_method='Delta'
-
-        if 'SampleSize' in options.keys():
-            num_mc_samples = options["SampleSize"]
-        else:
-            num_mc_samples=10000
-
-        if 'ErrorBars' in options.keys():
-            alpha = options["ConfidenceLevel"]
-        else:
-            alpha=0.95
-
-        covariance_array = np.array(param_covariance)
-
-        prediction_dict = {}
-        prediction_dict['Inputs'] = input_list
-        for o in observ_list:
-            statistics = [ [stat.full()[0][0]
-                            for stat in self.model[o](param, inputs)]
-                            for inputs in input_list]
-            if error_method == "MonteCarlo":
-                param_sample = np.random.multivariate_normal(param,  covariance_array,  num_mc_samples).tolist()
-                mc_sample =  [[[stat.full()[0][0]
-                                for stat in self.model[o](par, inputs)]
-                                for par in param_sample]
-                                for inputs in input_list]
-            observ_dict = {}
-            for s in range(len(self.sensitivity)):
-                stat_dict={}
-
-                stat_list = [stat[s] for stat in statistics]
-                stat_dict['Value'] = stat_list
-
-                if sensitivity or error_method == "Delta":
-                    sensitivity_list = [list(self.sensitivity[o][s](param, inputs).full()[0]) for inputs in input_list]
-                    stat_dict['Sensitivity'] = sensitivity_list
-                if param_covariance:
-                    if error_method == "Delta":
-                        standard_dev_multiplier = -st.norm.ppf((1-alpha)/2)
-                        delta_list = [standard_dev_multiplier*(np.sqrt(np.array(sensitivity_vec) @ covariance_array @ np.array(sensitivity_vec).T))
-                                        for sensitivity_vec in sensitivity_list]
-                        #NOTE: need to scale this to alpha interval, right now just a single standard dev
-                        bounds_list = [[stat_list[i]-delta_list[i],stat_list[i]+delta_list[i]]
-                                        for i in range(len(stat_list))]
-                    elif error_method == "MonteCarlo":
-                        bounds_list = [np.percentile(
-                            [mc_sample[i][j][s] for j in range(num_mc_samples)],[100*(1-alpha)/2, 100*(0.5+alpha/2)]
-                            ) for i in range(len(stat_list))]
-                    else:
-                        raise Exception('No such option; '+str(error_method)+' exists for field \'ErrorMethod\'!')
-                    stat_dict['Bounds'] = bounds_list
-                observ_dict[self.stat_name_dict[self.distribution[o]][s]] = stat_dict
-            prediction_dict[self.observ_name_list[0]]= observ_dict
-
-        return prediction_dict
 
     # def evalfim(self):
     #     #NOTE: eval fim at given inputs and dataset

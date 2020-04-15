@@ -13,33 +13,33 @@ x=cs.SX.sym('Xs',1)
 
 #Declare the number of parameters-of-interest
 #These are the parameters you are interested in estimating as accurately as possible (or nuisance parameters, you can decide which is which later)
-beta=cs.SX.sym('Betas',2)
+p=cs.SX.sym('Betas',2)
 
 #Now we define how x and beta are linked to the distribution parameters, theta, of the normal response distribution
 #Define a 1D linear model with slope and intercept for the mean, constant variance, 
 #combine these into a function computing the response distribution parameters, theta (in this case mean and var)
-theta=cs.Function('theta',[beta,x],[beta[0] + x*beta[1], 0.01])
+predictor = cs.Function('theta',[p,x],[p[0] + x*p[1], 0.01])
 
 #Enter the above model into the list of reponse variables
-response= [('y1','Normal',theta)]
-xnames=['x1']
-betanames=['beta0','beta1']
+response= [('y1','Normal',predictor)]
+input_names = ['x1']
+param_names = ['p1','p2']
 
 #Instantiate class
-linear1d=Model(response,xnames,betanames)
+linear1d=Model(response,input_names,param_names)
 
-experimient1 = pd.DataFrame({'x1':[0,1,2],'y1':[5,1,5]})
-dataset1 = linear1d.sample(experimient1,[0,1],5)
+design1 = pd.DataFrame({'x1':[0,1,2],'y1':[5,1,5]})
+design2 = pd.DataFrame({'x1':[-1,0,1],'y1':[4,3,4]})
 
+dataset_list = linear1d.sample([design1,design2],[0,1],5)
 
-# start = time.time()
-pars=linear1d.fit(dataset1,[0,1],options={'Confidence':'Contours'})
-# end = time.time()
-# print(end - start)
+pars_info = linear1d.fit(dataset_list,[0,1],options={'Confidence':'Contours'})
 
+inputs = design1[input_names]
+par_est = pars_info['Estimate'][param_names].to_numpy()
 
-# pred_structA=linear1d.eval_model([1,1],[1],[[1,0],[0,1]],True,options={'ErrorMethod':'Delta'})
-# pred_structB=linear1d.eval_model([1,1],[1],[[1,0],[0,1]],True,options={'ErrorMethod':'MonteCarlo','SampleSize':10000})
+#pred_structA=linear1d.eval_model(inputs, par_est, [[1,0],[0,1]], True,options={'ErrorMethod':'Delta'})
+#pred_structB=linear1d.eval_model(inputs, par_est, [[1,0],[0,1]], True,options={'ErrorMethod':'MonteCarlo','SampleSize':10000})
 # print(pred_structA['y1']['Mean']['Bounds'])
 # print(pred_structB['y1']['Mean']['Bounds'])
 
