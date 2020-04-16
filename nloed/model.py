@@ -382,34 +382,41 @@ class Model:
 
         return observation
         
-    # UTILITY FUNCTIONS
-    def eval_model(self, input_list, param, observ_names=None, covariance_matrix=None, sensitivity=False,  options={} ):
-        #NOTE: evaluate model,  predict y
+    def predict(self, input_struct, param, covariance_matrix=None,  options={} ):
+        #NOTE: evaluate model to predict mean and prediction interval for y
         #NOTE: optional pass cov matrix,  for use with delta method/MC error bars on predictions
         #NOTE: should multiplex over inputs
-        if isinstance(input_list, pd.DataFrame):
-            input_list = [[input_list]]
-        elif isinstance(input_list[0], pd.DataFrame):
-            input_list = [input_list]
+        # if isinstance(input_list, pd.DataFrame):
+        #     input_list = [[input_list]]
+        # elif isinstance(input_list[0], pd.DataFrame):
+        #     input_list = [input_list]
 
-        # if not observ_names:
-        #     observ_names = self.observ_name_list
+        default_options = { 'Uncertainty':      [False,     lambda x: isinstance(x,bool)],
+                            'Method':           ['Delta',   lambda x: isinstance(x,str) and x=='Delta' or x=='MonteCarlo'],
+                            'SampleSize':       [10000,     lambda x: isinstance(x,int) and 1<x],
+                            'Percentile':       [0.95,      lambda x: isinstance(x,float) and 0<=x and x<=1],
+                            'Sensitivity':      [False,     lambda x: isinstance(x,bool)]}
+        for key in options.keys:
+            if not key in default_options.keys():
+                raise Exception('Invalid option key; '+key+'!')
+            elif not default_options[key][1](options[key]):
+                raise Exception('Invalid value; '+str(options[key])+', passed for option key; '+key+'!')
+        for key in default_options.keys():
+            if not key in options.keys() :
+                options[key] = default_options[key][0]
 
-        # if 'ErrorMethod' in options.keys():
-        #     error_method = options["ErrorMethod"]
-        # else:
-        #     error_method='Delta'
+    #NEW
+        # for index,row in input_struct.iterrows():
 
-        # if 'SampleSize' in options.keys():
-        #     num_mc_samples = options["SampleSize"]
-        # else:
-        #     num_mc_samples=10000
+        #     input_vec = row[self.input_name_list]
+        #     observ_var_name = row['Variable']
 
-        # if 'ErrorBars' in options.keys():
-        #     alpha = options["ConfidenceLevel"]
-        # else:
-        #     alpha=0.95
+        #     if options['Method']=='Delta':
+        #         self.model[o](param, inputs).full().flatten()
 
+
+        #     elif options['Method']=='MonteCarlo':
+    #OLD
         # prediction_dict = {}
         # prediction_dict['Inputs'] = input_list
         # for o in observ_list:

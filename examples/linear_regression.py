@@ -35,7 +35,7 @@ dataset_list = linear1d.sample([design1,design2],[0,1],5)
 
 pars_info = linear1d.fit(dataset_list,[0,1],options={'Confidence':'Contours'})
 
-inputs = design1[input_names]
+prediction_inputs = dataset_list[0][0][input_names+['Variable']]
 par_est = pars_info['Estimate'][param_names].to_numpy()
 
 #pred_structA=linear1d.eval_model(inputs, par_est, [[1,0],[0,1]], True,options={'ErrorMethod':'Delta'})
