@@ -63,7 +63,7 @@ class Model:
 
         # extract and store dimensions of the model
         self.num_observ = len(observ_struct)
-        self.num_param = max(input_names) #somewhat unsafe,  using max assumes its nx1 or 1xn
+        self.num_param = max(input_names) 
         self.num_input = max(param_names)
         #create lists of input/param/param names,  can be used to look up names with indices (observ names filled in below)
         self.input_name_list = input_names
@@ -81,77 +81,111 @@ class Model:
         #   functions for computing observation sampling statistics, loglikelihood, and fisher info. matrix
         self.distribution, self.model, self.loglik, self.fisher_info_matrix = [],[],[],[]
         #create a list to store casadi functions for the predicted mean, mean parameteric sensitivity, prediction variance 
-        self.prediction_mean , self.prediction_variance, self.prediction_sensitivity, self.sampler = [],[],[]
-        #create symbols for parameters and inputs,  needed for function defs below
-        param_symbols = cs.SX.sym('param_symbols', self.num_param)
-        input_symbols = cs.SX.sym('input_symbols', self.num_input)
+        self.prediction_mean , self.prediction_variance, self.prediction_sensitivity, self.sampler = [],[],[], []
         #loop over the observation variables
         for i in range(self.num_observ):
+            #fetch the observation name, distribution type and casadi function (maps inputs and params to observation statistics)
             observ_name = observ_struct[i][0]
+            observ_distribution = observ_struct[i][1]
+            observ_model = observ_struct[i][2]
             #extract names of observ_struct variables
             if not(observ_name in self.observ_name_dict):
                 self.observ_name_dict[observ_name] = i
                 self.observ_name_list.append(observ_name)
             else:
                 raise Exception('Observation names must be unique!')
-            #fetch and store the distribution type
-            observ_distribution = observ_struct[i][1]
             self.distribution.append(observ_distribution)
-            #fetch and store the casadi function for the observation sampling statistics (links observ_struct distribution parameters to the parameters-of-interest)
-            observ_model= observ_struct[i][2]
             self.model.append(observ_model)
-            #create a observ_struct symbol
-            observ_symbol = cs.SX.sym(observ_name, 1)
-            if observ_distribution  == 'Normal':
-                #get the distribution statistics
-                mean_symbol, variance_symbol = observ_model(param_symbols, input_symbols)
-                #create LogLikelihood symbolics and function 
-                loglik_symbol = -0.5*cs.log(2*cs.pi*variance_symbol) - (observ_symbol - mean_symbol)**2/(2*variance_symbol)
-                self.loglik.append( cs.Function('ll_'+observ_name,  [observ_symbol, param_symbols, input_symbols],  [loglik_symbol]) )
-                #generate derivatives of distribution parameters,  StatisticModel (here mean and variance) with respect to parameters-of-interest,  Params
-                mean_sensitivity_symbol = cs.jacobian(mean_symbol, param_symbols)
-                variance_sensitivity_symbol = cs.jacobian(variance_symbol, param_symbols)
-                #store sensitivity functions for the the model
-                #self.sensitivity.append([mean_sensitivity_func, variance_sensitivity_func])
-                #create FIM symbolics and function
-                fisher_info_symbol = ((mean_sensitivity_symbol.T @ mean_sensitivity_symbol)/variance_symbol 
-                                        + (variance_sensitivity_symbol.T @ variance_sensitivity_symbol)/variance_symbol**2)
-                self.fisher_info_matrix.append(cs.Function('FIM_'+observ_name,  [param_symbols, input_symbols],  [fisher_info_symbol]) )
-                #create prediction functions for the mean, sensitivity and variance
-                self.prediction_mean.append(cs.Function('prediction_mean_'+observ_name,  [param_symbols, input_symbols],  [mean_symbol])) 
-                self.prediction_sensitivity.append(cs.Function('prediction_sensitivity_'+observ_name,  [param_symbols, input_symbols],  [mean_sensitivity_symbol]))
-                self.prediction_variance.append(cs.Function('prediction_variance'+observ_name,  [param_symbols, input_symbols],  [variance_symbol]))
-                self.sampler = lambda par,inpt: np.random.normal(*observ_model(par,inpt))
-                #NOTE: ADD OTHER DISTRIBUTIONS, SUNDAY/MONDAY !!!!!!!!!!!!
-            elif observ_distribution == 'Poisson':
-                #get the distribution statistic 
-                lambda_symbol = observ_model(param_symbols, input_symbols)[0]
-                #create a custom casadi function for doing factorials (needed in poisson LogLikelihood and FIM)
-                casadi_factorial = factorial('fact')
-                #store the function in the class so it doesn't go out of scope
-                self.__factorialFunc = casadi_factorial
-                #create LogLikelihood symbolics and function 
-                loglik_symbol =  observ_symbol*cs.log(lambda_symbol)+casadi_factorial(observ_symbol)-lambda_symbol
-                self.loglik.append( cs.Function('ll_'+observ_name,  [observ_symbol, param_symbols, input_symbols],  [loglik_symbol]) )
-                #generate derivatives of distribution parameters,  StatisticModel (here Mean and variance) with respect to parameters-of-interest,  Params
-                lamba_sensitivity_symbol = cs.jacobian(lambda_symbol, param_symbols)
-                #create sensitivity function for lambda
-                lambda_sensitivity_func = cs.Function('var_sens_'+observ_name,  [param_symbols, input_symbols],  [variance_sensitivity_symbol]) 
-                #store sensitivity function for lambda
-                #self.sensitivity.append([lambda_sensitivity_func])
-                #create FIM symbolics and function
-                fisher_info_symbol = (lamba_sensitivity_symbol.T @ lamba_sensitivity_symbol)/lambda_symbol
-                self.fisher_info_matrix.append(cs.Function('FIM_'+observ_name,  [param_symbols, input_symbols],  [fisher_info_symbol]) )
-            elif observ_distribution == 'Lognormal':    
-                print('Not Implemeneted')
-            elif observ_distribution == 'Binomial': 
-                print('Not Implemeneted')
-            elif observ_distribution == 'Exponential': 
-                print('Not Implemeneted')
-            elif observ_distribution == 'Gamma': 
-                print('Not Implemeneted')
-            else:
-                raise Exception('Unknown Distribution: '+observ_distribution)
+            [loglik, fisher_info, predict_mean, predict_sensitivity, predict_variance, observ_sampler] = \
+                self._get_distribution_functions(observ_name, observ_distribution, observ_model)
+            self.loglik.append(loglik)
+            self.fisher_info_matrix.append(fisher_info)
+            self.prediction_mean.append(predict_mean)
+            self.prediction_sensitivity.append(predict_sensitivity)
+            self.prediction_variance.append(predict_variance)
+            self.observation_sampler.append(observ_sampler)
+            
+    def _get_distribution_functions(self, observ_name, observ_distribution, observ_model):
+        """
+        This function 
+
+        Args:
+
+        Return:
+        """
+        #create symbols for parameters and inputs,  and observation variable
+        param_symbols = cs.SX.sym('param_symbols', self.num_param)
+        input_symbols = cs.SX.sym('input_symbols', self.num_input)
+        observ_symbol = cs.SX.sym(observ_name, 1)
+        #generate the distribution statistics symbols, and prediction sensitivity symbol
+        stats = observ_model(param_symbols, input_symbols)
+        stats_sensitivity = cs.jacobian(stats, param_symbols)
+
+        if observ_distribution  == 'Normal':
+            #create LogLikelihood symbolics and function 
+            loglik_symbol = -0.5*cs.log(2*cs.pi*stats[1]) - (observ_symbol - stats[0])**2/(2*stats[1])
+            #create FIM symbolics and function
+            elemental_fim = cs.SX([1/stats[1], 0],[0, 1/(2*stats[1]**2)]])
+            #create prediction functions for the mean, sensitivity and variance
+            prediction_mean_symbol = stats[0]
+            prediction_sensitivity_symbol = stats_sensitivity[0,:]
+            prediction_variance_symbol = stats[1]
+            #create random sampling function
+            var_to_stdev = lambda s: [s[0].full().flatten(), np.sqrt(s[1]).full().flatten()]
+            observ_sampler_func = lambda par,inpt: np.random.normal(*var_to_stdev(observ_model(par,inpt)))
+        elif observ_distribution == 'Poisson':
+            #create a custom casadi function for doing factorials, store the function in the class so it doesn't go out of scope
+            self.__factorialFunc = casadi_factorial
+            casadi_factorial = factorial('fact')
+            #create LogLikelihood symbolics and function 
+            loglik_symbol = observ_symbol*cs.log(stats[0]) + casadi_factorial(observ_symbol) - stats[0]
+            #create FIM symbolics and function
+            elemental_fim = cs.SX(1/stats[0])
+            #create prediction functions for the mean, sensitivity and variance
+            prediction_mean_symbol = stats[0]
+            prediction_sensitivity_symbol = stats_sensitivity[0,:]
+            prediction_variance_symbol = stats[0]
+            #create random sampling function
+            observ_sampler_func = lambda par,inpt: np.random.poisson(*observ_model(par,inpt).full().flatten())
+        elif observ_distribution == 'Lognormal':    
+            #create LogLikelihood symbolics and function 
+            loglik_symbol = -cs.log(observ_symbol) - 0.5*cs.log(2*cs.pi*stats[1])\
+                 - (cs.log(observ_symbol) - stats[0])**2/(2*stats[1])
+            #create FIM symbolics and function
+            elemental_fim = cs.SX([1/stats[1], 0],[0, 1/(2*stats[1]**2)]])
+            #create prediction functions for the mean, sensitivity and variance
+            prediction_mean_symbol = cs.exp(stats[0] + stats[1]/2)
+            prediction_sensitivity_symbol = cs.jacobian(prediction_mean_symbol,param_symbols)
+            prediction_variance_symbol = (cs.exp(stats[1])-1) * cs.exp(2*stats[0] + stats[1])
+            #create random sampling function
+            var_to_stdev = lambda s: [s[0].full().flatten(), np.sqrt(s[1]).full().flatten()]
+            observ_sampler_func = lambda par,inpt: np.random.lognormal(*var_to_stdev(observ_model(par,inpt)))
+        elif observ_distribution == 'Binomial': 
+            #create LogLikelihood symbolics and function 
+            loglik_symbol = -cs.log(observ_symbol) - 0.5*cs.log(2*cs.pi*stats[1])\
+                 - (cs.log(observ_symbol) - stats[0])**2/(2*stats[1])
+            #create FIM symbolics and function
+            elemental_fim = cs.SX([1/stats[1], 0],[0, 1/(2*stats[1]**2)]])
+            #create prediction functions for the mean, sensitivity and variance
+            prediction_mean_symbol = cs.exp(stats[0] + stats[1]/2)
+            prediction_sensitivity_symbol = cs.jacobian(prediction_mean_symbol,param_symbols)
+            prediction_variance_symbol = (cs.exp(stats[1])-1) * cs.exp(2*stats[0] + stats[1])
+            #create random sampling function
+            var_to_stdev = lambda s: [s[0].full().flatten(), np.sqrt(s[1]).full().flatten()]
+            observ_sampler_func = lambda par,inpt: np.random.lognormal(*var_to_stdev(observ_model(par,inpt)))
+        elif observ_distribution == 'Exponential': 
+            print('Not Implemeneted')
+        elif observ_distribution == 'Gamma': 
+            print('Not Implemeneted')
+        else:
+            raise Exception('Unknown Distribution: '+observ_distribution)
+
+        loglik_func = cs.Function('loglik_'+observ_name, [observ_symbol, param_symbols, input_symbols], [loglik_symbol])
+        fisher_info_symbol = stats_sensitivity @ elemental_fim @ stats_sensitivity.T
+        fisher_info_func = cs.Function('fim_'+observ_name, [param_symbols, input_symbols], [fisher_info_symbol])
+        prediction_mean_func = cs.Function('pred_mean_'+observ_name, [param_symbols, input_symbols], [prediction_mean_func])
+        prediction_sensitivity_func = cs.Function('pred_sens_'+observ_name, [param_symbols, input_symbols], [prediction_sensitivity_symbol])
+        prediction_variance_func = cs.Function('pred_var'+observ_name, [param_symbols, input_symbols], [prediction_variance_symbol])
 
     def fit(self, dataset_struct, start_param, options={}):
         """
