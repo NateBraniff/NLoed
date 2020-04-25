@@ -4,7 +4,7 @@ Add a docstring
 import numpy as np
 import casadi as cs
 import pandas as pd
-from nloed.model import Model
+from nloed import Model
 from nloed import design
 import time
 
@@ -16,124 +16,124 @@ pnames = ['p']
 design = pd.DataFrame({'x':[-2,-1,0,1,2],'y':[10,10,10,10,10]})
 
 # #normal model
-# mean, var = x*p, x**2*p**2+.1
-# normal_stats = cs.vertcat(mean, var)
-# y_norm_func = cs.Function('y_norm_func',[x,p],[normal_stats])
-# normal_response = [('y','Normal',y_norm_func)]
-# normal_model = Model(normal_response,xnames,pnames)
-# normal_data = normal_model.sample(design,[1])
-# normal_fit = normal_model.fit(normal_data,[2])
+mean, var = x*p, x**2*p**2+.1
+normal_stats = cs.vertcat(mean, var)
+y_norm_func = cs.Function('y',[x,p],[normal_stats])
+normal_response = [(y_norm_func,'Normal')]
+normal_model = Model(normal_response,xnames,pnames)
+normal_data = normal_model.sample(design,[1])
+normal_fit = normal_model.fit(normal_data,[2])
 
-# #poisson model
-# rate = cs.exp(x*p)
-# poisson_stats = rate
-# y_pois_func = cs.Function('y_pois_func',[x,p],[poisson_stats])
-# poisson_response = [('y','Poisson',y_pois_func)]
-# poisson_model = Model(poisson_response,xnames,pnames)
-# poisson_data = poisson_model.sample(design,[1])
-# poisson_fit = poisson_model.fit(poisson_data,[2])
+#poisson model
+rate = cs.exp(x*p)
+poisson_stats = rate
+y_pois_func = cs.Function('y',[x,p],[poisson_stats])
+poisson_response = [(y_pois_func,'Poisson')]
+poisson_model = Model(poisson_response,xnames,pnames)
+poisson_data = poisson_model.sample(design,[1])
+poisson_fit = poisson_model.fit(poisson_data,[2])
 
-# #lognormal model
-# geomean, geovar = x*p, cs.exp(x*p)
-# logn_stats = cs.vertcat(geomean, geovar)
-# y_logn_func = cs.Function('y_logn_func',[x,p],[logn_stats])
-# logn_response = [('y','Lognormal',y_logn_func)]
-# logn_model = Model(logn_response,xnames,pnames)
-# logn_data = logn_model.sample(design,[1])
-# logn_fit = logn_model.fit(logn_data,[2])
+#lognormal model
+geomean, geovar = x*p, cs.exp(x*p)
+logn_stats = cs.vertcat(geomean, geovar)
+y_logn_func = cs.Function('y',[x,p],[logn_stats])
+logn_response = [(y_logn_func,'Lognormal')]
+logn_model = Model(logn_response,xnames,pnames)
+logn_data = logn_model.sample(design,[1])
+logn_fit = logn_model.fit(logn_data,[2])
 
-# #binomial model
-# prob, num = cs.exp(x*p)/(1+cs.exp(x*p)), 10
-# binom_stats = cs.vertcat(prob, num)
-# y_binom_func = cs.Function('y_binom_func',[x,p],[binom_stats])
-# binom_response = [('y','Binomial',y_binom_func)]
-# binom_model = Model(binom_response,xnames,pnames)
-# binom_data = binom_model.sample(design,[1])
-# binom_fit = binom_model.fit(binom_data,[2])
+#binomial model
+prob, num = cs.exp(x*p)/(1+cs.exp(x*p)), 10
+binom_stats = cs.vertcat(prob, num)
+y_binom_func = cs.Function('y',[x,p],[binom_stats])
+binom_response = [(y_binom_func,'Binomial')]
+binom_model = Model(binom_response,xnames,pnames)
+binom_data = binom_model.sample(design,[1])
+binom_fit = binom_model.fit(binom_data,[2])
 
-# #bernoulli model
-# prob = cs.exp(x*p)/(1+cs.exp(x*p))
-# bern_stats = prob
-# y_bern_func = cs.Function('y_bern_func',[x,p],[bern_stats])
-# bern_response = [('y','Bernoulli',y_bern_func)]
-# bern_model = Model(bern_response,xnames,pnames)
-# bern_data = bern_model.sample(design,[1])
-# bern_fit = bern_model.fit(bern_data,[2])
+#bernoulli model
+prob = cs.exp(x*p)/(1+cs.exp(x*p))
+bern_stats = prob
+y_bern_func = cs.Function('y',[x,p],[bern_stats])
+bern_response = [(y_bern_func,'Bernoulli')]
+bern_model = Model(bern_response,xnames,pnames)
+bern_data = bern_model.sample(design,[1])
+bern_fit = bern_model.fit(bern_data,[2])
 
-# #exponential model
-# rate = cs.exp(x*p)
-# exp_stats = prob
-# y_pois_func = cs.Function('y_exp_func',[x,p],[exp_stats])
-# exp_response = [('y','Exponential',y_pois_func)]
-# exp_model = Model(exp_response,xnames,pnames)
-# exp_data = exp_model.sample(design,[1])
-# exp_fit = exp_model.fit(exp_data,[2])
+#exponential model
+rate = cs.exp(x*p)
+exp_stats = prob
+y_pois_func = cs.Function('y',[x,p],[exp_stats])
+exp_response = [(y_pois_func,'Exponential')]
+exp_model = Model(exp_response,xnames,pnames)
+exp_data = exp_model.sample(design,[1])
+exp_fit = exp_model.fit(exp_data,[2])
 
 t=0
 ##########################################################################################
 
-# xs = cs.SX.sym('xs',2)
-# xnames = ['x1','x2']
-# ps = cs.SX.sym('ps',4)
-# pnames = ['Intercept','x1-Main','x2-Main','Interaction']
+xs = cs.SX.sym('xs',2)
+xnames = ['x1','x2']
+ps = cs.SX.sym('ps',4)
+pnames = ['Intercept','x1-Main','x2-Main','Interaction']
 
-# lin_predictor = ps[0] + ps[1]*xs[0] + ps[2]*xs[1] + ps[3]*xs[0]*xs[1]
+lin_predictor = ps[0] + ps[1]*xs[0] + ps[2]*xs[1] + ps[3]*xs[0]*xs[1]
 
-# design = pd.DataFrame({'x1':[-1,-1,-1,0,0,0,1,1,1],'x2':[-1,0,1,-1,0,1,-1,0,1],'y':[5,5,5,5,5,5,5,5,5]})
+design = pd.DataFrame({'x1':[-1,-1,-1,0,0,0,1,1,1],'x2':[-1,0,1,-1,0,1,-1,0,1],'y':[5,5,5,5,5,5,5,5,5]})
 
-# #normal model
-# mean, var = lin_predictor, lin_predictor**2 + 0.1
-# normal_stats = cs.vertcat(mean, var)
-# y_norm_func = cs.Function('y_norm_func',[xs,ps],[normal_stats])
-# normal_response = [('y','Normal',y_norm_func)]
-# normal_model = Model(normal_response,xnames,pnames)
-# normal_data = normal_model.sample(design,[0.5,1.1,2.1,0.3])
-# normal_fit = normal_model.fit(normal_data,[1,1,1,1])
+#normal model
+mean, var = lin_predictor, lin_predictor**2 + 0.1
+normal_stats = cs.vertcat(mean, var)
+y_norm_func = cs.Function('y',[xs,ps],[normal_stats])
+normal_response = [(y_norm_func,'Normal')]
+normal_model = Model(normal_response,xnames,pnames)
+normal_data = normal_model.sample(design,[0.5,1.1,2.1,0.3])
+normal_fit = normal_model.fit(normal_data,[1,1,1,1])
 
-# #poisson model
-# rate = cs.exp(lin_predictor)
-# poisson_stats = rate
-# y_pois_func = cs.Function('y_pois_func',[xs,ps],[poisson_stats])
-# poisson_response = [('y','Poisson',y_pois_func)]
-# poisson_model = Model(poisson_response,xnames,pnames)
-# poisson_data = poisson_model.sample(design,[0.5,1.1,2.1,0.3])
-# poisson_fit = poisson_model.fit(poisson_data,[1,1,1,1])
+#poisson model
+rate = cs.exp(lin_predictor)
+poisson_stats = rate
+y_pois_func = cs.Function('y',[xs,ps],[poisson_stats])
+poisson_response = [(y_pois_func,'Poisson')]
+poisson_model = Model(poisson_response,xnames,pnames)
+poisson_data = poisson_model.sample(design,[0.5,1.1,2.1,0.3])
+poisson_fit = poisson_model.fit(poisson_data,[1,1,1,1])
 
-# #lognormal model
-# geomean, geovar = lin_predictor, cs.exp(lin_predictor)
-# logn_stats = cs.vertcat(geomean, geovar)
-# y_logn_func = cs.Function('y_logn_func',[xs,ps],[logn_stats])
-# logn_response = [('y','Lognormal',y_logn_func)]
-# logn_model = Model(logn_response,xnames,pnames)
-# logn_data = logn_model.sample(design,[0.5,1.1,2.1,0.3])
-# logn_fit = logn_model.fit(logn_data,[1,1,1,1])
+#lognormal model
+geomean, geovar = lin_predictor, cs.exp(lin_predictor)
+logn_stats = cs.vertcat(geomean, geovar)
+y_logn_func = cs.Function('y',[xs,ps],[logn_stats])
+logn_response = [(y_logn_func,'Lognormal')]
+logn_model = Model(logn_response,xnames,pnames)
+logn_data = logn_model.sample(design,[0.5,1.1,2.1,0.3])
+logn_fit = logn_model.fit(logn_data,[1,1,1,1])
 
-# #binomial model
-# prob, num = cs.exp(lin_predictor)/(1+cs.exp(lin_predictor)), 10
-# binom_stats = cs.vertcat(prob, num)
-# y_binom_func = cs.Function('y_binom_func',[xs,ps],[binom_stats])
-# binom_response = [('y','Binomial',y_binom_func)]
-# binom_model = Model(binom_response,xnames,pnames)
-# binom_data = binom_model.sample(design,[0.5,1.1,2.1,0.3])
-# binom_fit = binom_model.fit(binom_data,[1,1,1,1])
+#binomial model
+prob, num = cs.exp(lin_predictor)/(1+cs.exp(lin_predictor)), 10
+binom_stats = cs.vertcat(prob, num)
+y_binom_func = cs.Function('y',[xs,ps],[binom_stats])
+binom_response = [(y_binom_func,'Binomial')]
+binom_model = Model(binom_response,xnames,pnames)
+binom_data = binom_model.sample(design,[0.5,1.1,2.1,0.3])
+binom_fit = binom_model.fit(binom_data,[1,1,1,1])
 
-# #bernoulli model
-# prob = cs.exp(lin_predictor)/(1+cs.exp(lin_predictor))
-# bern_stats = prob
-# y_bern_func = cs.Function('y_bern_func',[xs,ps],[bern_stats])
-# bern_response = [('y','Bernoulli',y_bern_func)]
-# bern_model = Model(bern_response,xnames,pnames)
-# bern_data = bern_model.sample(design,[0.5,1.1,2.1,0.3])
-# bern_fit = bern_model.fit(bern_data,[1,1,1,1])
+#bernoulli model
+prob = cs.exp(lin_predictor)/(1+cs.exp(lin_predictor))
+bern_stats = prob
+y_bern_func = cs.Function('y',[xs,ps],[bern_stats])
+bern_response = [(y_bern_func,'Bernoulli')]
+bern_model = Model(bern_response,xnames,pnames)
+bern_data = bern_model.sample(design,[0.5,1.1,2.1,0.3])
+bern_fit = bern_model.fit(bern_data,[1,1,1,1])
 
-# #exponential model
-# rate = cs.exp(lin_predictor)
-# exp_stats = prob
-# y_pois_func = cs.Function('y_exp_func',[xs,ps],[exp_stats])
-# exp_response = [('y','Exponential',y_pois_func)]
-# exp_model = Model(exp_response,xnames,pnames)
-# exp_data = exp_model.sample(design,[0.5,1.1,2.1,0.3])
-# exp_fit = exp_model.fit(exp_data,[1,1,1,1])
+#exponential model
+rate = cs.exp(lin_predictor)
+exp_stats = prob
+y_pois_func = cs.Function('y',[xs,ps],[exp_stats])
+exp_response = [(y_pois_func,'Exponential')]
+exp_model = Model(exp_response,xnames,pnames)
+exp_data = exp_model.sample(design,[0.5,1.1,2.1,0.3])
+exp_fit = exp_model.fit(exp_data,[1,1,1,1])
 
 
 t=0
@@ -147,26 +147,26 @@ lin_predictor = ps[0] + ps[1]*xs[0] + ps[2]*xs[1] + ps[3]*xs[0]*xs[1]
 
 design = pd.DataFrame({ 'x1':[-1,-1,-1,0,0,0,1,1,1],
                         'x2':[-1,0,1,-1,0,1,-1,0,1],
-                        'y_normal':[5,5,5,5,5,5,5,5,5],
+                        'y_norm':[5,5,5,5,5,5,5,5,5],
                         'y_bern':[5,5,5,5,5,5,5,5,5],
                         'y_pois':[5,5,5,5,5,5,5,5,5]})
 
 #mixed model
 mean, var = lin_predictor, lin_predictor**2 + 0.1
 normal_stats = cs.vertcat(mean, var)
-y_norm_func = cs.Function('y_norm_func',[xs,ps],[normal_stats])
+y_norm_func = cs.Function('y_norm',[xs,ps],[normal_stats])
 
 rate = cs.exp(lin_predictor)
 poisson_stats = rate
-y_pois_func = cs.Function('y_pois_func',[xs,ps],[poisson_stats])
+y_pois_func = cs.Function('y_pois',[xs,ps],[poisson_stats])
 
 prob = cs.exp(lin_predictor)/(1+cs.exp(lin_predictor))
 bern_stats = prob
-y_bern_func = cs.Function('y_bern_func',[xs,ps],[bern_stats])
+y_bern_func = cs.Function('y_bern',[xs,ps],[bern_stats])
 
-mixed_response = [  ('y_normal','Normal',y_norm_func),
-                    ('y_bern','Bernoulli',y_bern_func),
-                    ('y_pois','Poisson',y_pois_func)]
+mixed_response = [  (y_norm_func,'Normal'),
+                    (y_bern_func,'Bernoulli'),
+                    (y_pois_func,'Poisson')]
 
 mixed_model = Model(mixed_response,xnames,pnames)
 mixed_data = mixed_model.sample(design,[0.5,1.1,2.1,0.3])
