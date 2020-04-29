@@ -149,6 +149,10 @@ design = pd.DataFrame({ 'x1':[-1,-1,-1,0,0,0,1,1,1],
                         'x2':[-1,0,1,-1,0,1,-1,0,1],
                         'y_norm':[50,50,50,50,50,50,50,50,50]})
 
+predict_inputs = pd.DataFrame({ 'x1':[-1,-1,-1,0,0,0,1,1,1],
+                                'x2':[-1,0,1,-1,0,1,-1,0,1],
+                                'Variable':['y_norm']*9})
+
 #mixed model
 mean, var = lin_predictor, lin_predictor**2+0.1
 normal_stats = cs.vertcat(mean, var)
@@ -162,18 +166,27 @@ lin_model = Model(lin_response,xnames,pnames)
 # options={'Confidence':'Contours','InitParameters':[-1,0,-1]}
 # lin_fit = lin_model.fit(lin_data,options)
 
+options={'Confidence':'Contours','InitParamBounds':[(-5,5),(-5,5),(-5,5)],'InitSearchNumber':7}
+
+prediction_data = lin_model.predict(predict_inputs,[-2,0.5,-1.1])
+
 lin_data = lin_model.sample(design,[-2,0.5,-1.1])
-options={'Confidence':'Intervals','InitParamBounds':[(-5,5),(-5,5),(-5,5)],'InitSearchNumber':7}
-lin_fit = lin_model.fit(lin_data,options)
+lin_fit = lin_model.fit(lin_data,options=options)
+print(lin_fit)
+fit_param_vec=lin_fit['Estimate'].to_numpy()
+lin_model.predict(predict_inputs,fit_param_vec)
 
 lin_data = lin_model.sample(design,[0.2,1.9,3.25])
-lin_fit = lin_model.fit(lin_data,options)
+lin_fit = lin_model.fit(lin_data,options=options)
+print(lin_fit)
 
 lin_data = lin_model.sample(design,[-0.5,-3.3,0.2])
-lin_fit = lin_model.fit(lin_data,options)
+lin_fit = lin_model.fit(lin_data,options=options)
+print(lin_fit)
 
 lin_data = lin_model.sample(design,[4.3,0,-0.4])
-lin_fit = lin_model.fit(lin_data,options)
+lin_fit = lin_model.fit(lin_data,options=options)
+print(lin_fit)
 
 xs = cs.SX.sym('xs',2)
 xnames = ['x1','x2']

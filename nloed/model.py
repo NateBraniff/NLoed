@@ -235,9 +235,19 @@ class Model:
         loglik_func = cs.Function('loglik_'+observ_name, [observ_symbol, input_symbols, param_symbols], [loglik_symbol])
         fisher_info_symbol = stats_sensitivity.T @ elemental_fim @ stats_sensitivity
         fisher_info_func = cs.Function('fim_'+observ_name, [input_symbols, param_symbols], [fisher_info_symbol])
-        prediction_mean_func = cs.Function('pred_mean_'+observ_name, [input_symbols, param_symbols], [prediction_mean_symbol])
-        prediction_sensitivity_func = cs.Function('pred_sens_'+observ_name, [input_symbols, param_symbols], [prediction_sensitivity_symbol])
-        prediction_variance_func = cs.Function('pred_var'+observ_name, [input_symbols, param_symbols], [prediction_variance_symbol])
+
+        mean_casadi_func = cs.Function('pred_mean_'+observ_name,
+                                        [input_symbols, param_symbols],
+                                        [prediction_mean_symbol])
+        prediction_mean_func = lambda inpt,par: mean_casadi_func(inpt,par).full().item()
+        sensitivity_casadi_func = cs.Function('pred_sens_'+observ_name,
+                                                [input_symbols, param_symbols],
+                                                [prediction_sensitivity_symbol])
+        prediction_sensitivity_func = lambda inpt,par: sensitivity_casadi_func(inpt,par).full().flatten()
+        variance_casadi_func = cs.Function('pred_var'+observ_name,
+                                            [input_symbols, param_symbols],
+                                            [prediction_variance_symbol])
+        prediction_variance_func = lambda inpt,par: variance_casadi_func(inpt,par).full().item()
 
         function_list = [loglik_func, fisher_info_func,
                          prediction_mean_func, prediction_sensitivity_func,prediction_variance_func,
@@ -246,7 +256,7 @@ class Model:
         return function_list
 
 
-    def fit(self, dataset_struct, options={}):
+    def fit(self, dataset_struct, start_param=None, options={}):
         """
         This function fits the model to a dataset using maximum likelihood
         it also provides optional marginal confidence intervals
@@ -273,17 +283,19 @@ class Model:
             'MaxSteps':         [2000,                  lambda x: isinstance(x,int) and 1<x],
             'SearchFactor':     [5,                     lambda x: isinstance(x,float) and 0<x],
             'SearchBound':      [3,                     lambda x: isinstance(x,float) and 0<x],
-            'InitParameters':   [[0]*self.num_param,    lambda x: isinstance(x,list) or isinstance(x,np.ndarray)],
             'InitParamBounds':  [False,                 lambda x: isinstance(x,list) or isinstance(x,np.ndarray)],
             'InitSearchNumber': [3,                     lambda x: isinstance(x,int) and 0<x]}
+        options=cp.deepcopy(options)
         for key in options.keys():
-            if not key in default_options.keys():
+            if not key in options.keys():
                 raise Exception('Invalid option key; '+key+'!')
             elif not default_options[key][1](options[key]):
                 raise Exception('Invalid value; '+str(options[key])+', passed for option key; '+key+'!')
         for key in default_options.keys():
             if not key in options.keys() :
                 options[key] = default_options[key][0]
+        if not start_param:
+            start_param = [0]*self.num_param
         # if not len(start_param) == self.num_param:
         #     raise Exception('Starting parameter mismatch, there were; '+str(len(start_param))+', provided but; '+str(self.num_param)+' needed!')
         #this block allows the user to pass a dataset, list of datasets,  list of lists etc. for Design x Replicat fitting
@@ -365,23 +377,25 @@ class Model:
                 #add it to the list of replicate loglik functions
                 loglik_func_list.append(loglik_func)
 
-                #find assess starting params
+                #crude grid search of staring parameters, if request in options
                 print(options['InitParamBounds'])
                 if options['InitParamBounds']:
                     candidate_list = [np.linspace(bnds[0],bnds[1],options['InitSearchNumber']) \
                                      for bnds in options['InitParamBounds']]
                     param_grid = self.__creategrid(candidate_list)
-                    param_grid.append(options['InitParameters'])
+                    param_grid.append(start_param)
                     loglik_value = -1e7
                     for param in param_grid:
                         new_loglik_value = loglik_func(param)
                         if  new_loglik_value > loglik_value:
-                            start_params = param
+                            start_param = param
                             loglik_value = new_loglik_value
-                else:
-                    start_params = options['InitParameters']
 
-                fit_param = archetype_fitting_solver(x0=start_params, p=observ_vec)['x'].full().flatten()
+                #NOTE: could do a full multi-start here or top N multistart etc. will depen on testing
+                #NOTE: should probably make start param search optionally specified by param covaraince
+                #especially if we allow laplace-basyian style fitting (actuall only reall makes sense
+                # if we do both bayes fitting with bayes covarianse start)
+                fit_param = archetype_fitting_solver(x0=start_param, p=observ_vec)['x'].full().flatten()
                 fit_param_list.append(fit_param)
 
 
@@ -494,7 +508,19 @@ class Model:
             #else if multiple designs were passed (with/without reps),  return a list of list of datasets
             return design_datasets
         
-    def predict(self, input_struct, param, covariance_matrix=None,  options={}):
+    def predict(self, input_struct, param, covariance_matrix=None, options={}):
+        """
+        This function 
+
+        Args:
+            input_struct:
+            param:
+            covariance_matrix:
+            options: optional,  a dictionary of user defined options
+
+        Return:
+           
+        """
         #NOTE: evaluate model to predict mean and prediction interval for y
         #NOTE: optional pass cov matrix,  for use with delta method/MC error bars on predictions
         #NOTE: should multiplex over inputs
@@ -511,8 +537,9 @@ class Model:
                             'PredictionSampleNumber':   [10,        lambda x: isinstance(x,int) and 1<x],
                             'ConfidenceLevel':          [0.95,      lambda x: isinstance(x,float) and 0<=x and x<=1]}
                             
+        options=cp.deepcopy(options)
         for key in options.keys():
-            if not key in default_options.keys():
+            if not key in options.keys():
                 raise Exception('Invalid option key; '+key+'!')
             elif not default_options[key][1](options[key]):
                 raise Exception('Invalid value; '+str(options[key])+', passed for option key; '+key+'!')
@@ -545,7 +572,7 @@ class Model:
             elif options['Method']=='Delta':
                 mean_value = self.prediction_mean[observ_name](input_vec,param)
                 mean.append(mean_value)
-                stddev_multiplier = -st.norm.ppf((1-options['Confidence'])/2)
+                stddev_multiplier = -st.norm.ppf((1-options['ConfidenceLevel'])/2)
                 if options['MeanInterval']:
                     stddev_mean = self.prediction_sensitivity[observ_name](input_vec,param)\
                                     * covariance_matrix \
@@ -585,13 +612,14 @@ class Model:
                 for p in range(self.num_param):
                     sensitivity_lists[p].append(sensitivity_vec[p])
 
-        output_data = input_struct
-        output_data.join({'Mean': mean})
+        output_data = cp.deepcopy(input_struct)
+        output_data['Mean'] = mean
         if options['MeanInterval']:
-            
-            output_data.join({'Mean_Upper_Bound': mean_lower,'Mean_Lower_Bound':mean_upper})
+            output_data['Mean_Upper_Bound'] = mean_lower
+            output_data['Mean_Lower_Bound'] = mean_upper
         if options['PredictionInterval']:
-            output_data.join({'Mean_Upper_Bound': mean_lower,'Mean_Lower_Bound':mean_upper})
+            output_data['Prediction_Upper_Bound'] = prediction_lower
+            output_data['Prediction_Lower_Bound'] = prediction_upper
         if options['Sensitivity']:
             for p in range(self.num_param):
                 output_data.join({self.param_name_list[p]+'_Sensitivity': sensitivity_lists[p]})
