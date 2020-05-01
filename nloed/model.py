@@ -78,8 +78,8 @@ class Model:
         #   functions for computing observation sampling statistics, loglikelihood, and fisher info. matrix
         self.distribution, self.model, self.loglik, self.fisher_info_matrix = {},{},{},{}
         #create a list to store casadi functions for the predicted mean, mean parameteric sensitivity, prediction variance 
-        self.prediction_mean , self.prediction_variance, self.prediction_sensitivity = {},{},{}
-        self.observation_sampler, self.prediction_percentile ={}, {}
+        self.model_mean , self.model_variance, self.model_sensitivity = {},{},{}
+        self.observation_sampler, self.observation_percentile ={}, {}
         #loop over the observation variables
         for i in range(self.num_observ):
             #fetch the observation name, distribution type and casadi function (maps inputs and params to observation statistics)
@@ -94,15 +94,15 @@ class Model:
                 raise Exception('Observation names must be unique!')
             self.distribution[observ_name] = observ_distribution
             self.model[observ_name] = observ_model
-            [loglik, fish_info, pred_mean, pred_sens, pred_var, obs_sampler, pred_percent] = \
+            [loglik, fish_info, model_mean, model_sens, model_var, obs_sampler, obs_percent] = \
                 self._get_distribution_functions(observ_model, observ_distribution)
             self.loglik[observ_name] = loglik
             self.fisher_info_matrix[observ_name] = fish_info
-            self.prediction_mean[observ_name] = pred_mean
-            self.prediction_sensitivity[observ_name] = pred_sens
-            self.prediction_variance[observ_name] = pred_var
+            self.model_mean[observ_name] = model_mean
+            self.model_sensitivity[observ_name] = model_sens
+            self.model_variance[observ_name] = model_var
             self.observation_sampler[observ_name] = obs_sampler
-            self.prediction_percentile[observ_name] = pred_percent
+            self.observation_percentile[observ_name] = obs_percent
             
     def _get_distribution_functions(self, observ_model, observ_distribution ):
         """
@@ -139,13 +139,13 @@ class Model:
             #create FIM symbolics and function
             elemental_fim = cs.vertcat(cs.horzcat(1/stats[1], cs.SX(0)),cs.horzcat(cs.SX(0), 1/(2*stats[1]**2)))
             #create prediction functions for the mean, sensitivity and variance
-            prediction_mean_symbol = stats[0]
-            prediction_sensitivity_symbol = stats_sensitivity[0,:]
-            prediction_variance_symbol = stats[1]
+            model_mean_symbol = stats[0]
+            model_sensitivity_symbol = stats_sensitivity[0,:]
+            model_variance_symbol = stats[1]
             #create random sampling function
             var_to_stdev = lambda s: [s[0].full().item(), np.sqrt(s[1]).full().item()]
-            observ_sampler_func = lambda inpt,par,n=1: np.random.normal(*var_to_stdev(observ_model(inpt,par)),size=n).item()
-            prediction_percentile_func = lambda inpt,par,perc: st.norm.ppf(perc,*var_to_stdev(observ_model(inpt,par)))
+            observ_sampler_func = lambda inpt,par,n=1: np.random.normal(*var_to_stdev(observ_model(inpt,par)),size=n)
+            observation_percentile_func = lambda perc,inpt,par: st.norm.ppf(perc,*var_to_stdev(observ_model(inpt,par)))
         elif observ_distribution == 'Poisson':
             if not stats.shape == (1,1):
                 raise Exception('The Poisson distribution accepts only 1 distributional parameters, but dimension '+str(stats)+' provided!')
@@ -158,12 +158,12 @@ class Model:
             #create FIM symbolics and function
             elemental_fim = 1/stats[0]
             #create prediction functions for the mean, sensitivity and variance
-            prediction_mean_symbol = stats[0]
-            prediction_sensitivity_symbol = stats_sensitivity[0,:]
-            prediction_variance_symbol = stats[0]
+            model_mean_symbol = stats[0]
+            model_sensitivity_symbol = stats_sensitivity[0,:]
+            model_variance_symbol = stats[0]
             #create random sampling function
             observ_sampler_func = lambda inpt,par,n=1: np.random.poisson(observ_model(inpt,par).full().item(),size=n).item()
-            prediction_percentile_func = lambda inpt,par,perc: st.poisson.ppf(perc,*observ_model(inpt,par).full().item())
+            observation_percentile_func = lambda inpt,par,perc: st.poisson.ppf(perc,*observ_model(inpt,par).full().item())
         elif observ_distribution == 'Lognormal': 
             if not stats.shape == (2,1):
                 raise Exception('The Lognormal distribution accepts only 2 distributional parameters, but dimension '+str(stats)+' provided!')
@@ -174,14 +174,14 @@ class Model:
             #create FIM symbolics and function
             elemental_fim = cs.vertcat(cs.horzcat(1/stats[1], cs.SX(0)),cs.horzcat(cs.SX(0), 1/(2*stats[1]**2)))
             #create prediction functions for the mean, sensitivity and variance
-            prediction_mean_symbol = cs.exp(stats[0] + stats[1]/2)
-            prediction_sensitivity_symbol = cs.jacobian(prediction_mean_symbol,param_symbols)
-            prediction_variance_symbol = (cs.exp(stats[1])-1) * cs.exp(2*stats[0] + stats[1])
+            model_mean_symbol = cs.exp(stats[0] + stats[1]/2)
+            model_sensitivity_symbol = cs.jacobian(model_mean_symbol,param_symbols)
+            model_variance_symbol = (cs.exp(stats[1])-1) * cs.exp(2*stats[0] + stats[1])
             #create random sampling function
             var_to_stdev = lambda s: [s[0].full().item(), np.sqrt(s[1].full().item())]
-            observ_sampler_func = lambda inpt,par,n=1: np.random.lognormal(*var_to_stdev(observ_model(inpt,par)),size=n).item()
+            observ_sampler_func = lambda inpt,par,n=1: np.random.lognormal(*var_to_stdev(observ_model(inpt,par)),size=n)
             to_shape_scale = lambda s: [np.sqrt(s[1].full().item()), 0, np.exp(s[0].full().item())]
-            prediction_percentile_func = lambda inpt,par,perc: st.lognorm.ppf(perc,*to_shape_scale(observ_model(inpt,par)))
+            observation_percentile_func = lambda perc,inpt,par: st.lognorm.ppf(perc,*to_shape_scale(observ_model(inpt,par)))
         elif observ_distribution == 'Binomial': 
             if not stats.shape == (2,1):
                 raise Exception('The Binomial distribution accepts only 2 distributional parameters, but dimension '+str(stats)+' provided!')
@@ -192,13 +192,13 @@ class Model:
             #create FIM symbolics and function
             elemental_fim = cs.vertcat(cs.horzcat(stats[1]/(stats[0]*(1-stats[0])), cs.SX(0)),cs.horzcat(cs.SX(0), cs.SX(0)))
             #create prediction functions for the mean, sensitivity and variance
-            prediction_mean_symbol = stats[0]*stats[1]
-            prediction_sensitivity_symbol = cs.jacobian(prediction_mean_symbol,param_symbols)
-            prediction_variance_symbol = stats[1]*stats[0]*(1-stats[0])
+            model_mean_symbol = stats[0]*stats[1]
+            model_sensitivity_symbol = cs.jacobian(model_mean_symbol,param_symbols)
+            model_variance_symbol = stats[1]*stats[0]*(1-stats[0])
             #create random sampling function
             float_to_int = lambda s: [int(s[1].full().item()), s[0].full().item()]
-            observ_sampler_func = lambda inpt,par,n=1: np.random.binomial(*float_to_int(observ_model(inpt,par)),size=n).item()
-            prediction_percentile_func = lambda inpt,par,perc: st.binom.ppf(perc,*float_to_int(observ_model(inpt,par)))
+            observ_sampler_func = lambda inpt,par,n=1: np.random.binomial(*float_to_int(observ_model(inpt,par)),size=n)
+            observation_percentile_func = lambda perc,inpt,par: st.binom.ppf(perc,*float_to_int(observ_model(inpt,par)))
         elif observ_distribution == 'Bernoulli':
             if not stats.shape == (1,1):
                 raise Exception('The Bernoulli distribution accepts only 1 distributional parameters, but dimension '+str(stats)+' provided!')
@@ -207,12 +207,12 @@ class Model:
             #create FIM symbolics and function
             elemental_fim = 1/(stats[0]*(1-stats[0]))
             #create prediction functions for the mean, sensitivity and variance
-            prediction_mean_symbol = stats[0]
-            prediction_sensitivity_symbol = cs.jacobian(prediction_mean_symbol,param_symbols)
-            prediction_variance_symbol = stats[0]*(1-stats[0])
+            model_mean_symbol = stats[0]
+            model_sensitivity_symbol = cs.jacobian(model_mean_symbol,param_symbols)
+            model_variance_symbol = stats[0]*(1-stats[0])
             #create random sampling function
-            observ_sampler_func = lambda inpt,par,n=1: np.random.binomial(1,observ_model(inpt,par).full().item(),size=n).item()
-            prediction_percentile_func = lambda inpt,par,perc: st.bernoulli.ppf(perc,observ_model(inpt,par).full().item())
+            observ_sampler_func = lambda inpt,par,n=1: np.random.binomial(1,observ_model(inpt,par).full().item(),size=n)
+            observation_percentile_func = lambda perc,inpt,par: st.bernoulli.ppf(perc,observ_model(inpt,par).full().item())
         elif observ_distribution == 'Exponential': 
             if not stats.shape == (1,1):
                 raise Exception('The Exponential distribution accepts only 1 distributional parameters, but dimension '+str(stats)+' provided!')
@@ -221,12 +221,12 @@ class Model:
             #create FIM symbolics and function
             elemental_fim = 1/(cs.power(stats[0],2))
             #create prediction functions for the mean, sensitivity and variance
-            prediction_mean_symbol = 1/stats[0]
-            prediction_sensitivity_symbol = cs.jacobian(prediction_mean_symbol,param_symbols)
-            prediction_variance_symbol = 1/(cs.power(stats[0],2))
+            model_mean_symbol = 1/stats[0]
+            model_sensitivity_symbol = cs.jacobian(model_mean_symbol,param_symbols)
+            model_variance_symbol = 1/(cs.power(stats[0],2))
             #create random sampling function
-            observ_sampler_func = lambda inpt,par,n=1: np.random.exponential(1/observ_model(inpt,par).full().item(),size=n).item()
-            prediction_percentile_func = lambda inpt,par,perc: st.expon.ppf(perc,1/observ_model(inpt,par).full().item())
+            observ_sampler_func = lambda inpt,par,n=1: np.random.exponential(1/observ_model(inpt,par).full().item(),size=n)
+            observation_percentile_func = lambda perc,inpt,par: st.expon.ppf(perc,1/observ_model(inpt,par).full().item())
         elif observ_distribution == 'Gamma': 
             print('Not Implemeneted')
         else:
@@ -238,20 +238,20 @@ class Model:
 
         mean_casadi_func = cs.Function('pred_mean_'+observ_name,
                                         [input_symbols, param_symbols],
-                                        [prediction_mean_symbol])
-        prediction_mean_func = lambda inpt,par: mean_casadi_func(inpt,par).full().item()
+                                        [model_mean_symbol])
+        model_mean_func = lambda inpt,par: mean_casadi_func(inpt,par).full().item()
         sensitivity_casadi_func = cs.Function('pred_sens_'+observ_name,
                                                 [input_symbols, param_symbols],
-                                                [prediction_sensitivity_symbol])
-        prediction_sensitivity_func = lambda inpt,par: sensitivity_casadi_func(inpt,par).full().flatten()
+                                                [model_sensitivity_symbol])
+        model_sensitivity_func = lambda inpt,par: sensitivity_casadi_func(inpt,par).full().flatten()
         variance_casadi_func = cs.Function('pred_var'+observ_name,
                                             [input_symbols, param_symbols],
-                                            [prediction_variance_symbol])
-        prediction_variance_func = lambda inpt,par: variance_casadi_func(inpt,par).full().item()
+                                            [model_variance_symbol])
+        model_variance_func = lambda inpt,par: variance_casadi_func(inpt,par).full().item()
 
         function_list = [loglik_func, fisher_info_func,
-                         prediction_mean_func, prediction_sensitivity_func,prediction_variance_func,
-                         observ_sampler_func, prediction_percentile_func]
+                         model_mean_func, model_sensitivity_func,model_variance_func,
+                         observ_sampler_func, observation_percentile_func]
 
         return function_list
 
@@ -491,7 +491,7 @@ class Model:
                 for index,row in itemized_design.iterrows():
                     input_row = row[self.input_name_list].to_numpy()
                     observ_name = row['Variable']
-                    observation_list.append(self.observation_sampler[observ_name](input_row, param))
+                    observation_list.append(self.observation_sampler[observ_name](input_row, param).item())
                 dataset['Observation'] = observation_list
                 replicat_datasets.append(dataset)
             design_datasets.append(replicat_datasets)
@@ -530,11 +530,11 @@ class Model:
         #     input_list = [input_list]
 
         default_options = { 'Method':                   ['Delta',   lambda x: isinstance(x,str) and ( x=='Exact' or x=='Delta' or x=='MonteCarlo')],
-                            'MeanInterval':             [False,     lambda x: isinstance(x,bool)],
                             'PredictionInterval':       [False,     lambda x: isinstance(x,bool)],
+                            'ObservationInterval':      [False,     lambda x: isinstance(x,bool)],
                             'Sensitivity':              [False,     lambda x: isinstance(x,bool)],
-                            'SampleNumber':             [10000,     lambda x: isinstance(x,int) and 1<x],
-                            'PredictionSampleNumber':   [10,        lambda x: isinstance(x,int) and 1<x],
+                            'PredictionSampleNumber':   [10000,     lambda x: isinstance(x,int) and 1<x],
+                            'ObservationSampleNumber':  [10,        lambda x: isinstance(x,int) and 1<x],
                             'ConfidenceLevel':          [0.95,      lambda x: isinstance(x,float) and 0<=x and x<=1]}
                             
         options=cp.deepcopy(options)
@@ -546,88 +546,102 @@ class Model:
         for key in default_options.keys():
             if not key in options.keys() :
                 options[key] = default_options[key][0]
-        if not covariance_matrix and options['MeanInterval']:
-            raise Exception('Mean intervals cannot be computed without parameter uncertainty specified by a covariance matrix!')
-        
-        percentiles = [100*(1-options['ConfidenceLevel'])/2, 100*(0.5+options['SampleNumber']/2)]
+        if covariance_matrix is None:
+            if options['MeanInterval']:
+                raise Exception('Mean intervals cannot be computed without parameter uncertainty \
+                                 specified by a covariance matrix!')
+            if options['PredictionInterval'] and not options['Method']=='Exact':
+                raise Exception('Prediction intervals can only be computed using \'Exact\' method \
+                                without a covariance matrix!')
 
-        mean = []
-        mean_lower, mean_upper = [], []
+        #NOTE: need to add check for covariance matrix format and dimensions, agnostic to array/list type
+
+        percentiles = np.array([(1-options['ConfidenceLevel'])/2, (0.5+options['ConfidenceLevel']/2)])
+
+        prediction_mean,observation_mean = [],[]
         prediction_lower, prediction_upper = [], []
+        observation_lower, observation_upper = [], []
         sensitivity_lists=[]
         for par_name in self.param_name_list:
             sensitivity_lists.append([])
         for index,row in input_struct.iterrows():
-            input_vec = row[self.input_name_list]
+            input_vec = row[self.input_name_list].to_numpy()
             observ_name = row['Variable'] 
             if options['Method']=='Exact':
-                mean.append(self.prediction_mean[observ_name](input_vec,param))
-                if options['MeanInterval']:
-                     raise Exception('Mean intervals cannot be computed exactly!')
+                prediction_mean.append(self.model_mean[observ_name](input_vec,param))
                 if options['PredictionInterval']:
-                    prediction_bounds = self.prediction_percentile[observ_name](percentiles,input_vec,param)
-                    prediction_lower.append(prediction_bounds[0])
-                    prediction_upper.append(prediction_bounds[1])
+                     raise Exception('Prediction intervals cannot be computed exactly!')
+                if options['ObservationInterval']:
+                    observation_bounds = self.observation_percentile[observ_name](percentiles,input_vec,param)
+                    observation_lower.append(observation_bounds[0])
+                    observation_upper.append(observation_bounds[1])
                 
             elif options['Method']=='Delta':
-                mean_value = self.prediction_mean[observ_name](input_vec,param)
-                mean.append(mean_value)
+                mean = self.model_mean[observ_name](input_vec,param)
+                prediction_mean.append(mean)
                 stddev_multiplier = -st.norm.ppf((1-options['ConfidenceLevel'])/2)
-                if options['MeanInterval']:
-                    stddev_mean = self.prediction_sensitivity[observ_name](input_vec,param)\
-                                    * covariance_matrix \
-                                    * self.prediction_sensitivity[observ_name](input_vec,param).T
-                    mean_lower.append(mean_value - stddev_multiplier*stddev_mean)
-                    mean_upper.append(mean_value + stddev_multiplier*stddev_mean)
-
                 if options['PredictionInterval']:
-                    mean_variance = self.prediction_sensitivity[observ_name](input_vec,param)\
-                                    * covariance_matrix\
-                                    * self.prediction_sensitivity[observ_name](input_vec,param).T
-                    observation_variance = self.prediction_variance[observ_name](input_vec,param) 
-                    stddev_total = np.sqrt(mean_variance + observation_variance)
-                    prediction_lower.append(mean_value - stddev_multiplier*stddev_total)
-                    prediction_upper.append(mean_value + stddev_multiplier*stddev_total)
+                    stddev = np.sqrt(self.model_sensitivity[observ_name](input_vec,param)\
+                                    @ covariance_matrix \
+                                    @ self.model_sensitivity[observ_name](input_vec,param))
+                    prediction_lower.append(mean - stddev_multiplier*stddev)
+                    prediction_upper.append(mean + stddev_multiplier*stddev)
+
+                if options['ObservationInterval']:
+                    observation_mean.append(mean)
+                    prediction_var = (self.model_sensitivity[observ_name](input_vec,param)\
+                                    @ covariance_matrix\
+                                    @ self.model_sensitivity[observ_name](input_vec,param))
+                    observation_var = self.model_variance[observ_name](input_vec,param) 
+                    stddev_total = np.sqrt(prediction_var + observation_var)
+                    observation_lower.append(mean - stddev_multiplier*stddev_total)
+                    observation_upper.append(mean + stddev_multiplier*stddev_total)
 
             elif options['Method']=='MonteCarlo':
-                param_sample = np.random.multivariate_normal(param,  covariance_matrix,  options['SampleNumber'])
-                prediction_sample = [self.prediction_mean[observ_name](input_vec,par) for par in param_sample]
-                mean.append(np.mean(prediction_sample))
-                if options['MeanInterval']:
-                    mean_bounds = np.percentile(prediction_sample,percentiles) 
-                    mean_lower.append(mean_bounds[0])
-                    mean_upper.append(mean_bounds[1])
-
+                param_sample = np.random.multivariate_normal(param,  covariance_matrix,  options['PredictionSampleNumber'])
+                prediction_sample = [self.model_mean[observ_name](input_vec,par) for par in param_sample]
+                prediction_mean.append(np.mean(prediction_sample))
                 if options['PredictionInterval']:
-                    prior_predictive_sample = [value
-                                    for par in param_sample
-                                    for value in self.observation_sampler[observ_name]\
-                                    (input_vec,par,options['PredictionSampleNumber'])]
-                    prediction_bounds = np.percentile(prior_predictive_sample,percentiles) 
+                    prediction_bounds = np.percentile(prediction_sample,percentiles) 
                     prediction_lower.append(prediction_bounds[0])
                     prediction_upper.append(prediction_bounds[1])
 
+                if options['ObservationInterval']:
+                    prior_predictive_sample = [value.item()
+                                    for par in param_sample
+                                        for value in self.observation_sampler[observ_name]\
+                                            (input_vec,par,options['ObservationSampleNumber'])]
+                    observation_mean.append(np.mean(prior_predictive_sample))
+                    observation_bounds = np.percentile(prior_predictive_sample,100*percentiles) 
+                    observation_lower.append(observation_bounds[0])
+                    observation_upper.append(observation_bounds[1])
+
             if options['Sensitivity']:
-                sensitivity_vec = self.prediction_sensitivity[observ_name](input_vec,param)
+                sensitivity_vec = self.model_sensitivity[observ_name](input_vec,param)
                 for p in range(self.num_param):
                     sensitivity_lists[p].append(sensitivity_vec[p])
 
         output_data = cp.deepcopy(input_struct)
-        output_data['Mean'] = mean
-        if options['MeanInterval']:
-            output_data['Mean_Upper_Bound'] = mean_lower
-            output_data['Mean_Lower_Bound'] = mean_upper
+        column_name_list =output_data.columns.tolist()
+        num_col_names = len(column_name_list)
+        output_data.columns=pd.MultiIndex(levels=[['Inputs'],column_name_list],
+                                          codes=[[0]*num_col_names,[i for i in range(num_col_names)]])
+        output_data['Prediction','Mean'] = prediction_mean
         if options['PredictionInterval']:
-            output_data['Prediction_Upper_Bound'] = prediction_lower
-            output_data['Prediction_Lower_Bound'] = prediction_upper
+            output_data['Prediction','Lower'] = prediction_lower
+            output_data['Prediction','Upper'] = prediction_upper
+        if options['ObservationInterval']:
+            output_data['Observation','Mean'] = observation_mean
+            output_data['Observation','Lower'] = observation_lower
+            output_data['Observation','Upper'] = observation_upper
         if options['Sensitivity']:
             for p in range(self.num_param):
-                output_data.join({self.param_name_list[p]+'_Sensitivity': sensitivity_lists[p]})
+                output_data['Sensitivity',self.param_name_list[p]] = sensitivity_lists[p]
 
         return output_data
 
     #NOTE: should maybe rename this
-    def eval_design(self):
+    def evaluate(self):
         #maybe this should move to the design class(??)
         #For D (full cov/bias),  Ds (partial cov/bias),  T separation using the delta method?! but need two models
         # assess model/design,  returns various estimates of cov,  bias,  confidence regions/intervals

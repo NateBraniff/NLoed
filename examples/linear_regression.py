@@ -166,15 +166,32 @@ lin_model = Model(lin_response,xnames,pnames)
 # options={'Confidence':'Contours','InitParameters':[-1,0,-1]}
 # lin_fit = lin_model.fit(lin_data,options)
 
-options={'Confidence':'Contours','InitParamBounds':[(-5,5),(-5,5),(-5,5)],'InitSearchNumber':7}
 
-prediction_data = lin_model.predict(predict_inputs,[-2,0.5,-1.1])
+pred_options = {'Method':'MonteCarlo',
+                'PredictionInterval':True,
+                'ObservationInterval':True,
+                'Sensitivity':True,
+                'PredictionSampleNumber':1000}
+cov_mat = np.diag([0.1,0.1,0.1])
+predictions_mc = lin_model.predict(predict_inputs,[-2,0.5,-1.1],covariance_matrix= cov_mat,options=pred_options)
+
+pred_options = {'Method':'Delta',
+                'PredictionInterval':True,
+                'ObservationInterval':True,
+                'Sensitivity':True}
+cov_mat = np.diag([0.1,0.1,0.1])
+predictions_dlta = lin_model.predict(predict_inputs,[-2,0.5,-1.1],covariance_matrix= cov_mat,options=pred_options)
+
+
+options={'Confidence':'Profiles','InitParamBounds':[(-5,5),(-5,5),(-5,5)],'InitSearchNumber':7}
 
 lin_data = lin_model.sample(design,[-2,0.5,-1.1])
 lin_fit = lin_model.fit(lin_data,options=options)
 print(lin_fit)
 fit_param_vec=lin_fit['Estimate'].to_numpy()
-lin_model.predict(predict_inputs,fit_param_vec)
+pred_options={'Method':'Exact','MeanInterval':False,'PredictionInterval':True}
+cov_mat=np.diag([0.1,0.1,0.1])
+predictions=lin_model.predict(predict_inputs,fit_param_vec,covariance_matrix= cov_mat,options=pred_options)
 
 lin_data = lin_model.sample(design,[0.2,1.9,3.25])
 lin_fit = lin_model.fit(lin_data,options=options)
