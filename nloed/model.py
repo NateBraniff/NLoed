@@ -3,6 +3,9 @@ import numpy as np
 import pandas as pd
 import math as mt
 import copy as cp
+import os as os
+import sys as sys
+from contextlib import contextmanager
 from scipy import stats as st
 from scipy.interpolate import splev,  splrep
 import matplotlib.pyplot as plt
@@ -162,7 +165,7 @@ class Model:
             model_sensitivity_symbol = stats_sensitivity[0,:]
             model_variance_symbol = stats[0]
             #create random sampling function
-            observ_sampler_func = lambda inpt,par,n=1: np.random.poisson(observ_model(inpt,par).full().item(),size=n).item()
+            observ_sampler_func = lambda inpt,par,n=1: np.random.poisson(observ_model(inpt,par).full().item(),size=n)
             observation_percentile_func = lambda inpt,par,perc: st.poisson.ppf(perc,*observ_model(inpt,par).full().item())
         elif observ_distribution == 'Lognormal': 
             if not stats.shape == (2,1):
@@ -284,7 +287,8 @@ class Model:
             'SearchFactor':     [5,                     lambda x: isinstance(x,float) and 0<x],
             'SearchBound':      [3,                     lambda x: isinstance(x,float) and 0<x],
             'InitParamBounds':  [False,                 lambda x: isinstance(x,list) or isinstance(x,np.ndarray)],
-            'InitSearchNumber': [3,                     lambda x: isinstance(x,int) and 0<x]}
+            'InitSearchNumber': [3,                     lambda x: isinstance(x,int) and 0<x],
+            'Verbose':          [True,                  lambda x: isinstance(x,int) and 0<x]}
         options=cp.deepcopy(options)
         for key in options.keys():
             if not key in options.keys():
@@ -330,6 +334,9 @@ class Model:
         #total_loglik_symbol = 0
         #create archetypal param symbol vector , used for casadi loglik functions for each design
         archetype_param_symbols = cs.SX.sym('archetype_param_symbols', self.num_param)
+        # if options['Verbose']:
+        #     progress_counter=0
+        #     self._progress_bar(progress_counter, num_datasets, prefix = 'Fitting models:')
         #loop over different designs (outer most list)
         for d in range(num_designs):
             #get the set of replicats for this design
@@ -358,7 +365,7 @@ class Model:
                                                 [archetype_loglik_symbol])
 
             archetype_loglik_optim_struct = {'f': -archetype_loglik_symbol, 'x': archetype_param_symbols,'p':archetype_observ_symbol}
-            archetype_fitting_solver = cs.nlpsol('solver', 'ipopt', archetype_loglik_optim_struct, {'ipopt.print_level':5, 'print_time':False}) 
+            archetype_fitting_solver = cs.nlpsol('solver', 'ipopt', archetype_loglik_optim_struct, {'ipopt.print_level':0, 'print_time':False}) 
 
             #loop over replicats within each design
             for r in range(num_replicat_list[d]):
@@ -378,7 +385,7 @@ class Model:
                 loglik_func_list.append(loglik_func)
 
                 #crude grid search of staring parameters, if request in options
-                print(options['InitParamBounds'])
+                #print(options['InitParamBounds'])
                 if options['InitParamBounds']:
                     candidate_list = [np.linspace(bnds[0],bnds[1],options['InitSearchNumber']) \
                                      for bnds in options['InitParamBounds']]
@@ -395,9 +402,12 @@ class Model:
                 #NOTE: should probably make start param search optionally specified by param covaraince
                 #especially if we allow laplace-basyian style fitting (actuall only reall makes sense
                 # if we do both bayes fitting with bayes covarianse start)
-                fit_param = archetype_fitting_solver(x0=start_param, p=observ_vec)['x'].full().flatten()
+                with silence_stdout():
+                    fit_param = archetype_fitting_solver(x0=start_param, p=observ_vec)['x'].full().flatten()
                 fit_param_list.append(fit_param)
-
+                # if options['Verbose']:
+                #     progress_counter =+ 1
+                #     self._progress_bar(progress_counter, num_datasets, prefix = 'Fitting models:')
 
         #create row index for parameter dataframe export, specifies design index for each datset
         design_index = [design_indx+1 for design_indx in range(num_designs) for i in range(num_replicat_list[design_indx])]
@@ -602,7 +612,7 @@ class Model:
                 prediction_sample = [self.model_mean[observ_name](input_vec,par) for par in param_sample]
                 prediction_mean.append(np.mean(prediction_sample))
                 if options['PredictionInterval']:
-                    prediction_bounds = np.percentile(prediction_sample,percentiles) 
+                    prediction_bounds = np.percentile(prediction_sample,100*percentiles) 
                     prediction_lower.append(prediction_bounds[0])
                     prediction_upper.append(prediction_bounds[1])
 
@@ -1097,6 +1107,33 @@ class Model:
             new_grid=[d for d in candidates_current_dim]
 
         return new_grid
+
+    def _progress_bar (self, iteration, total, prefix = ''):
+        """
+        Helper function to print progress bar in a looped process
+
+        Args:
+            iteration:   current iteration in the process
+            total:       total iterations in the process
+            prefix:      prefix string to name process
+        """
+        max_length= 50
+        percent = ("{0:.1f}").format(max_length * (iteration / float(total)))
+        filledLength = int(max_length * iteration // total)
+        bar = '█' * filledLength + '-' * (max_length - filledLength)
+        print('\r%s |%s| %s%%' % (prefix, bar, percent), end = "\r")
+        if iteration == total: 
+            print()
+
+@contextmanager
+def silence_stdout():
+    old_target = sys.stdout
+    try:
+        with open(os.devnull, "w") as new_target:
+            sys.stdout = new_target
+            yield new_target
+    finally:
+        sys.stdout = old_target
 
 class factorial(cs.Callback):
     def __init__(self,  name,  options = {}):

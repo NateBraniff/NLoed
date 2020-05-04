@@ -8,6 +8,65 @@ from nloed import Model
 from nloed import design
 import time
 
+
+
+
+xs = cs.SX.sym('xs',2)
+xnames = ['x1','x2']
+ps = cs.SX.sym('ps',4)
+pnames = ['Intercept','x1-Main','x2-Main','Interaction']
+
+lin_predictor = ps[0] + ps[1]*xs[0] + ps[2]*xs[1] + ps[3]*xs[0]*xs[1]
+
+design = pd.DataFrame({ 'x1':[-1,-1,-1,0,0,0,1,1,1],
+                        'x2':[-1,0,1,-1,0,1,-1,0,1],
+                        'y_norm':[5,5,5,5,5,5,5,5,5],
+                        'y_bern':[5,5,5,5,5,5,5,5,5],
+                        'y_pois':[5,5,5,5,5,5,5,5,5]})
+
+predict_inputs = pd.DataFrame({ 'x1':[-1,-1,-1,0,0,0,1,1,1]*3,
+                                'x2':[-1,0,1,-1,0,1,-1,0,1]*3,
+                                'Variable':['y_norm']*9+['y_bern']*9+['y_pois']*9})
+
+#mixed model
+mean, var = lin_predictor, 0.1
+normal_stats = cs.vertcat(mean, var)
+y_norm_func = cs.Function('y_norm',[xs,ps],[normal_stats])
+
+rate = cs.exp(lin_predictor)
+poisson_stats = rate
+y_pois_func = cs.Function('y_pois',[xs,ps],[poisson_stats])
+
+prob = cs.exp(lin_predictor)/(1+cs.exp(lin_predictor))
+bern_stats = prob
+y_bern_func = cs.Function('y_bern',[xs,ps],[bern_stats])
+
+mixed_response = [  (y_norm_func,'Normal'),
+                    (y_bern_func,'Bernoulli'),
+                    (y_pois_func,'Poisson')]
+
+mixed_model = Model(mixed_response,xnames,pnames)
+mixed_data = mixed_model.sample(design,[0.5,1.1,2.1,0.3])
+fit_options={'Confidence':'Profiles',
+            'InitParamBounds':[(-5,5),(-5,5),(-5,5),(-5,5)],
+            'InitSearchNumber':7}
+mixed_fit = mixed_model.fit(mixed_data, options=fit_options)
+
+fit_pars = mixed_fit['Estimate'].to_numpy().flatten()
+print(fit_pars)
+
+#evaluate goes here
+
+cov_mat = np.diag([0.1,0.1,0.1,0.1])
+pred_options = {'Method':'MonteCarlo',
+                'PredictionInterval':True,
+                'ObservationInterval':True,
+                'Sensitivity':True}
+predictions_dlta = mixed_model.predict(predict_inputs,fit_pars,covariance_matrix = cov_mat,options=pred_options)
+
+
+t=0
+
 # x = cs.SX.sym('x')
 # xnames = ['x']
 # p = cs.SX.sym('p')
@@ -136,110 +195,130 @@ import time
 # exp_fit = exp_model.fit(exp_data,[1,1,1,1])
 
 
-t=0
+# t=0
 
-xs = cs.SX.sym('xs',2)
-xnames = ['x1','x2']
-ps = cs.SX.sym('ps',3)
-pnames = ['Intercept','x1-Main','x2-Main']
+# xs = cs.SX.sym('xs',2)
+# xnames = ['x1','x2']
+# ps = cs.SX.sym('ps',3)
+# pnames = ['Intercept','x1-Main','x2-Main']
 
-lin_predictor = ps[0] + ps[1]*xs[0] + ps[2]*xs[1]
+# lin_predictor = ps[0] + ps[1]*xs[0] + ps[2]*xs[1]
 
-design = pd.DataFrame({ 'x1':[-1,-1,-1,0,0,0,1,1,1],
-                        'x2':[-1,0,1,-1,0,1,-1,0,1],
-                        'y_norm':[50,50,50,50,50,50,50,50,50]})
+# design = pd.DataFrame({ 'x1':[-1,-1,-1,0,0,0,1,1,1],
+#                         'x2':[-1,0,1,-1,0,1,-1,0,1],
+#                         'y_norm':[50,50,50,50,50,50,50,50,50]})
 
-predict_inputs = pd.DataFrame({ 'x1':[-1,-1,-1,0,0,0,1,1,1],
-                                'x2':[-1,0,1,-1,0,1,-1,0,1],
-                                'Variable':['y_norm']*9})
+# predict_inputs = pd.DataFrame({ 'x1':[-1,-1,-1,0,0,0,1,1,1],
+#                                 'x2':[-1,0,1,-1,0,1,-1,0,1],
+#                                 'Variable':['y_norm']*9})
 
-#mixed model
-mean, var = lin_predictor, lin_predictor**2+0.1
-normal_stats = cs.vertcat(mean, var)
-y_norm_func = cs.Function('y_norm',[xs,ps],[normal_stats])
+# #mixed model
+# mean, var = lin_predictor, lin_predictor**2+0.1
+# normal_stats = cs.vertcat(mean, var)
+# y_norm_func = cs.Function('y_norm',[xs,ps],[normal_stats])
 
-lin_response = [ (y_norm_func,'Normal')]
+# lin_response = [ (y_norm_func,'Normal')]
 
-lin_model = Model(lin_response,xnames,pnames)
+# lin_model = Model(lin_response,xnames,pnames)
 
 # lin_data = lin_model.sample(design,[-2,0.5,-1.1])
 # options={'Confidence':'Contours','InitParameters':[-1,0,-1]}
 # lin_fit = lin_model.fit(lin_data,options)
 
 
-pred_options = {'Method':'MonteCarlo',
-                'PredictionInterval':True,
-                'ObservationInterval':True,
-                'Sensitivity':True,
-                'PredictionSampleNumber':1000}
-cov_mat = np.diag([0.1,0.1,0.1])
-predictions_mc = lin_model.predict(predict_inputs,[-2,0.5,-1.1],covariance_matrix= cov_mat,options=pred_options)
+# pred_options = {'Method':'MonteCarlo',
+#                 'PredictionInterval':True,
+#                 'ObservationInterval':True,
+#                 'Sensitivity':True,
+#                 'PredictionSampleNumber':10000}
+# cov_mat = np.diag([0.1,0.1,0.1])
+# predictions_mc = lin_model.predict(predict_inputs,[-2,0.5,-1.1],covariance_matrix= cov_mat,options=pred_options)
 
-pred_options = {'Method':'Delta',
-                'PredictionInterval':True,
-                'ObservationInterval':True,
-                'Sensitivity':True}
-cov_mat = np.diag([0.1,0.1,0.1])
-predictions_dlta = lin_model.predict(predict_inputs,[-2,0.5,-1.1],covariance_matrix= cov_mat,options=pred_options)
+# pred_options = {'Method':'Delta',
+#                 'PredictionInterval':True,
+#                 'ObservationInterval':True,
+#                 'Sensitivity':True}
+# cov_mat = np.diag([0.1,0.1,0.1])
+# predictions_dlta = lin_model.predict(predict_inputs,[-2,0.5,-1.1],covariance_matrix = cov_mat,options=pred_options)
 
 
-options={'Confidence':'Profiles','InitParamBounds':[(-5,5),(-5,5),(-5,5)],'InitSearchNumber':7}
+# options={'Confidence':'Profiles','InitParamBounds':[(-5,5),(-5,5),(-5,5)],'InitSearchNumber':7}
 
-lin_data = lin_model.sample(design,[-2,0.5,-1.1])
-lin_fit = lin_model.fit(lin_data,options=options)
-print(lin_fit)
-fit_param_vec=lin_fit['Estimate'].to_numpy()
-pred_options={'Method':'Exact','MeanInterval':False,'PredictionInterval':True}
-cov_mat=np.diag([0.1,0.1,0.1])
-predictions=lin_model.predict(predict_inputs,fit_param_vec,covariance_matrix= cov_mat,options=pred_options)
+# lin_data = lin_model.sample(design,[-2,0.5,-1.1])
+# lin_fit = lin_model.fit(lin_data,options=options)
+# print(lin_fit)
+# fit_param_vec=lin_fit['Estimate'].to_numpy()
+# pred_options={'Method':'Exact','MeanInterval':False,'PredictionInterval':True}
+# cov_mat=np.diag([0.1,0.1,0.1])
+# predictions=lin_model.predict(predict_inputs,fit_param_vec,covariance_matrix= cov_mat,options=pred_options)
 
-lin_data = lin_model.sample(design,[0.2,1.9,3.25])
-lin_fit = lin_model.fit(lin_data,options=options)
-print(lin_fit)
+# lin_data = lin_model.sample(design,[0.2,1.9,3.25])
+# lin_fit = lin_model.fit(lin_data,options=options)
+# print(lin_fit)
 
-lin_data = lin_model.sample(design,[-0.5,-3.3,0.2])
-lin_fit = lin_model.fit(lin_data,options=options)
-print(lin_fit)
+# lin_data = lin_model.sample(design,[-0.5,-3.3,0.2])
+# lin_fit = lin_model.fit(lin_data,options=options)
+# print(lin_fit)
 
-lin_data = lin_model.sample(design,[4.3,0,-0.4])
-lin_fit = lin_model.fit(lin_data,options=options)
-print(lin_fit)
+# lin_data = lin_model.sample(design,[4.3,0,-0.4])
+# lin_fit = lin_model.fit(lin_data,options=options)
+# print(lin_fit)
 
-xs = cs.SX.sym('xs',2)
-xnames = ['x1','x2']
-ps = cs.SX.sym('ps',4)
-pnames = ['Intercept','x1-Main','x2-Main','Interaction']
+# xs = cs.SX.sym('xs',2)
+# xnames = ['x1','x2']
+# ps = cs.SX.sym('ps',4)
+# pnames = ['Intercept','x1-Main','x2-Main','Interaction']
 
-lin_predictor = ps[0] + ps[1]*xs[0] + ps[2]*xs[1] + ps[3]*xs[0]*xs[1]
+# lin_predictor = ps[0] + ps[1]*xs[0] + ps[2]*xs[1] + ps[3]*xs[0]*xs[1]
 
-design = pd.DataFrame({ 'x1':[-1,-1,-1,0,0,0,1,1,1],
-                        'x2':[-1,0,1,-1,0,1,-1,0,1],
-                        'y_norm':[5,5,5,5,5,5,5,5,5],
-                        'y_bern':[5,5,5,5,5,5,5,5,5],
-                        'y_pois':[5,5,5,5,5,5,5,5,5]})
+# design = pd.DataFrame({ 'x1':[-1,-1,-1,0,0,0,1,1,1],
+#                         'x2':[-1,0,1,-1,0,1,-1,0,1],
+#                         'y_norm':[5,5,5,5,5,5,5,5,5],
+#                         'y_bern':[5,5,5,5,5,5,5,5,5],
+#                         'y_pois':[5,5,5,5,5,5,5,5,5]})
 
-#mixed model
-mean, var = lin_predictor, lin_predictor**2 + 0.1
-normal_stats = cs.vertcat(mean, var)
-y_norm_func = cs.Function('y_norm',[xs,ps],[normal_stats])
+# predict_inputs = pd.DataFrame({ 'x1':[-1,-1,-1,0,0,0,1,1,1]*3,
+#                                 'x2':[-1,0,1,-1,0,1,-1,0,1]*3,
+#                                 'Variable':['y_norm']*9+['y_bern']*9+['y_pois']*9})
 
-rate = cs.exp(lin_predictor)
-poisson_stats = rate
-y_pois_func = cs.Function('y_pois',[xs,ps],[poisson_stats])
+# #mixed model
+# mean, var = lin_predictor, 0.1
+# normal_stats = cs.vertcat(mean, var)
+# y_norm_func = cs.Function('y_norm',[xs,ps],[normal_stats])
 
-prob = cs.exp(lin_predictor)/(1+cs.exp(lin_predictor))
-bern_stats = prob
-y_bern_func = cs.Function('y_bern',[xs,ps],[bern_stats])
+# rate = cs.exp(lin_predictor)
+# poisson_stats = rate
+# y_pois_func = cs.Function('y_pois',[xs,ps],[poisson_stats])
 
-mixed_response = [  (y_norm_func,'Normal'),
-                    (y_bern_func,'Bernoulli'),
-                    (y_pois_func,'Poisson')]
+# prob = cs.exp(lin_predictor)/(1+cs.exp(lin_predictor))
+# bern_stats = prob
+# y_bern_func = cs.Function('y_bern',[xs,ps],[bern_stats])
 
-mixed_model = Model(mixed_response,xnames,pnames)
-mixed_data = mixed_model.sample(design,[0.5,1.1,2.1,0.3])
-mixed_fit = mixed_model.fit(mixed_data,[1,1,1,1],options={'Confidence':'Contours'})
+# mixed_response = [  (y_norm_func,'Normal'),
+#                     (y_bern_func,'Bernoulli'),
+#                     (y_pois_func,'Poisson')]
 
-t=0
+# mixed_model = Model(mixed_response,xnames,pnames)
+# mixed_data = mixed_model.sample(design,[0.5,1.1,2.1,0.3])
+# fit_options={'Confidence':'Profiles',
+#             'InitParamBounds':[(-5,5),(-5,5),(-5,5),(-5,5)],
+#             'InitSearchNumber':7}
+# mixed_fit = mixed_model.fit(mixed_data, options=fit_options)
+
+# fit_pars = mixed_fit['Estimate'].to_numpy().flatten()
+# print(fit_pars)
+
+# #evaluate goes here
+
+# cov_mat = np.diag([0.1,0.1,0.1,0.1])
+# pred_options = {'Method':'MonteCarlo',
+#                 'PredictionInterval':True,
+#                 'ObservationInterval':True,
+#                 'Sensitivity':True}
+# predictions_dlta = mixed_model.predict(predict_inputs,fit_pars,covariance_matrix = cov_mat,options=pred_options)
+
+
+# t=0
 # stats2=cs.vertcat(mean,var)
 # stats3=cs.vertcat(mean,10)
 
