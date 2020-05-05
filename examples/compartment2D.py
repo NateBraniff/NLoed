@@ -1,71 +1,129 @@
 import casadi as cs
-from nloed import model
+import pandas as pd
+import numpy as np
+import re
+import matplotlib.pyplot as plt
+from nloed import Model
 from nloed import design
 
+#states and controls
+y = cs.SX.sym('y',2)
+u = cs.SX.sym('u')
+p = cs.SX.sym('p',4)
+rhs = cs.vertcat(cs.exp(p[0])*u -cs.exp(p[1])*y[0], cs.exp(p[2])*y[0]-cs.exp(p[3])*y[1])
+ode = cs.Function('ode',[y,u,p],[rhs])
 
-#Declare independent variables (covarietes, control inputs, conditions etc.)
-#These are the variables you control in the experimental design, and for which you want to find the optimal settings of
-x=cs.MX.sym('x',4)
-
-#Declare the number of parameters-of-interest
-#These are the parameters you are interested in estimating as accurately as possible (or nuisance parameters, you can decide which is which later)
-beta=cs.MX.sym('beta',4)
-
-# The code below is based on Casadi's sysid.py example (Feb, 2020): https://github.com/casadi/casadi/blob/master/docs/examples/python/sysid.py
-# define ode variables, these are just for convenience, there naming won't be important later
-z1  = cs.MX.sym('z1')
-z2 = cs.MX.sym('z2')
-u  = cs.MX.sym('u')
-
-#define the rhs, this is based on casadi examples
-states = cs.vertcat(z1,z2)
-controls = u
-rhs = cs.vertcat(beta[0]*u -beta[1]*z1, beta[2]*z1-beta[3]*z2)
-
-# Create a differential function (ode right hand side)
-ode = cs.Function('ode',[states,controls,beta],[rhs])
-
-# Set the total length fo the experiment, the time interval between samples,
-# the integration steps within each interval, and the RK timestep
-Tend=30
-SampleInterval=10
-StepsPerSample = 10
-dt = SampleInterval/StepsPerSample
-
+dt = 1
 # Create symbolics for RK4 integration, as shown in Casadi examples
-k1 = ode(states,controls,beta)
-k2 = ode(states+dt/2.0*k1,controls,beta)
-k3 = ode(states+dt/2.0*k2,controls,beta)
-k4 = ode(states+dt*k3,controls,beta)
-states_final = states+dt/6.0*(k1+2*k2+2*k3+k4)
-
+k1 = ode(y, u, p)
+k2 = ode(y + dt/2.0*k1, u, p)
+k3 = ode(y + dt/2.0*k2, u, p)
+k4 = ode(y + dt*k3, u, p)
+y_step = y+dt/6.0*(k1+2*k2+2*k3+k4)
 # Create a function to perform one step of the RK integration
-step = cs.Function('step',[states, controls, beta],[states_final])
+step = cs.Function('step',[y, u, p],[y_step])
+
+##########################################################################################
+
+steps_per_sample = [1,2,3,5] 
+samples_per_cntrl = 1
+cntrls_per_run = 3
+
+y0 = cs.SX.sym('y0',2)
+uvec = cs.SX.sym('uvec',3)
+x = cs.vertcat(y0,uvec)
 
 #Loop over the ste function to create symbolics for integrating across a sample interval
-X = states
-for i in range(StepsPerSample):
-  X = step(X, controls, beta)
+y_sample = y0
+sample_list=[]
+times=[]
+cntr=0
+for i in range(cntrls_per_run):
+  for num_stps in steps_per_sample:
+    for k in range(num_stps):
+      y_sample = step(y_sample, uvec[i], p)
+      cntr+=1
+    sample_list.append(y_sample)
+    times.append(cntr*dt)
 
-# Create a function that simulates the whole sample interval
-sample = cs.Function('sample',[states, controls, beta], [X])
+ode_response = []
+response_names=[]
+for i in range(len(sample_list)):
 
-X0 = cs.vertcat(x[0],0)
-mean1 = step(X0, x[1], beta)
-mean2 = step(X0, x[2], beta)
-mean3 = step(X0, x[3], beta)
+  mrna_stats = cs.vertcat(sample_list[i][0], 0.01)
+  mrna_func = cs.Function('mrna_t'+str(times[i]),[x,p],[mrna_stats])
+  ode_response.append((mrna_func,'Normal'))
+  response_names.append('mrna_t'+str(times[i]))
 
-#Define the type of distribution for the response variable, and variance as a constant
-distType='normal'
-var = 1
-#Enter the above model into the list of reponse variables
-response= [(distType,(mean1, var)),(distType,(mean2, var)),(distType,(mean3, var))]
+  prot_stats = cs.vertcat(sample_list[i][1], 0.01)
+  prot_func = cs.Function('prot_t'+str(times[i]),[x,p],[prot_stats])
+  ode_response.append((prot_func,'Normal'))
+  response_names.append('prot_t'+str(times[i]))
 
-#Instantiate class
-comp2D=model(response, beta, x)
+xnames = ['mrna_ic','prot_ic','cntrl_1','cntrl_2','cntrl_3']
+pnames = ['alpha','delta','beta','gamma']
 
-#beta0=(0.5,1)
-#xbounds=(0,10)
-#xi=design(quadraticRS,beta0,xbounds)
+ode_model = Model(ode_response,xnames,pnames)
 
-#print(xi)
+predict_inputs = pd.DataFrame({ 'mrna_ic':[1]*len(response_names),
+                                'prot_ic':[1]*len(response_names),
+                                'cntrl_1':[0.1]*len(response_names),
+                                'cntrl_2':[1.0]*len(response_names),
+                                'cntrl_3':[0.1]*len(response_names),
+                                'Variable':response_names})
+
+true_pars = [np.log(0.5),np.log(1.1),np.log(2.1),np.log(0.3)]
+predictions = ode_model.predict(predict_inputs,true_pars)
+
+digit_re=re.compile('[a-z]+_t(\d+)')
+type_re=re.compile('([a-z]+)_t\d+')
+
+predictions['Prediction','Time'] = predictions['Inputs','Variable'].apply(lambda x: int(digit_re.search(x).group(1)))
+predictions['Prediction','Type'] = predictions['Inputs','Variable'].apply(lambda x: type_re.search(x).group(1))
+
+mrna_pred = predictions.loc[predictions['Prediction','Type'] == 'mrna']
+prot_pred = predictions.loc[predictions['Prediction','Type'] == 'prot']
+
+mrna_pred.plot.scatter(x=('Prediction','Time'),y=('Prediction','Mean'))
+prot_pred.plot.scatter(x=('Prediction','Time'),y=('Prediction','Mean'))
+plt.show()
+
+design = pd.DataFrame({ 'mrna_ic':[0.5,1,2],
+                        'prot_ic':[1,0.1,2],
+                        'cntrl_1':[0.1,1,1],
+                        'cntrl_2':[0.2,0,0.5],
+                        'cntrl_3':[0.3,2,0.1],
+                        'mrna_t1':[10,10,10],
+                        'prot_t1':[10,10,10],
+                        'mrna_t2':[10,10,10],
+                        'prot_t2':[10,10,10],
+                        'mrna_t3':[10,10,10],
+                        'prot_t3':[10,10,10]})
+
+ode_data = ode_model.sample(design,true_pars)
+#
+fit_options={'Confidence':'Intervals',
+            'InitParamBounds':[(-3,2)]*4,
+            'InitSearchNumber':11,
+            'MaxSteps':100000}
+ode_fit = ode_model.fit(ode_data, options=fit_options)
+
+t=0
+
+# fit_pars = mixed_fit['Estimate'].to_numpy().flatten()
+# print(fit_pars)
+
+# #evaluate goes here
+
+# predict_inputs = pd.DataFrame({ 'x1':[-1,-1,-1,0,0,0,1,1,1]*3,
+#                                 'x2':[-1,0,1,-1,0,1,-1,0,1]*3,
+#                                 'Variable':['y_norm']*9+['y_bern']*9+['y_pois']*9})
+
+# cov_mat = np.diag([0.1,0.1,0.1,0.1])
+# pred_options = {'Method':'MonteCarlo',
+#                 'PredictionInterval':True,
+#                 'ObservationInterval':True,
+#                 'Sensitivity':True}
+# predictions_dlta = mixed_model.predict(predict_inputs,fit_pars,covariance_matrix = cov_mat,options=pred_options)
+
+

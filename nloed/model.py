@@ -557,11 +557,11 @@ class Model:
             if not key in options.keys() :
                 options[key] = default_options[key][0]
         if covariance_matrix is None:
-            if options['MeanInterval']:
-                raise Exception('Mean intervals cannot be computed without parameter uncertainty \
+            if options['PredictionInterval']:
+                raise Exception('Prediction intervals cannot be computed without parameter uncertainty \
                                  specified by a covariance matrix!')
-            if options['PredictionInterval'] and not options['Method']=='Exact':
-                raise Exception('Prediction intervals can only be computed using \'Exact\' method \
+            if options['ObservationInterval'] and not options['Method']=='Exact':
+                raise Exception('Observation intervals can only be computed using \'Exact\' method \
                                 without a covariance matrix!')
 
         #NOTE: need to add check for covariance matrix format and dimensions, agnostic to array/list type
@@ -1026,7 +1026,7 @@ class Model:
         init_radius =  sign*options['InitialStep']
         upper_radius = init_radius / 10**(1/options['SearchFactor'])
         upper_ratio_gap = -st.chi2.ppf(options['ConfidenceLevel'],  self.num_param)
-        upper_marginal_param = marginal_param
+        upper_marginal_param = np.array(marginal_param)
         while not np.sign(upper_ratio_gap)==1 :
             upper_radius = upper_radius * 10**(1/options['SearchFactor'])
             lower_ratio_gap = upper_ratio_gap
@@ -1084,7 +1084,7 @@ class Model:
                 lower_ratio_gap = middle_ratio_gap
                 lower_marginal_param = middle_marginal_param
 
-            #print('Rad: '+str(middle_radius)+', Gap: '+str(middle_ratio_gap)+', Par: '+str(middle_marginal_param))
+            print('Rad: '+str(middle_radius)+', Gap: '+str(middle_ratio_gap)+', Par: '+str(middle_marginal_param))
             #increment the iterations counter
             iteration_counter+=1
             if iteration_counter>options['MaxSteps']:
