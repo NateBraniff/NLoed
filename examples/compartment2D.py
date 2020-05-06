@@ -1,7 +1,8 @@
 import casadi as cs
 import pandas as pd
 import numpy as np
-import re
+import re as re
+import copy as cp
 import matplotlib.pyplot as plt
 from nloed import Model
 from nloed import design
@@ -46,19 +47,29 @@ for i in range(cntrls_per_run):
     sample_list.append(y_sample)
     times.append(cntr*dt)
 
+design = pd.DataFrame({ 'mrna_ic':[1],
+                        'prot_ic':[1],
+                        'cntrl_1':[0.1],
+                        'cntrl_2':[1],
+                        'cntrl_3':[0.1]})
+
 ode_response = []
 response_names=[]
 for i in range(len(sample_list)):
 
-  mrna_stats = cs.vertcat(sample_list[i][0], 0.01)
+  mrna_stats = cs.vertcat(sample_list[i][0], 0.001)
   mrna_func = cs.Function('mrna_t'+str(times[i]),[x,p],[mrna_stats])
   ode_response.append((mrna_func,'Normal'))
   response_names.append('mrna_t'+str(times[i]))
 
-  prot_stats = cs.vertcat(sample_list[i][1], 0.01)
+  design['mrna_t'+str(times[i])]=[5]
+
+  prot_stats = cs.vertcat(sample_list[i][1], 0.001)
   prot_func = cs.Function('prot_t'+str(times[i]),[x,p],[prot_stats])
   ode_response.append((prot_func,'Normal'))
   response_names.append('prot_t'+str(times[i]))
+
+  design['prot_t'+str(times[i])]=[5]
 
 xnames = ['mrna_ic','prot_ic','cntrl_1','cntrl_2','cntrl_3']
 pnames = ['alpha','delta','beta','gamma']
@@ -84,25 +95,25 @@ predictions['Prediction','Type'] = predictions['Inputs','Variable'].apply(lambda
 mrna_pred = predictions.loc[predictions['Prediction','Type'] == 'mrna']
 prot_pred = predictions.loc[predictions['Prediction','Type'] == 'prot']
 
-mrna_pred.plot.scatter(x=('Prediction','Time'),y=('Prediction','Mean'))
-prot_pred.plot.scatter(x=('Prediction','Time'),y=('Prediction','Mean'))
-plt.show()
-
-design = pd.DataFrame({ 'mrna_ic':[0.5,1,2],
-                        'prot_ic':[1,0.1,2],
-                        'cntrl_1':[0.1,1,1],
-                        'cntrl_2':[0.2,0,0.5],
-                        'cntrl_3':[0.3,2,0.1],
-                        'mrna_t1':[10,10,10],
-                        'prot_t1':[10,10,10],
-                        'mrna_t2':[10,10,10],
-                        'prot_t2':[10,10,10],
-                        'mrna_t3':[10,10,10],
-                        'prot_t3':[10,10,10]})
+ax1=mrna_pred.plot.scatter(x=('Prediction','Time'),y=('Prediction','Mean'),c='Red')
+ax2=prot_pred.plot.scatter(x=('Prediction','Time'),y=('Prediction','Mean'),c='Red')
 
 ode_data = ode_model.sample(design,true_pars)
-#
-fit_options={'Confidence':'Intervals',
+
+data=cp.deepcopy(ode_data)
+
+data['Time'] = data['Variable'].apply(lambda x: int(digit_re.search(x).group(1)))
+data['Type'] = data['Variable'].apply(lambda x: type_re.search(x).group(1))
+
+mrna_obs = data.loc[data['Type'] == 'mrna']
+prot_obs = data.loc[data['Type'] == 'prot']
+
+mrna_obs.plot.scatter(x=('Time'),y=('Observation'),ax=ax1)
+prot_obs.plot.scatter(x=('Time'),y=('Observation'),ax=ax2)
+plt.show()
+
+
+fit_options={'Confidence':'Contours',
             'InitParamBounds':[(-3,2)]*4,
             'InitSearchNumber':11,
             'MaxSteps':100000}

@@ -467,6 +467,7 @@ class Model:
             design_datasets: either; a singel dataset for the given design,  OR,  a list of dataset replicats for the given design,  OR,  a list of list of dataset replicats for each design
         """
         #NOTE: needs checks on inputs
+        #NOTE: should make the returned dataframe a multicolumn index to be consistent
         #NOTE: multiplex multiple parameter values??
         #NOTE: actually maybe more important to be able to replicat designs N times
         if not len(param) == self.num_param:
@@ -651,14 +652,29 @@ class Model:
         return output_data
 
     #NOTE: should maybe rename this
-    def evaluate(self):
+    def evaluate(self,design,param,options={}):
         #maybe this should move to the design class(??)
         #For D (full cov/bias),  Ds (partial cov/bias),  T separation using the delta method?! but need two models
         # assess model/design,  returns various estimates of cov,  bias,  confidence regions/intervals
         # no data: asymptotic: covaraince,  beale bias,  maybe MSE
         #          sigma point: covariance,  bias (using mean) (need to figure out how to do sigma for non-normal data),  maybe MSE
         #          monte carlo: covariance,  bias,  MSE
-        
+        default_options = { 'Method':                   ['Asymptotic',  lambda x: isinstance(x,str) and ( x=='Asymptotic' or x=='MonteCarlo')],
+                            'Covariance':               [True,          lambda x: isinstance(x,bool)],
+                            'FIM':                      [False,         lambda x: isinstance(x,bool)],
+                            'Bias':                     [False,         lambda x: isinstance(x,bool)],
+                            'MSE':                      [False,         lambda x: isinstance(x,bool)],
+                            'SampleNumber':             [10000,         lambda x: isinstance(x,int) and 1<x]}
+                            
+        options=cp.deepcopy(options)
+        for key in options.keys():
+            if not key in options.keys():
+                raise Exception('Invalid option key; '+key+'!')
+            elif not default_options[key][1](options[key]):
+                raise Exception('Invalid value; '+str(options[key])+', passed for option key; '+key+'!')
+        for key in default_options.keys():
+            if not key in options.keys() :
+                options[key] = default_options[key][0]
         print('Not Implemeneted')
 
     # def evalfim(self):
