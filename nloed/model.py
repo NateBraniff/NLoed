@@ -377,9 +377,11 @@ class Model:
         archetype_loglik_func = cs.Function('archetype_loglik_func',
                                             [archetype_observ_symbol, archetype_param_symbols],
                                             [archetype_loglik_symbol])
-
+        print("at solver creation")
         archetype_loglik_optim_struct = {'f': -archetype_loglik_symbol, 'x': archetype_param_symbols,'p':archetype_observ_symbol}
-        archetype_fitting_solver = cs.nlpsol('solver', 'ipopt', archetype_loglik_optim_struct, {'ipopt.print_level':0, 'print_time':False}) 
+        #archetype_fitting_solver = cs.nlpsol('solver', 'ipopt', archetype_loglik_optim_struct, {'ipopt.print_level':5, 'print_time':False,'ipopt.hessian_approximation':'limited-memory'}) 
+        archetype_fitting_solver = cs.nlpsol('solver', 'ipopt', archetype_loglik_optim_struct, {'ipopt.print_level':5, 'print_time':False }) 
+        print("done solver creation")
 
         if options['Verbose']:
             progress_counter=0
@@ -423,8 +425,10 @@ class Model:
             #NOTE: should probably make start param search optionally specified by param covaraince
             #especially if we allow laplace-basyian style fitting (actuall only reall makes sense
             # if we do both bayes fitting with bayes covarianse start)
-            with silence_stdout():
-                fit_param = archetype_fitting_solver(x0=start_param, p=observ_vec)['x'].full().flatten()
+            print("at solver")
+            fit_param = archetype_fitting_solver(x0=start_param, p=observ_vec)['x'].full().flatten()
+            # with silence_stdout():
+            #     fit_param = archetype_fitting_solver(x0=start_param, p=observ_vec)['x'].full().flatten()
             fit_param_list.append(fit_param)
 
             if options['Verbose']:

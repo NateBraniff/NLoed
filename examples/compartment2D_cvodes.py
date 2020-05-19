@@ -8,61 +8,39 @@ from nloed import Model
 from nloed import design
 
 #states and controls
-# y = cs.MX.sym('y',2)
-# u = cs.MX.sym('u')
-# p = cs.MX.sym('p',4)
-#####  -or-  #####
-y = cs.SX.sym('y',2)
-u = cs.SX.sym('u')
-p = cs.SX.sym('p',4)
-
+y = cs.MX.sym('y',2)
+u = cs.MX.sym('u')
+p = cs.MX.sym('p',4)
 rhs = cs.vertcat(cs.exp(p[0])*u -cs.exp(p[1])*y[0], cs.exp(p[2])*y[0]-cs.exp(p[3])*y[1])
-ode = cs.Function('ode',[y,u,p],[rhs])
-
-dt = 1
-
-# # Create symbolics for RK4 integration, as shown in Casadi examples
-k1 = ode(y, u, p)
-k2 = ode(y + dt/2.0*k1, u, p)
-k3 = ode(y + dt/2.0*k2, u, p)
-k4 = ode(y + dt*k3, u, p)
-y_step = y+dt/6.0*(k1+2*k2+2*k3+k4)
-# Create a function to perform one step of the RK integration
-step = cs.Function('step',[y, u, p],[y_step])
-#####  -or-  #####
-# ode_sys = {'x':y, 'p':cs.vertcat(u,p), 'ode':rhs}
-# opts = {'tf':dt}
-# step = cs.integrator('F', 'cvodes', ode_sys, opts)
+#ode = cs.Function('ode',[y,u,p],[rhs])
 
 ##########################################################################################
-
-#steps_per_sample = [1,2,3,5] 
-steps_per_sample = [1,9] 
+steps_per_sample = [1,2,3,5] 
+#steps_per_sample = [1,9] 
 samples_per_cntrl = 1
 cntrls_per_run = 3
 
-# y0 = cs.MX.sym('y0',2)
-# uvec = cs.MX.sym('uvec',3)
-#####  -or-  #####
-y0 = cs.SX.sym('y0',2)
-uvec = cs.SX.sym('uvec',3)
+y0 = cs.MX.sym('y0',2)
+uvec = cs.MX.sym('uvec',3)
 
 x = cs.vertcat(y0,uvec)
+
+dt=1
+# # Create symbolics for RK4 integration, as shown in Casadi examples
+ode_sys = {'x':y, 'p':cs.vertcat(u,p), 'ode':rhs}
 
 #Loop over the ste function to create symbolics for integrating across a sample interval
 y_sample = y0
 sample_list=[]
 times=[]
-cntr=0
+time_cntr=0
 for i in range(cntrls_per_run):
   for num_stps in steps_per_sample:
-    for k in range(num_stps):
-      y_sample = step(y_sample, uvec[i], p)
-      #####  -or-  #####
-      #y_sample = step(x0=y_sample, p=cs.vertcat(uvec[i], p))['xf']
-      cntr+=1
+    stepper = cs.integrator('F_'+str(i)+'_'+str(num_stps), 'cvodes', ode_sys, {'tf':dt*num_stps})
+    y_sample = stepper(x0=y_sample, p=cs.vertcat(uvec[i], p))['xf']
     sample_list.append(y_sample)
-    times.append(cntr*dt)
+    time_cntr+=num_stps*dt
+    times.append(time_cntr)
 
 design = pd.DataFrame({ 'mrna_ic':[1],
                         'prot_ic':[1],
@@ -97,7 +75,7 @@ design = design.sort_values(by='Variable').reset_index()
 xnames = ['mrna_ic','prot_ic','cntrl_1','cntrl_2','cntrl_3']
 pnames = ['alpha','delta','beta','gamma']
 
-ode_model = Model(ode_response,xnames,pnames)
+ode_model = Model(ode_response,xnames,pnames,{'ScalarSymbolics':False})
 
 predict_inputs = pd.DataFrame({ 'mrna_ic':[1]*len(response_names),
                                 'prot_ic':[1]*len(response_names),
