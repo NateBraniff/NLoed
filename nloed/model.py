@@ -36,8 +36,20 @@ class Model:
                         'Exponential':  ['Rate'],
                         'Gamma':        ['Shape','Scale']}
 
-    def __init__(self, observ_struct, input_names, param_names):
+    def __init__(self, observ_struct, input_names, param_names,options={}):
         
+        default_options = \
+          { 'ScalarSymbolics':       [True,       lambda x: isinstance(x,bool) ]}
+        options=cp.deepcopy(options)
+        for key in options.keys():
+            if not key in options.keys():
+                raise Exception('Invalid option key; '+key+'!')
+            elif not default_options[key][1](options[key]):
+                raise Exception('Invalid value; '+str(options[key])+', passed for option key; '+key+'!')
+        for key in default_options.keys():
+            if not key in options.keys() :
+                options[key] = default_options[key][0]
+
         #check for unique names
         if not(len(set(input_names)) == len(input_names)):
             raise Exception('Model input names must be unique!')
@@ -61,6 +73,7 @@ class Model:
                 raise Exception('Error in observation tuple;  '+str(o)+', Casadi function must return a single vector of observation distribution statistics!')
             # obs_tuple[2].size_out(0)) NOTE: need to check size of inputs to function and if they match input/param names, are columns etc.
 
+        self.symbolics_boolean =options['ScalarSymbolics']
         self.num_observ = len(observ_struct)
         self.num_input = len(input_names)
         self.num_param = len(param_names) 
@@ -127,9 +140,14 @@ class Model:
         #get the observation name
         observ_name = observ_model.name()
         #create symbols for parameters and inputs,  and observation variable
-        param_symbols = cs.SX.sym('param_symbols', self.num_param)
-        input_symbols = cs.SX.sym('input_symbols', self.num_input)
-        observ_symbol = cs.SX.sym(observ_name+'_symbol', 1)
+        if self.symbolics_boolean:
+            param_symbols = cs.SX.sym('param_symbols', self.num_param)
+            input_symbols = cs.SX.sym('input_symbols', self.num_input)
+            observ_symbol = cs.SX.sym(observ_name+'_symbol', 1)
+        else:
+            param_symbols = cs.MX.sym('param_symbols', self.num_param)
+            input_symbols = cs.MX.sym('input_symbols', self.num_input)
+            observ_symbol = cs.MX.sym(observ_name+'_symbol', 1)
         #generate the distribution statistics symbols, and prediction sensitivity symbol
         stats = observ_model(input_symbols, param_symbols)
         stats_sensitivity = cs.jacobian(stats, param_symbols)
@@ -140,7 +158,10 @@ class Model:
             #create LogLikelihood symbolics and function 
             loglik_symbol = -0.5*cs.log(cs.sqrt(stats[1])) - (observ_symbol - stats[0])**2/(2*stats[1])
             #create FIM symbolics and function
-            elemental_fim = cs.vertcat(cs.horzcat(1/stats[1], cs.SX(0)),cs.horzcat(cs.SX(0), 1/(2*stats[1]**2)))
+            if self.symbolics_boolean:
+                elemental_fim = cs.vertcat(cs.horzcat(1/stats[1], cs.SX(0)),cs.horzcat(cs.SX(0), 1/(2*stats[1]**2)))
+            else:
+                elemental_fim = cs.vertcat(cs.horzcat(1/stats[1], cs.MX(0)),cs.horzcat(cs.MX(0), 1/(2*stats[1]**2)))
             #create prediction functions for the mean, sensitivity and variance
             model_mean_symbol = stats[0]
             model_sensitivity_symbol = stats_sensitivity[0,:]
@@ -175,7 +196,10 @@ class Model:
             #     - (cs.log(observ_symbol) - stats[0])**2/(2*stats[1])
             loglik_symbol = - 0.5*cs.log(2*cs.pi*stats[1]) - (cs.log(observ_symbol) - stats[0])**2/(2*stats[1])
             #create FIM symbolics and function
-            elemental_fim = cs.vertcat(cs.horzcat(1/stats[1], cs.SX(0)),cs.horzcat(cs.SX(0), 1/(2*stats[1]**2)))
+            if self.symbolics_boolean:
+                elemental_fim = cs.vertcat(cs.horzcat(1/stats[1], cs.SX(0)),cs.horzcat(cs.SX(0), 1/(2*stats[1]**2)))
+            else:
+                elemental_fim = cs.vertcat(cs.horzcat(1/stats[1], cs.MX(0)),cs.horzcat(cs.MX(0), 1/(2*stats[1]**2)))
             #create prediction functions for the mean, sensitivity and variance
             model_mean_symbol = cs.exp(stats[0] + stats[1]/2)
             model_sensitivity_symbol = cs.jacobian(model_mean_symbol,param_symbols)
@@ -193,7 +217,10 @@ class Model:
             #create LogLikelihood symbolics and function 
             loglik_symbol = observ_symbol*cs.log(stats[0]) + (stats[1]-observ_symbol)*cs.log(1-stats[0])
             #create FIM symbolics and function
-            elemental_fim = cs.vertcat(cs.horzcat(stats[1]/(stats[0]*(1-stats[0])), cs.SX(0)),cs.horzcat(cs.SX(0), cs.SX(0)))
+            if self.symbolics_boolean:
+                elemental_fim = cs.vertcat(cs.horzcat(stats[1]/(stats[0]*(1-stats[0])), cs.SX(0)),cs.horzcat(cs.SX(0), cs.SX(0)))
+            else:
+                elemental_fim = cs.vertcat(cs.horzcat(stats[1]/(stats[0]*(1-stats[0])), cs.MX(0)),cs.horzcat(cs.MX(0), cs.MX(0)))
             #create prediction functions for the mean, sensitivity and variance
             model_mean_symbol = stats[0]*stats[1]
             model_sensitivity_symbol = cs.jacobian(model_mean_symbol,param_symbols)
@@ -259,7 +286,7 @@ class Model:
         return function_list
 
 
-    def fit(self, dataset_struct, start_param=None, options={}):
+    def fit(self, datasets, start_param=None, options={}):
         """
         This function fits the model to a dataset using maximum likelihood
         it also provides optional marginal confidence intervals
@@ -302,115 +329,110 @@ class Model:
             start_param = [0]*self.num_param
         # if not len(start_param) == self.num_param:
         #     raise Exception('Starting parameter mismatch, there were; '+str(len(start_param))+', provided but; '+str(self.num_param)+' needed!')
-        #this block allows the user to pass a dataset, list of datasets,  list of lists etc. for Design x Replicat fitting
-        if isinstance(dataset_struct, pd.DataFrame):
+        
+        if isinstance(datasets, pd.DataFrame):
             #if a single dataset is passed vis the dataset_struct input
-            # wrap it in two lists so it matches general case
-            design_datasets = [[dataset_struct]]
-        elif isinstance(dataset_struct[0], pd.DataFrame):
-            #else if dataset_struct input is a list of replciated datasets, 
             # wrap it in a single list to match general case
-            design_datasets = [dataset_struct]
+            replicat_datasets = [datasets]
         else:
             #else if dataset_struct input is a list of designs, each with a list of replicats,
             # just pass on the input
-            design_datasets = dataset_struct
+            replicat_datasets = datasets
         #set confidence interval boolean
         interval_bool = options['Confidence']=="Intervals" \
                         or options['Confidence']=="Profiles" \
                         or options['Confidence']=="Contours"
         #set plotting boolean
         plot_bool = options['Confidence']=="Contours" or options['Confidence']=="Profiles"
-        #get number of designs
-        num_designs = len(design_datasets)
-        #get number of replicats for each design
-        num_replicat_list = [len(rep_list) for rep_list in design_datasets]
         #get total number of datasets
-        num_datasets = sum(num_replicat_list)
+        num_datasets = len(replicat_datasets)
         #create a list to store parameter casadi optimization symbols, starting parameters values, generic casadi loglikelihood functions
         #param_symbols_list, start_params_list = [], []
         loglik_func_list, fit_param_list = [], []
-        #create a total loglikelihood summation store, initialize to zero
-        #total_loglik_symbol = 0
         #create archetypal param symbol vector , used for casadi loglik functions for each design
-        archetype_param_symbols = cs.SX.sym('archetype_param_symbols', self.num_param)
-        # if options['Verbose']:
-        #     progress_counter=0
-        #     self._progress_bar(progress_counter, num_datasets, prefix = 'Fitting models:')
-        #loop over different designs (outer most list)
-        for d in range(num_designs):
-            #get the set of replicats for this design
-            replicat_datasets = design_datasets[d]
-            #summation variable for the loglikelihood for a loglik_symbolset of the current design
-            archetype_loglik_symbol = 0
-            #for each design use the first replicat 
-            archetype_dataset = replicat_datasets[0]
-            # get onbservation count for this design
-            num_observations = len(archetype_dataset.index)
-            #create a vector of casadi symbols for the observations
-            archetype_observ_symbol = cs.SX.sym('archetype_observ_symbol'+str(d), num_observations)
-            #loop over the dataset inputs
-            for index,row in archetype_dataset.iterrows():
-                #get the curren input settings
-                input_row = row[self.input_name_list].to_numpy()
-                #get the observation variable index
-                #observ_var_index = self.observ_name_dict[row['Variable']]
-                #create a symbol for the loglikelihood for the given input and observation variable
-                archetype_loglik_symbol += self.loglik[row['Variable']](archetype_observ_symbol[index],
-                                                                        input_row,
-                                                                        archetype_param_symbols)
-            #create a casadi function for the loglikelihood of the current design (observations are free/input symbols)
-            archetype_loglik_func = cs.Function('archetype_loglik_func'+str(d),
-                                                [archetype_observ_symbol, archetype_param_symbols],
-                                                [archetype_loglik_symbol])
+        if self.symbolics_boolean:
+            archetype_param_symbols = cs.SX.sym('archetype_param_symbols', self.num_param)
+        else:
+            archetype_param_symbols = cs.MX.sym('archetype_param_symbols', self.num_param)
+        
+        archetype_loglik_symbol = 0
+        #for each design use the first replicat 
+        archetype_dataset = replicat_datasets[0]
+        # get onbservation count for this design
+        num_observations = len(archetype_dataset.index)
+        #create a vector of casadi symbols for the observations
+        if self.symbolics_boolean:
+            archetype_observ_symbol = cs.SX.sym('archetype_observ_symbol', num_observations)
+        else:
+            archetype_observ_symbol = cs.MX.sym('archetype_observ_symbol', num_observations)
+        #loop over the dataset inputs
+        for index,row in archetype_dataset.iterrows():
+            #get the curren input settings
+            input_row = row[self.input_name_list].to_numpy()
+            #create a symbol for the loglikelihood for the given input and observation variable
+            archetype_loglik_symbol += self.loglik[row['Variable']](archetype_observ_symbol[index],
+                                                                    input_row,
+                                                                    archetype_param_symbols)
+        #create a casadi function for the loglikelihood of the current design (observations are free/input symbols)
+        archetype_loglik_func = cs.Function('archetype_loglik_func',
+                                            [archetype_observ_symbol, archetype_param_symbols],
+                                            [archetype_loglik_symbol])
 
-            archetype_loglik_optim_struct = {'f': -archetype_loglik_symbol, 'x': archetype_param_symbols,'p':archetype_observ_symbol}
-            archetype_fitting_solver = cs.nlpsol('solver', 'ipopt', archetype_loglik_optim_struct, {'ipopt.print_level':0, 'print_time':False}) 
+        archetype_loglik_optim_struct = {'f': -archetype_loglik_symbol, 'x': archetype_param_symbols,'p':archetype_observ_symbol}
+        archetype_fitting_solver = cs.nlpsol('solver', 'ipopt', archetype_loglik_optim_struct, {'ipopt.print_level':0, 'print_time':False}) 
 
-            #loop over replicats within each design
-            for r in range(num_replicat_list[d]):
-                #NOTE: could abstract below into a Casadi function to avoid input/observ loop on each dataset and replicat
-                #get the dataset from the replicat list
-                dataset = replicat_datasets[r]
-                #create a vector of parameter symbols for this specific dataset,  each dataset gets its own,  these are used for ML optimization
-                fit_param_symbols = cs.SX.sym('fit_param_symbols'+'_'+str(d)+str(r), self.num_param)
-                #extract the vector of observations in the same format as in the archetype_loglik_func function input
-                observ_vec = dataset['Observation'].to_numpy() 
-                #create a symbol for the datasets loglikelihood function by pass in the observations for the free symbols in ObservSymbol
-                dataset_loglik_symbol = archetype_loglik_func(observ_vec, fit_param_symbols)
+        if options['Verbose']:
+            progress_counter=0
+            self._progress_bar(progress_counter, num_datasets, prefix = 'Fitting Dataset(s):')
 
-                loglik_func = cs.Function('dataset_loglik_func_'+str(d)+'_'+str(r),
-                                                     [fit_param_symbols],[dataset_loglik_symbol])
-                #add it to the list of replicate loglik functions
-                loglik_func_list.append(loglik_func)
+        #loop over replicats within each design
+        for r in range(num_datasets):
+            #NOTE: could abstract below into a Casadi function to avoid input/observ loop on each dataset and replicat
+            #get the dataset from the replicat list
+            dataset = replicat_datasets[r]
+            #create a vector of parameter symbols for this specific dataset,  each dataset gets its own,  these are used for ML optimization
+            if self.symbolics_boolean:
+                fit_param_symbols = cs.SX.sym('fit_param_symbols_'+str(r), self.num_param)
+            else:
+                fit_param_symbols = cs.MX.sym('fit_param_symbols_'+str(r), self.num_param)
+            #extract the vector of observations in the same format as in the archetype_loglik_func function input
+            observ_vec = dataset['Observation'].to_numpy() 
+            #create a symbol for the datasets loglikelihood function by pass in the observations for the free symbols in ObservSymbol
+            dataset_loglik_symbol = archetype_loglik_func(observ_vec, fit_param_symbols)
 
-                #crude grid search of staring parameters, if request in options
-                #print(options['InitParamBounds'])
-                if options['InitParamBounds']:
-                    candidate_list = [np.linspace(bnds[0],bnds[1],options['InitSearchNumber']) \
-                                     for bnds in options['InitParamBounds']]
-                    param_grid = self.__creategrid(candidate_list)
-                    param_grid.append(start_param)
-                    loglik_value = -1e7
-                    for param in param_grid:
-                        new_loglik_value = loglik_func(param)
-                        if  new_loglik_value > loglik_value:
-                            start_param = param
-                            loglik_value = new_loglik_value
+            loglik_func = cs.Function('dataset_loglik_func_'+str(r),
+                                                    [fit_param_symbols],[dataset_loglik_symbol])
+            #add it to the list of replicate loglik functions
+            loglik_func_list.append(loglik_func)
 
-                #NOTE: could do a full multi-start here or top N multistart etc. will depen on testing
-                #NOTE: should probably make start param search optionally specified by param covaraince
-                #especially if we allow laplace-basyian style fitting (actuall only reall makes sense
-                # if we do both bayes fitting with bayes covarianse start)
-                with silence_stdout():
-                    fit_param = archetype_fitting_solver(x0=start_param, p=observ_vec)['x'].full().flatten()
-                fit_param_list.append(fit_param)
-                # if options['Verbose']:
-                #     progress_counter =+ 1
-                #     self._progress_bar(progress_counter, num_datasets, prefix = 'Fitting models:')
+            #crude grid search of staring parameters, if request in options
+            #print(options['InitParamBounds'])
+            if options['InitParamBounds']:
+                candidate_list = [np.linspace(bnds[0],bnds[1],options['InitSearchNumber']) \
+                                    for bnds in options['InitParamBounds']]
+                param_grid = self.__creategrid(candidate_list)
+                param_grid.append(start_param)
+                loglik_value = -1e7
+                for param in param_grid:
+                    new_loglik_value = loglik_func(param)
+                    if  new_loglik_value > loglik_value:
+                        start_param = param
+                        loglik_value = new_loglik_value
+
+            #NOTE: could do a full multi-start here or top N multistart etc. will depen on testing
+            #NOTE: should probably make start param search optionally specified by param covaraince
+            #especially if we allow laplace-basyian style fitting (actuall only reall makes sense
+            # if we do both bayes fitting with bayes covarianse start)
+            with silence_stdout():
+                fit_param = archetype_fitting_solver(x0=start_param, p=observ_vec)['x'].full().flatten()
+            fit_param_list.append(fit_param)
+
+            if options['Verbose']:
+                progress_counter += 1
+                self._progress_bar(progress_counter, num_datasets, prefix = 'Fitting Dataset(s):')
 
         #create row index for parameter dataframe export, specifies design index for each datset
-        design_index = [design_indx+1 for design_indx in range(num_designs) for i in range(num_replicat_list[design_indx])]
+        #design_index = [design_indx+1 for design_indx in range(num_designs) for i in range(num_replicat_list[design_indx])]
         #check if a  confidence value was passed as an option, requires confidence intervals at least
         if interval_bool:
             #create a multiindex for the columns of parameter dataframe export
@@ -420,6 +442,8 @@ class Model:
             bound_list = []
             #loop over each design
             for d in range(num_datasets):
+                if options['Verbose']:
+                    print('Computing confidence information for replicat: '+str(d))
                 #get the parameter estimates for current dataset
                 #param_vec = fit_param_matrix[d,:]
                 param_vec = fit_param_list[d]
@@ -450,11 +474,11 @@ class Model:
             column_index = self.param_name_list
             param_output_matrix = np.stack(fit_param_list)
         #create ouput dataframe with all request parameter information
-        param_data = pd.DataFrame(param_output_matrix, index=design_index, columns=column_index)
+        param_data = pd.DataFrame(param_output_matrix, columns=column_index)
         #return the dataframe
         return param_data
 
-    def sample(self, design_struct, param, replicats=1):
+    def sample(self, design, param, design_replicats=1):
         """
         This function generates datasets for a given design or list of designs,  with a given set of parameters,  with an optional number of replicates
 
@@ -472,52 +496,29 @@ class Model:
         #NOTE: actually maybe more important to be able to replicat designs N times
         if not len(param) == self.num_param:
             raise Exception('Starting parameter mismatch, there were; '+str(len(param))+', provided but; '+str(self.num_param)+' needed!')
-        #check if designs is a single design or a list of designs
-        if isinstance(design_struct, pd.DataFrame):
-            #if single,  wrap it in a list to match general case
-            design_list = [design_struct]
-        else:
-            #else pass it as it is
-            design_list = design_struct
-        #create a list to store lists of datasets for each design
-        design_datasets = []
-        #loop over the designs
-        for design in design_list:
-            #ensure the design is sorted by inputs and has standard column ordering (inputs, observs)
-            unique_design = design.groupby(self.input_name_list,as_index=False).sum()[self.input_name_list+self.observ_name_list]
-            #expand the unique design so theire is a row for each; unique input combination X observ variable
-            expanded_design = unique_design.melt(id_vars=self.input_name_list,var_name='Variable',value_name='Replicats')
-            expanded_design.sort_values(self.input_name_list,inplace=True)
-            expanded_design.reset_index(drop=True,inplace=True)
-            #expand design further so that design has a row for each; unique input combination X observ var  X replicate
-            itemized_design = expanded_design.reindex(expanded_design.index.repeat(expanded_design['Replicats']))
-            itemized_design.drop('Replicats',axis=1,inplace=True)
-            itemized_design.reset_index(drop=True,inplace=True)
-            #create a list for replciated datasets of the current design
-            replicat_datasets = []
-            #loop over the number of replicates
-            for r in range(replicats):
-                dataset=itemized_design.copy()
-                observation_list = []
-                for index,row in itemized_design.iterrows():
-                    input_row = row[self.input_name_list].to_numpy()
-                    observ_name = row['Variable']
-                    observation_list.append(self.observation_sampler[observ_name](input_row, param).item())
-                dataset['Observation'] = observation_list
-                replicat_datasets.append(dataset)
-            design_datasets.append(replicat_datasets)
+
+        itemized_design = design.reindex(design.index.repeat(design['Replicats']))
+        itemized_design.drop('Replicats',axis=1,inplace=True)
+        itemized_design.reset_index(drop=True,inplace=True)
+        #create a list for replciated datasets of the current design
+        replicat_datasets = []
+        #loop over the number of replicates
+        for r in range(design_replicats):
+            dataset=itemized_design.copy()
+            observation_list = []
+            for index,row in itemized_design.iterrows():
+                input_row = row[self.input_name_list].to_numpy()
+                observ_name = row['Variable']
+                observation_list.append(self.observation_sampler[observ_name](input_row, param).item())
+            dataset['Observation'] = observation_list
+            replicat_datasets.append(dataset)
                 
-        #check if a single design was passed
-        if isinstance(design_struct,  pd.DataFrame):
-            if replicats==1:
-                #if a single design was passed and there replicate count is 1,  return a single dataset
-                return design_datasets[0][0]
-            else:
-                #else if a single design was passed,  but with >1 reps,  return a list of datasets
-                return design_datasets[0]
+        if design_replicats==1:
+            #if a single design was passed and there replicate count is 1,  return a single dataset
+            return replicat_datasets[0]
         else:
-            #else if multiple designs were passed (with/without reps),  return a list of list of datasets
-            return design_datasets
+            #else if a single design was passed,  but with >1 reps,  return a list of datasets
+            return replicat_datasets
         
     def predict(self, input_struct, param, covariance_matrix=None, options={}):
         """
@@ -530,7 +531,7 @@ class Model:
             options: optional,  a dictionary of user defined options
 
         Return:
-           
+
         """
         #NOTE: evaluate model to predict mean and prediction interval for y
         #NOTE: optional pass cov matrix,  for use with delta method/MC error bars on predictions
@@ -706,6 +707,9 @@ class Model:
         Returns:
             interval_list: list of lists of upper and lower bounds for each parameter
         """
+        if options['Verbose']:
+            progress_counter=0
+            self._progress_bar(progress_counter, self.num_param, prefix = 'Confidence Intervals:')
         #create a list to store intervals
         interval_list = []
         #loop over parameters in model
@@ -729,6 +733,9 @@ class Model:
             #compute the location of the lower parameter bound
             lower_bound = mle_params[p]+direction[p]*lower_radius
             interval_list.append([lower_bound, upper_bound])
+            if options['Verbose']:
+                progress_counter += 1
+                self._progress_bar(progress_counter, self.num_param, prefix = 'Confidence Intervals:')
         return interval_list
 
     def __profileplot(self, mle_params, loglik_func, figure, options):
@@ -746,6 +753,7 @@ class Model:
             trace_list: list of list of lists of parameter vector values along profile trace for each parameter
             profile_list: List of lists of logliklihood ratio values for each parameter along the profile trace
         """
+
         #extract the confidence level and compute the chisquared threshold
         chi_squared_level = st.chi2.ppf( options['ConfidenceLevel'],  self.num_param)
         #run profile trave to get the CI's,  parameter traces,  and LR profile
@@ -782,6 +790,7 @@ class Model:
                     #plt.legend()
                     plt.xlabel(self.param_name_list[p1])
                     plt.ylabel(self.param_name_list[p2])
+
         #return CI,  trace and profilem (for extensibility)
         return [interval_list, trace_list, profile_list]
 
@@ -799,6 +808,10 @@ class Model:
             trace_list: list of list of lists of parameter vector values along profile trace for each parameter
             profile_list: List of lists of logliklihood ratio values for each parameter along the profile trace
         """
+        if options['Verbose']:
+            progress_counter=0
+            self._progress_bar(progress_counter, self.num_param, prefix = 'Profile Traces:')
+
         #extract the confidence level and compute the chisquared threshold
         chi_squared_level = st.chi2.ppf(options['ConfidenceLevel'],  self.num_param)
         #create lists to store the CI's,  profile logliklkhood values and parameter traces
@@ -862,6 +875,9 @@ class Model:
             profile_list.append(loglik_ratio_profile)
             #insert the final parameter trace into the trace list,  recording the current parameter's profile
             trace_list.append(param_trace)
+            if options['Verbose']:
+                progress_counter += 1
+                self._progress_bar(progress_counter, self.num_param, prefix = 'Profile Traces:')
         #return the intervals,  parameter trace and loglik ratio profile
         return [interval_list, trace_list, profile_list]
 
@@ -876,6 +892,11 @@ class Model:
             figure: the figure object on which plotting occurs
             options: an options dictionary for passing user options
         """
+        if options['Verbose']:
+            total_iterations = self.num_param*(self.num_param-1)/2
+            progress_counter=0
+            self._progress_bar(progress_counter, total_iterations, prefix = 'Contour Traces:')
+
         #loop over each unique pair of parameters 
         for p1 in range(self.num_param):
             for p2 in range(p1+1, self.num_param):
@@ -887,6 +908,10 @@ class Model:
                 #plt.legend()
                 plt.xlabel(self.param_name_list[p1])
                 plt.ylabel(self.param_name_list[p2])
+                if options['Verbose']:
+                    progress_counter += 1
+                    self._progress_bar(progress_counter, total_iterations, prefix = 'Contour Traces:')
+
 
     def __contourtrace(self, mle_params, loglik_func, coordinates, options):
         """ 
@@ -976,9 +1001,15 @@ class Model:
         if num_fixed_param == 0:
             raise Exception('No fixed parameters passed to loglikelihood search,  contact developers!')
         #create casadi symbols for the marginal parameters
-        marginal_param_symbols = cs.SX.sym('marginal_param_symbols', num_marginal_param)
+        if self.symbolics_boolean:
+            marginal_param_symbols = cs.SX.sym('marginal_param_symbols', num_marginal_param)
+        else:
+            marginal_param_symbols = cs.MX.sym('marginal_param_symbols', num_marginal_param)
         #create casadi symbols for the radius (radius measured from mle,  in given direction,  to chi-squared boundary)
-        radius_symbol = cs.SX.sym('radius_symbol')
+        if self.symbolics_boolean:
+            radius_symbol = cs.SX.sym('radius_symbol')
+        else:
+            radius_symbol = cs.MX.sym('radius_symbol')
         #creat a list to store a complete parameter vector
         #this is a mixture of fixed parameters set by the direction and radius,  and marginal parameters which are free symbols
         param_list = []
@@ -1100,7 +1131,7 @@ class Model:
                 lower_ratio_gap = middle_ratio_gap
                 lower_marginal_param = middle_marginal_param
 
-            print('Rad: '+str(middle_radius)+', Gap: '+str(middle_ratio_gap)+', Par: '+str(middle_marginal_param))
+            #print('Rad: '+str(middle_radius)+', Gap: '+str(middle_ratio_gap)+', Par: '+str(middle_marginal_param))
             #increment the iterations counter
             iteration_counter+=1
             if iteration_counter>options['MaxSteps']:
@@ -1134,7 +1165,7 @@ class Model:
             prefix:      prefix string to name process
         """
         max_length= 50
-        percent = ("{0:.1f}").format(max_length * (iteration / float(total)))
+        percent = ("{0:.1f}").format(100 * (iteration / float(total)))
         filledLength = int(max_length * iteration // total)
         bar = '█' * filledLength + '-' * (max_length - filledLength)
         print('\r%s |%s| %s%%' % (prefix, bar, percent), end = "\r")

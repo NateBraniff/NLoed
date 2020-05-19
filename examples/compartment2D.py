@@ -8,14 +8,20 @@ from nloed import Model
 from nloed import design
 
 #states and controls
+# y = cs.MX.sym('y',2)
+# u = cs.MX.sym('u')
+# p = cs.MX.sym('p',4)
+#####  -or-  #####
 y = cs.SX.sym('y',2)
 u = cs.SX.sym('u')
 p = cs.SX.sym('p',4)
+
 rhs = cs.vertcat(cs.exp(p[0])*u -cs.exp(p[1])*y[0], cs.exp(p[2])*y[0]-cs.exp(p[3])*y[1])
 ode = cs.Function('ode',[y,u,p],[rhs])
 
 dt = 1
-# Create symbolics for RK4 integration, as shown in Casadi examples
+
+# # Create symbolics for RK4 integration, as shown in Casadi examples
 k1 = ode(y, u, p)
 k2 = ode(y + dt/2.0*k1, u, p)
 k3 = ode(y + dt/2.0*k2, u, p)
@@ -23,6 +29,10 @@ k4 = ode(y + dt*k3, u, p)
 y_step = y+dt/6.0*(k1+2*k2+2*k3+k4)
 # Create a function to perform one step of the RK integration
 step = cs.Function('step',[y, u, p],[y_step])
+#####  -or-  #####
+# ode_sys = {'x':y, 'p':cs.vertcat(u,p), 'ode':rhs}
+# opts = {'tf':dt}
+# step = cs.integrator('F', 'cvodes', ode_sys, opts)
 
 ##########################################################################################
 
@@ -30,8 +40,12 @@ steps_per_sample = [1,2,3,5]
 samples_per_cntrl = 1
 cntrls_per_run = 3
 
+# y0 = cs.MX.sym('y0',2)
+# uvec = cs.MX.sym('uvec',3)
+#####  -or-  #####
 y0 = cs.SX.sym('y0',2)
 uvec = cs.SX.sym('uvec',3)
+
 x = cs.vertcat(y0,uvec)
 
 #Loop over the ste function to create symbolics for integrating across a sample interval
@@ -43,6 +57,8 @@ for i in range(cntrls_per_run):
   for num_stps in steps_per_sample:
     for k in range(num_stps):
       y_sample = step(y_sample, uvec[i], p)
+      #####  -or-  #####
+      #y_sample = step(x0=y_sample, p=cs.vertcat(uvec[i], p))['xf']
       cntr+=1
     sample_list.append(y_sample)
     times.append(cntr*dt)
@@ -55,21 +71,27 @@ design = pd.DataFrame({ 'mrna_ic':[1],
 
 ode_response = []
 response_names=[]
+replicates=[]
 for i in range(len(sample_list)):
 
+  mrna_name = 'mrna_'+'t'+"{0:0=2d}".format(times[i])
   mrna_stats = cs.vertcat(sample_list[i][0], 0.001)
-  mrna_func = cs.Function('mrna_t'+str(times[i]),[x,p],[mrna_stats])
+  mrna_func = cs.Function(mrna_name,[x,p],[mrna_stats])
   ode_response.append((mrna_func,'Normal'))
-  response_names.append('mrna_t'+str(times[i]))
+  response_names.append(mrna_name)
+  replicates.append(5)
 
-  design['mrna_t'+str(times[i])]=[5]
-
+  prot_name = 'prot_'+'t'+"{0:0=2d}".format(times[i])
   prot_stats = cs.vertcat(sample_list[i][1], 0.001)
-  prot_func = cs.Function('prot_t'+str(times[i]),[x,p],[prot_stats])
+  prot_func = cs.Function(prot_name,[x,p],[prot_stats])
   ode_response.append((prot_func,'Normal'))
-  response_names.append('prot_t'+str(times[i]))
+  response_names.append(prot_name)
+  replicates.append(5)
 
-  design['prot_t'+str(times[i])]=[5]
+design=design.reindex(design.index.repeat(len(response_names)))
+design['Variable'] = response_names
+design['Replicats'] = replicates
+design = design.sort_values(by='Variable').reset_index()
 
 xnames = ['mrna_ic','prot_ic','cntrl_1','cntrl_2','cntrl_3']
 pnames = ['alpha','delta','beta','gamma']
@@ -98,9 +120,9 @@ prot_pred = predictions.loc[predictions['Prediction','Type'] == 'prot']
 ax1=mrna_pred.plot.scatter(x=('Prediction','Time'),y=('Prediction','Mean'),c='Red')
 ax2=prot_pred.plot.scatter(x=('Prediction','Time'),y=('Prediction','Mean'),c='Red')
 
-ode_data = ode_model.sample(design,true_pars)
+ode_data = ode_model.sample(design,true_pars,design_replicats=3)
 
-data=cp.deepcopy(ode_data)
+data=cp.deepcopy(ode_data[0])
 
 data['Time'] = data['Variable'].apply(lambda x: int(digit_re.search(x).group(1)))
 data['Type'] = data['Variable'].apply(lambda x: type_re.search(x).group(1))
@@ -113,7 +135,7 @@ prot_obs.plot.scatter(x=('Time'),y=('Observation'),ax=ax2)
 plt.show()
 
 
-fit_options={'Confidence':'Contours',
+fit_options={'Confidence':'Intervals',
             'InitParamBounds':[(-3,2)]*4,
             'InitSearchNumber':11,
             'MaxSteps':100000}
