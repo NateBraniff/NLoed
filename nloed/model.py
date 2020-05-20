@@ -574,10 +574,10 @@ class Model:
 
         percentiles = np.array([(1-options['ConfidenceLevel'])/2, (0.5+options['ConfidenceLevel']/2)])
 
-        prediction_mean,observation_mean = [],[]
+        prediction_mean, observation_mean = [], []
         prediction_lower, prediction_upper = [], []
         observation_lower, observation_upper = [], []
-        sensitivity_lists=[]
+        sensitivity_lists = []
         for par_name in self.param_name_list:
             sensitivity_lists.append([])
         for index,row in input_struct.iterrows():
@@ -657,7 +657,7 @@ class Model:
         return output_data
 
     #NOTE: should maybe rename this
-    def evaluate(self,design,param,options={}):
+    def evaluate(self,inputs,param,options={}):
         #maybe this should move to the design class(??)
         #For D (full cov/bias),  Ds (partial cov/bias),  T separation using the delta method?! but need two models
         # assess model/design,  returns various estimates of cov,  bias,  confidence regions/intervals
@@ -666,11 +666,11 @@ class Model:
         #          monte carlo: covariance,  bias,  MSE
         default_options = { 'Method':                   ['Asymptotic',  lambda x: isinstance(x,str) and ( x=='Asymptotic' or x=='MonteCarlo')],
                             'Covariance':               [True,          lambda x: isinstance(x,bool)],
-                            'FIM':                      [False,         lambda x: isinstance(x,bool)],
                             'Bias':                     [False,         lambda x: isinstance(x,bool)],
                             'MSE':                      [False,         lambda x: isinstance(x,bool)],
                             'SampleNumber':             [10000,         lambda x: isinstance(x,int) and 1<x]}
-                            
+                            #'FIM':                      [False,         lambda x: isinstance(x,bool)],
+        
         options=cp.deepcopy(options)
         for key in options.keys():
             if not key in options.keys():
@@ -680,7 +680,52 @@ class Model:
         for key in default_options.keys():
             if not key in options.keys() :
                 options[key] = default_options[key][0]
-        print('Not Implemeneted')
+
+        # itemized_design = design.reindex(design.index.repeat(design['Replicats']))
+        # itemized_design.drop('Replicats',axis=1,inplace=True)
+        # itemized_design.reset_index(drop=True,inplace=True)
+
+        if isinstance(inputs, pd.DataFrame):
+            inputset_list = [inputs]
+        else:
+            inputset_list = inputs
+
+        fisher_info_list, covariance_list = [],[]
+        mse_list, bias_list = [],[]
+        #loop over the number of replicates
+        for i in range(len(inputset_list)):
+            inputset = inputset_list[i]
+
+            fisher_info_sum = np.zeros((self.num_param,self.num_param))
+            for index,row in inputset.iterrows():
+                input_row = row[self.input_name_list].to_numpy()
+                observ_name = row['Variable']
+                if inputset.columns.isin('Replicats'):
+                    reps = row['Replicats']
+                else:
+                    reps = 1
+                fisher_info_sum =+ reps * self.fisher_info_matrix[observ_name](input_row, param).full()
+            fisher_info_list.append(fisher_info_sum)
+
+            if options['Method'] == 'Asymptotic':
+                covariance_list.append(np.invert(fisher_info_sum))
+                bias_list.append(np.zero(self.num_param))
+                mse_list.append(covariance_matrix)
+
+            elif options['Method'] == 'MonteCarlo':
+                print('Not Implemented')
+
+            pd.DataFrame(np.array(,,index=[])
+
+        #convert to dataframe
+
+                
+        if design_replicats==1:
+            #if a single design was passed and there replicate count is 1,  return a single dataset
+            return replicat_datasets[0]
+        else:
+            #else if a single design was passed,  but with >1 reps,  return a list of datasets
+            return replicat_datasets
 
     # def evalfim(self):
     #     #NOTE: eval fim at given inputs and dataset
