@@ -690,8 +690,7 @@ class Model:
         else:
             inputset_list = inputs
 
-        fisher_info_list, covariance_list = [],[]
-        mse_list, bias_list = [],[]
+        eval_data_list = []
         #loop over the number of replicates
         for i in range(len(inputset_list)):
             inputset = inputset_list[i]
@@ -700,41 +699,54 @@ class Model:
             for index,row in inputset.iterrows():
                 input_row = row[self.input_name_list].to_numpy()
                 observ_name = row['Variable']
-                if inputset.columns.isin('Replicats'):
+                #NEED TO HANDLE MULTI OUTPUT DESIGNS (WTIH NO VARIABLE COLUMN)
+                if 'Replicats' in inputset:
                     reps = row['Replicats']
                 else:
                     reps = 1
                 fisher_info_sum =+ reps * self.fisher_info_matrix[observ_name](input_row, param).full()
-            fisher_info_list.append(fisher_info_sum)
+
+            #warning of error for singular matrix
+            columns_index = pd.MultiIndex.from_product([['FIM'],self.param_name_list])
+            eval_data = pd.DataFrame(np.array(fisher_info_sum),index=self.param_name_list,columns= columns_index)
 
             if options['Method'] == 'Asymptotic':
-                covariance_list.append(np.invert(fisher_info_sum))
-                bias_list.append(np.zero(self.num_param))
-                mse_list.append(covariance_matrix)
+                if options['Covariance']:
+                    columns_index = pd.MultiIndex.from_product([['Covariance'],self.param_name_list])
+                    cov_data = pd.DataFrame(np.matrix(fisher_info_sum).I,
+                                            index=self.param_name_list,
+                                            columns= columns_index)
+                    eval_data = pd.concat([eval_data,cov_data],axis=1)
+                if options['Bias']:
+                    columns_index = pd.MultiIndex.from_product([['Bias'],self.param_name_list])
+                    bias_data = pd.DataFrame(np.zeros((self.num_param,self.num_param)),
+                                            index=self.param_name_list,
+                                            columns= columns_index)
+                    eval_data = pd.concat([eval_data,bias_data],axis=1)
+                if options['MSE'] :
+                    columns_index = pd.MultiIndex.from_product([['MSE'],self.param_name_list])
+                    mse_data = pd.DataFrame(np.invert(fisher_info_sum),
+                                            index=self.param_name_list,
+                                            columns= columns_index)
+                    eval_data = pd.concat([eval_data,mse_data],axis=1)
 
             elif options['Method'] == 'MonteCarlo':
-                print('Not Implemented')
+                if options['Covariance']:
+                    print('Not Implemented')
+                if options['Bias']:
+                    print('Not Implemented')
+                if options['MSE'] :
+                    print('Not Implemented')
 
-            pd.DataFrame(np.array(,,index=[])
-
-        #convert to dataframe
+            eval_data_list.append(eval_data)
 
                 
-        if design_replicats==1:
+        if isinstance(inputs, pd.DataFrame):
             #if a single design was passed and there replicate count is 1,  return a single dataset
-            return replicat_datasets[0]
+            return eval_data_list[0]
         else:
             #else if a single design was passed,  but with >1 reps,  return a list of datasets
-            return replicat_datasets
-
-    # def evalfim(self):
-    #     #NOTE: eval fim at given inputs and dataset
-    #     #NOTE: should this even be here??? how much in model,  this isn't data dependent,  only design dependent
-    #     print('Not Implemeneted')
-
-    # def evalloglik(self):
-    #     #eval the logliklihood with given params and dataset
-    #     print('Not Implemeneted')
+            return eval_data_list
 
     # def plots(self):
     #     #FDS plot,  standardized variance (or Ds,  bayesian equivlant),  residuals

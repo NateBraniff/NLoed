@@ -36,8 +36,8 @@ step = cs.Function('step',[y, u, p],[y_step])
 
 ##########################################################################################
 
-#steps_per_sample = [1,2,3,5] 
-steps_per_sample = [1,9] 
+steps_per_sample = [1,2,3,5] 
+#steps_per_sample = [1,9] 
 samples_per_cntrl = 1
 cntrls_per_run = 3
 
@@ -74,20 +74,20 @@ ode_response = []
 response_names=[]
 replicates=[]
 for i in range(len(sample_list)):
-
+  reps=10
   mrna_name = 'mrna_'+'t'+"{0:0=2d}".format(times[i])
   mrna_stats = cs.vertcat(sample_list[i][0], 0.001)
   mrna_func = cs.Function(mrna_name,[x,p],[mrna_stats])
   ode_response.append((mrna_func,'Normal'))
   response_names.append(mrna_name)
-  replicates.append(5)
+  replicates.append(reps)
 
   prot_name = 'prot_'+'t'+"{0:0=2d}".format(times[i])
   prot_stats = cs.vertcat(sample_list[i][1], 0.001)
   prot_func = cs.Function(prot_name,[x,p],[prot_stats])
   ode_response.append((prot_func,'Normal'))
   response_names.append(prot_name)
-  replicates.append(5)
+  replicates.append(reps)
 
 design=design.reindex(design.index.repeat(len(response_names)))
 design['Variable'] = response_names
@@ -109,6 +109,9 @@ predict_inputs = pd.DataFrame({ 'mrna_ic':[1]*len(response_names),
 true_pars = [np.log(0.5),np.log(1.1),np.log(2.1),np.log(0.3)]
 predictions = ode_model.predict(predict_inputs,true_pars)
 
+opts={'Covariance':True,'Bias':True,'MSE':True}
+eval_dat = ode_model.evaluate(design,true_pars,opts)
+
 digit_re=re.compile('[a-z]+_t(\d+)')
 type_re=re.compile('([a-z]+)_t\d+')
 
@@ -118,8 +121,8 @@ predictions['Prediction','Type'] = predictions['Inputs','Variable'].apply(lambda
 mrna_pred = predictions.loc[predictions['Prediction','Type'] == 'mrna']
 prot_pred = predictions.loc[predictions['Prediction','Type'] == 'prot']
 
-ax1=mrna_pred.plot.scatter(x=('Prediction','Time'),y=('Prediction','Mean'),c='Red')
-ax2=prot_pred.plot.scatter(x=('Prediction','Time'),y=('Prediction','Mean'),c='Red')
+ax1 = mrna_pred.plot.scatter(x=('Prediction','Time'),y=('Prediction','Mean'),c='Red')
+ax2 = prot_pred.plot.scatter(x=('Prediction','Time'),y=('Prediction','Mean'),c='Red')
 
 ode_data = ode_model.sample(design,true_pars,design_replicats=3)
 
