@@ -482,7 +482,7 @@ class Model:
         #return the dataframe
         return param_data
 
-    def sample(self, design, param, design_replicats=1):
+    def sample(self, design, param, design_replicats=1,options={}):
         """
         This function generates datasets for a given design or list of designs,  with a given set of parameters,  with an optional number of replicates
 
@@ -498,6 +498,17 @@ class Model:
         #NOTE: should make the returned dataframe a multicolumn index to be consistent
         #NOTE: multiplex multiple parameter values??
         #NOTE: actually maybe more important to be able to replicat designs N times
+        default_options = \
+          { 'Verbose':          [True,                  lambda x: isinstance(x,int) and 0<x]}
+        options=cp.deepcopy(options)
+        for key in options.keys():
+            if not key in options.keys():
+                raise Exception('Invalid option key; '+key+'!')
+            elif not default_options[key][1](options[key]):
+                raise Exception('Invalid value; '+str(options[key])+', passed for option key; '+key+'!')
+        for key in default_options.keys():
+            if not key in options.keys() :
+                options[key] = default_options[key][0]
         if not len(param) == self.num_param:
             raise Exception('Starting parameter mismatch, there were; '+str(len(param))+', provided but; '+str(self.num_param)+' needed!')
 
@@ -506,6 +517,9 @@ class Model:
         itemized_design.reset_index(drop=True,inplace=True)
         #create a list for replciated datasets of the current design
         replicat_datasets = []
+        if options['Verbose']:
+            progress_counter=0
+            self._progress_bar(progress_counter, design_replicats, prefix = 'Sampling Datasets:')
         #loop over the number of replicates
         for r in range(design_replicats):
             dataset=itemized_design.copy()
@@ -516,6 +530,9 @@ class Model:
                 observation_list.append(self.observation_sampler[observ_name](input_row, param).item())
             dataset['Observation'] = observation_list
             replicat_datasets.append(dataset)
+            if options['Verbose']:
+                progress_counter += 1
+                self._progress_bar(progress_counter, design_replicats, prefix = 'Sampling Datasets:')
                 
         if design_replicats==1:
             #if a single design was passed and there replicate count is 1,  return a single dataset
@@ -668,7 +685,7 @@ class Model:
                             'Covariance':               [True,          lambda x: isinstance(x,bool)],
                             'Bias':                     [False,         lambda x: isinstance(x,bool)],
                             'MSE':                      [False,         lambda x: isinstance(x,bool)],
-                            'SampleNumber':             [10000,         lambda x: isinstance(x,int) and 1<x]}
+                            'SampleNumber':             [1000,          lambda x: isinstance(x,int) and 1<x]}
                             #'FIM':                      [False,         lambda x: isinstance(x,bool)],
         
         options=cp.deepcopy(options)
@@ -704,39 +721,52 @@ class Model:
                     reps = row['Replicats']
                 else:
                     reps = 1
-                fisher_info_sum =+ reps * self.fisher_info_matrix[observ_name](input_row, param).full()
+                fisher_info_sum += reps * self.fisher_info_matrix[observ_name](input_row, param).full()
 
             #warning of error for singular matrix
             columns_index = pd.MultiIndex.from_product([['FIM'],self.param_name_list])
             eval_data = pd.DataFrame(np.array(fisher_info_sum),index=self.param_name_list,columns= columns_index)
 
             if options['Method'] == 'Asymptotic':
-                if options['Covariance']:
-                    columns_index = pd.MultiIndex.from_product([['Covariance'],self.param_name_list])
-                    cov_data = pd.DataFrame(np.matrix(fisher_info_sum).I,
-                                            index=self.param_name_list,
-                                            columns= columns_index)
-                    eval_data = pd.concat([eval_data,cov_data],axis=1)
-                if options['Bias']:
-                    columns_index = pd.MultiIndex.from_product([['Bias'],self.param_name_list])
-                    bias_data = pd.DataFrame(np.zeros((self.num_param,self.num_param)),
-                                            index=self.param_name_list,
-                                            columns= columns_index)
-                    eval_data = pd.concat([eval_data,bias_data],axis=1)
-                if options['MSE'] :
-                    columns_index = pd.MultiIndex.from_product([['MSE'],self.param_name_list])
-                    mse_data = pd.DataFrame(np.invert(fisher_info_sum),
-                                            index=self.param_name_list,
-                                            columns= columns_index)
-                    eval_data = pd.concat([eval_data,mse_data],axis=1)
+                sample_data = self.sample(inputset, param,options['SampleNumber'], options={'Verbose':True})
+                sample_fits = self.fit(sample_data, start_param=param, options={'Verbose':True})
 
-            elif options['Method'] == 'MonteCarlo':
-                if options['Covariance']:
-                    print('Not Implemented')
-                if options['Bias']:
-                    print('Not Implemented')
-                if options['MSE'] :
-                    print('Not Implemented')
+            if options['Covariance']:
+                columns_index = pd.MultiIndex.from_product([['Covariance'],self.param_name_list])
+                if options['Method'] == 'Asymptotic':
+                    cov_matrix = np.matrix(fisher_info_sum).I
+                elif options['Method'] == 'MonteCarlo':
+                    cov_matrix = np.cov(sample_fits.to_numpy().T)
+                else:
+                    print('Error')
+                cov_data = pd.DataFrame(cov_matrix,
+                                        index=self.param_name_list,
+                                        columns= columns_index)
+                eval_data = pd.concat([eval_data,cov_data],axis=1)
+            if options['Bias']:
+                columns_index = pd.MultiIndex.from_product([['Bias'],['Bias']])
+                if options['Method'] == 'Asymptotic':
+                    bias_vec = np.zeros((self.num_param))
+                elif options['Method'] == 'MonteCarlo':
+                    bias_vec = np.mean(sample_fits.to_numpy(),0) - param
+                else:
+                    print('Error')
+                bias_data = pd.DataFrame(bias_vec,
+                                        index=self.param_name_list,
+                                        columns=columns_index)
+                eval_data = pd.concat([eval_data,bias_data],axis=1)
+            if options['MSE']:
+                columns_index = pd.MultiIndex.from_product([['MSE'],['MSE']])
+                if options['Method'] == 'Asymptotic':
+                    mse_vec = np.diagonal(np.matrix(fisher_info_sum).I)
+                elif options['Method'] == 'MonteCarlo':
+                    mse_vec = np.mean((sample_fits - np.array([param,]*options['SampleNumber']))**2,0)
+                else:
+                    print('Error')
+                mse_data = pd.DataFrame(mse_vec,
+                                        index=self.param_name_list,
+                                        columns= columns_index)
+                eval_data = pd.concat([eval_data,mse_data],axis=1)
 
             eval_data_list.append(eval_data)
 

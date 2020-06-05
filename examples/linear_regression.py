@@ -8,9 +8,6 @@ from nloed import Model
 from nloed import design
 import time
 
-
-
-
 xs = cs.SX.sym('xs',2)
 xnames = ['x1','x2']
 ps = cs.SX.sym('ps',4)
@@ -18,11 +15,10 @@ pnames = ['Intercept','x1-Main','x2-Main','Interaction']
 
 lin_predictor = ps[0] + ps[1]*xs[0] + ps[2]*xs[1] + ps[3]*xs[0]*xs[1]
 
-design = pd.DataFrame({ 'x1':[-1,-1,-1,0,0,0,1,1,1],
-                        'x2':[-1,0,1,-1,0,1,-1,0,1],
-                        'y_norm':[5,5,5,5,5,5,5,5,5],
-                        'y_bern':[5,5,5,5,5,5,5,5,5],
-                        'y_pois':[5,5,5,5,5,5,5,5,5]})
+design = pd.DataFrame({ 'x1':[-1,-1,-1,0,0,0,1,1,1]*3,
+                        'x2':[-1,0,1,-1,0,1,-1,0,1]*3,
+                        'Variable':['y_norm']*9+['y_bern']*9+['y_pois']*9,
+                        'Replicats':[5]*9*3})
 
 predict_inputs = pd.DataFrame({ 'x1':[-1,-1,-1,0,0,0,1,1,1]*3,
                                 'x2':[-1,0,1,-1,0,1,-1,0,1]*3,
@@ -47,7 +43,7 @@ mixed_response = [  (y_norm_func,'Normal'),
 
 mixed_model = Model(mixed_response,xnames,pnames)
 
-opts={'Covariance':True,'Bias':True,'MSE':True}
+opts={'Covariance':True,'Bias':True,'MSE':True,'SampleNumber':100}
 eval_dat = mixed_model.evaluate(design,[0.5,1.1,2.1,0.3],opts)
 
 mixed_data = mixed_model.sample(design,[0.5,1.1,2.1,0.3])
@@ -55,6 +51,8 @@ fit_options={'Confidence':'Profiles',
             'InitParamBounds':[(-5,5),(-5,5),(-5,5),(-5,5)],
             'InitSearchNumber':7}
 mixed_fit = mixed_model.fit(mixed_data, options=fit_options)
+
+
 
 fit_pars = mixed_fit['Estimate'].to_numpy().flatten()
 print(fit_pars)

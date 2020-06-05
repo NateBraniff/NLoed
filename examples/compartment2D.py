@@ -109,9 +109,6 @@ predict_inputs = pd.DataFrame({ 'mrna_ic':[1]*len(response_names),
 true_pars = [np.log(0.5),np.log(1.1),np.log(2.1),np.log(0.3)]
 predictions = ode_model.predict(predict_inputs,true_pars)
 
-opts={'Covariance':True,'Bias':True,'MSE':True}
-eval_dat = ode_model.evaluate(design,true_pars,opts)
-
 digit_re=re.compile('[a-z]+_t(\d+)')
 type_re=re.compile('([a-z]+)_t\d+')
 
@@ -144,6 +141,10 @@ fit_options={'Confidence':'Intervals',
             'InitSearchNumber':3,
             'MaxSteps':100000}
 ode_fit = ode_model.fit(ode_data, options=fit_options)
+
+
+opts={'Covariance':True,'Bias':True,'MSE':True}
+eval_dat = ode_model.evaluate(design,true_pars,opts)
 
 t=0
 
