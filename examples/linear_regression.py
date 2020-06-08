@@ -46,6 +46,9 @@ mixed_model = Model(mixed_response,xnames,pnames)
 opts={'Covariance':True,'Bias':True,'MSE':True,'SampleNumber':100}
 eval_dat = mixed_model.evaluate(design,[0.5,1.1,2.1,0.3],opts)
 
+opts={'Method':'MonteCarlo','Covariance':True,'Bias':True,'MSE':True,'SampleNumber':100}
+eval_dat = mixed_model.evaluate(design,[0.5,1.1,2.1,0.3],opts)
+
 mixed_data = mixed_model.sample(design,[0.5,1.1,2.1,0.3])
 fit_options={'Confidence':'Profiles',
             'InitParamBounds':[(-5,5),(-5,5),(-5,5),(-5,5)],
