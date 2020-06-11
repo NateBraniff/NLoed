@@ -1,6 +1,241 @@
 import casadi as cs
 import numpy as np
 import random as rn
+import copy as cp
+
+
+class Design:
+    """ 
+    A class for statisical models in the NLoed package
+    """
+
+    def __init__(self, models, approx_inputs=None, exact_inputs=None, observ_groups=None, fixed_design=None, options={}):
+
+        default_options = \
+          { 'NumGridPoints':       [5,       lambda x: isinstance(x,int) and x>0 ]}
+        options=cp.deepcopy(options)
+        for key in options.keys():
+            if not key in options.keys():
+                raise Exception('Invalid option key; '+key+'!')
+            elif not default_options[key][1](options[key]):
+                raise Exception('Invalid value; '+str(options[key])+', passed for option key; '+key+'!')
+        for key in default_options.keys():
+            if not key in options.keys() :
+                options[key] = default_options[key][0]
+
+        #get number of models
+        self.num_models=len(models)
+        # fim list for each model, keeps a running sum of symbols for each model (and prior parameter evaluation)
+        self.fim_list = []
+        # List of beta symbols for each model 
+        # or create sigma points first and nest loop within model loop for fim, with fim list sigmaXmodels big
+        self.param_list = []
+        #list for casadi objective functions for each model, as matrix dim.s change, we need to define at run-time
+        self.objective_func = []
+        if not('Model' in models[0]):
+                raise Exception('Missing objective for model at index '+str(0)+' in models list!')
+        #set common dimensions for all model
+        self.input_dim = models[0]['Model'].num_input
+        self.observ_dim = models[0]['Model'].num_observ
+        #set common dicts for inputs and observations, NOTE: could later allow for different orderings
+        self.input_dict = models[0]['Model'].input_name_dict
+        # REMOVED !!!!!!!!!!!!!!!!!
+        #self.observ_dict = models[0]['Model'].ObservNameDict #THIS DOESN'T EXIST ANYMORE
+        #create lists for reverse lookup, index to name mapping NOTE: can get these from model[0] now
+        self.input_name_list = models[0]['Model'].input_name_list
+        self.observ_name_list = models[0]['Model'].observ_name_list
+        #loop over models check dimensions and dicts, build objective functions, create fim and beta lists 
+        for m in range(self.num_models):
+            model = models[m]['Model']
+            objective_type = models[m]['Objective']
+
+            #NOTE:model D score must be weighted/rooted log-divided according to number of params, need to check this
+            if objective_type =='D':
+                matrix = cs.SX.sym('Matrx',model.num_param, model.num_param)
+                r_factorial = cs.qr(matrix)[1]
+                normed_log_det = cs.trace(cs.log(r_factorial))/model.num_param
+                self.objective_func.append( cs.Function('ObjFunc'+str(m),[matrix],[-normed_log_det]) )
+            elif objective_type == 'Ds':
+                print('Not implemented!')
+            elif objective_type == 'T':
+                print('Not implemented!')
+            elif objective_type == 'Custom':
+                print('Not implemented!')
+            else:
+                raise Exception('Unknown objective: '+str(objective_type)+'!')
+
+            #create the fim list for summing fim symbolics in group loop and parameter symbols for each model 
+            #ParamList used for bayesian priors
+            #NOTE:should maybe be an 'output' list for model selection objective; T-optimality etc.
+            self.fim_list.append(np.zeros((model.num_param,model.num_param) ))
+            #ParamList.append(cs.MX.sym('beta_model'+str(m),model.Nb))
+            
+            # REMOVED !!!!!!!!!!!!!!!!!
+            #param_list.append(Params)
+
+        #counter to track the total number inputs across exact and approx, must sum to total for the model(s)
+        input_num_check = 0
+        #if user has passed approximate inputs
+        if  approx_inputs:
+            self.approx_input_flag = True
+            [self.approx_input_grid,
+             self.num_approx_input,
+             self.approx_input_names,
+             self.approx_input_num] = self._approx_settup(approx_inputs, options)
+        else:
+            self.approx_input_flag = False
+
+        # these data structures are used to track where exact input symbols, approx input-observation weights end up in the final optimization solution
+        # OptimSolutionMap is a dictionary mapping optimization vector input indices (only ones that correspond to a sample weights)
+        # to a dictionary with information on reconstructing the corresponding intput vector and observation group
+        optim_solution_map={}
+        # List_Of_SampleWeightOptimIndices is a list of optimization vector indices that correspond to a sample weight (as opposed to an exact input value)
+        list_of_sample_weight_optim_indices=[]
+        # ArchetypeIndex_To_OptimIndices ia a list that maps and index in the exact archetype list to the set of optimizaion vector indices that contain the archetype exact input value after optimization
+        # one-to-many, ordering here is identical to user-passed ordering
+        archetype_index_to_optim_indices=[]
+        # Keyword_To_OptimIndex is a dictionary that maps a keyword passed via the exactinput 'Structure' field to an index in the optimization vector (one-to-one)
+        keyword_to_optim_index={}
+
+        # list of optimization variables (exact input settings and approximate weights), and a list of starting values
+        optim_symbol_list = []
+        optim_variable_start = []
+        # list of Casadi expressions for (non-)linear ineqaulity constraints on exact settings (e.g. g(X)>0), and linear constraints on approx problem (i.e. sum(xi)=1)
+        optim_constraints = []
+        # lower and upper bounds for optimization variables and for optimization constraints in OptimConstraints
+        lower_bound_variables = []
+        upper_bound_variables = []
+        lower_bound_constraints = []
+        upper_bound_constraints = []
+        #if the user has passed exact inputs
+        if exact_inputs:
+            
+        else:
+            NumExactArchetypes=1 #NOTE: this is ugly, but needed for now so that while loops and weight initialization works out if exact isn't passed
+            ExactInputIndices=[]
+
+
+    def _approx_settup(self, approx_inputs, options):
+        """
+        This function 
+        Args:
+        Return:
+        """
+        #get names, number and indices of approximate inputs
+        approx_input_names =  approx_inputs['Inputs']
+        approx_input_num = len(approx_input_names)
+        approx_input_bounds =  approx_inputs['Bounds']
+        #check if inquality OptimConstraintsains have been passed, if so store them 
+        approx_input_constr = []
+        if 'Constraints' in  approx_inputs:
+            approx_input_constr  =  approx_inputs['Constraints']          
+        #set resolution of grid NOTE: this should be able to be specified by the user, will change
+        num_points = options['NumGridPoints']
+        #create a list for storing possible levels of each approxmate input
+        approx_input_candidates = []
+        #loop over bounds passed, and use resolution and bounds to populate xlist
+        for b in approx_input_bounds:
+            approx_input_candidates.extend([np.linspace(b[0],b[1],num_points).tolist()])
+        #call recursive createGrid function to generate ApproxInputGrid, a list of all possible permuations of xlist's that also satisfy inequality OptimConstraintsaints
+        #NOTE: currently, createGrid doesn't actually check the inequality OptimConstraintsaints, need to add, and perhaps add points on inequality boundary??!
+        approx_input_grid = _creategrid(approx_input_candidates,approx_input_constr)
+        num_approx_input = len(approx_input_grid)
+
+        return [approx_input_grid, num_approx_input, approx_input_names, approx_input_num]
+
+    def _exact_settup(self, approx_inputs, options):
+        """
+        This function 
+        Args:
+        Return:
+        """
+        #get names, number and indices of exact inputs
+            exact_input_names = exact_inputs['Inputs']
+            exact_input_num = len(exact_input_names)
+            exact_input_bounds = exact_inputs['Bounds']
+            exact_input_structure = exact_inputs['Structure']
+            #create a list of dicts for tracking existing symbols 
+            keyword_symbol_dict_list = []
+            #add a dictionary to the list for each exact input
+            for i in range(exact_input_num):
+                keyword_symbol_dict_list.append({})
+            #create a list to store casadi optimization symbols for exact input archetypes
+            symbol_archetypes = []
+            #loop over exact input structure and create archetype symbol list for exact inputs provided
+            for i in range(len(exact_input_structure)):
+                keyword_row = exact_input_structure[i]
+                current_archetype = []
+                #current_arch_optim_indices = []
+                for j in range(len(keyword_row)):
+                    keyword = keyword_row[j]
+                    #check if this keyword has been seen before 
+                    # NOTE: should really only restrict the use to unique keyworks per column of ExactInputStructure, otherwise we can get bad behaviour
+                    if keyword in keyword_symbol_dict_list[j]:
+                        #if the keyword has been seen then a symbol already exists, add the casadi symbol to the current archetype list
+                        current_archetype.append(keyword_symbol_dict_list[j][keyword])
+                        #add the index within OptimSymbolList corresponding to the existing symbol to the current archetype's index list
+                        current_arch_optim_indices.append(keyword_to_optim_index[keyword])
+                    else:
+                        #if the keyword is new, a casadi symbol does not exist, create optimizaton symbols for the corresponding exact input
+                        new_exact_symbol = cs.MX.sym('ExactSym_'+self.exact_input_names[j]+'_entry'+str(i)+'_elmnt'+ str(j))
+                        #now add the new casadi symbol to the current archetype list
+                        current_archetype.append(new_exact_symbol)
+                        #add new keyword-symbol pair to the existing symbol dictionary
+                        keyword_symbol_dict_list[j][keyword] = new_exact_symbol
+                        #add new keyword to the map so we can find the optimization index that matches that keyword
+                        keyword_to_optim_index[keyword]=len(optim_symbol_list)
+                        #add the index within OptimSymbolList corresponding to the new symbol to the current archetype's index list
+                        current_arch_optim_indices.append(len(optim_symbol_list))
+                        #add exact symbols for this group to optimzation symbol list
+                        optim_symbol_list += [new_exact_symbol]
+                        #get the current bounds
+                        lb = self.exact_input_bounds[j][0]
+                        ub = self.exact_input_bounds[j][1]
+                        #set the exact input start value randomly within bounds and add it to start value list
+                        optim_variable_start += [rn.uniform(lb,ub)]
+                        #get the upper and lower bound and add them to the opt var bound lists
+                        LowerBoundVariables += [lb]
+                        UpperBoundVariables += [ub]
+                #add the current archetype list to the list of archetype lists
+                ExactSymbolArchetypes.append(CurrentArchetype)
+                #append the current archetype's index list to the ArchetypeIndex_To_OptimIndices list within the optimal solution map
+                ArchetypeIndex_To_OptimIndices.append(CurrentArchOptimIndices) 
+                NumExactArchetypes=len(ExactSymbolArchetypes)
+
+    #Function that recursively builds a grid point list from a set of candidate levels of the provided inputs
+    def _creategrid(inputcandidates,constraints):
+        """
+        This function 
+        Args:
+        Return:
+        """
+        NewGrid=[]
+        CurrentDim=inputcandidates.pop()
+
+        if len(inputcandidates)>0:
+            CurrentGrid=creategrid(inputcandidates,constraints)
+            for g in CurrentGrid:
+                for d in CurrentDim:
+                    TempGridPoint=g.copy()
+                    TempGridPoint.append(d)
+                    NewGrid.extend([TempGridPoint])
+        else:
+            NewGrid=[[d] for d in CurrentDim]
+
+        return NewGrid
+
+    #Function uses recursion to find the insertion index to ensure sorted designs
+    def _sortinputs(newrow,rows,rowpntr=0,colpntr=0):
+        if not(len(rows)==0) and colpntr<len(rows[0]):
+            i=rowpntr
+            while i<len(rows):
+                if newrow[colpntr]>rows[i][colpntr]:
+                    rowpntr+=1
+                elif newrow[colpntr]==rows[i][colpntr]:
+                    rowpntr=max(rowpntr,sortinputs(newrow,rows,rowpntr,colpntr+1))
+                i+=1
+        return rowpntr
+
 
 def design(models, approxinputs=None, exactinputs=None, observgroups=None, fixeddesign=None):
     """ 
@@ -486,31 +721,4 @@ def design(models, approxinputs=None, exactinputs=None, observgroups=None, fixed
 
     return Design
 
-#Function that recursively builds a grid point list from a set of candidate levels of the provided inputs
-def creategrid(inputcandidates,constraints):
-    NewGrid=[]
-    CurrentDim=inputcandidates.pop()
 
-    if len(inputcandidates)>0:
-        CurrentGrid=creategrid(inputcandidates,constraints)
-        for g in CurrentGrid:
-            for d in CurrentDim:
-                TempGridPoint=g.copy()
-                TempGridPoint.append(d)
-                NewGrid.extend([TempGridPoint])
-    else:
-        NewGrid=[[d] for d in CurrentDim]
-
-    return NewGrid
-
-#Function uses recursion to find the insertion index to ensure sorted designs
-def sortinputs(newrow,rows,rowpntr=0,colpntr=0):
-    if not(len(rows)==0) and colpntr<len(rows[0]):
-        i=rowpntr
-        while i<len(rows):
-            if newrow[colpntr]>rows[i][colpntr]:
-                rowpntr+=1
-            elif newrow[colpntr]==rows[i][colpntr]:
-                rowpntr=max(rowpntr,sortinputs(newrow,rows,rowpntr,colpntr+1))
-            i+=1
-    return rowpntr
