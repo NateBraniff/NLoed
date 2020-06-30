@@ -1298,7 +1298,8 @@ class factorial(cs.Callback):
         return [f]
 
 
-
+#NOTE: commented stuff is saved from using newton type root search in profile loglik
+#NOTE: replaced with grid search for stability in more complex models (currently in code ~June 2020)
     # def __profilesetup(self, mle_params, loglik_func, fixedparams, direction, options):
     #     """ 
     #     This function creates function/solver objects for performing a profile likelihood search for the condifence boundary
