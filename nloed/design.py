@@ -38,14 +38,6 @@ class Design:
         if not(observ_groups):
             observ_groups = [[obs] for obs in self.observ_name_list]
         observ_group_num = len(observ_groups)
-        #list for observation group indices in the models
-        # ObservGroupIndices = []
-        # for i in range(NumObservGroups):
-        #     CurrentGroupNames = ObservGroups[i]
-        #     #NOTE: need to add check that names exist here
-        #     #lookup the indices for the y variable names
-        #     CurrentIndices = [ObservDict[n] for n in CurrentGroupNames] 
-        #     ObservGroupIndices.append(CurrentIndices)
 
         #get number of models
         self.num_models = len(models)
@@ -59,10 +51,15 @@ class Design:
         if not('Model' in models[0]):
                 raise Exception('Missing objective for model at index '+str(0)+' in models list!')
         
+        self.model_list = []
+        self.objective_list = []
+        self.param_list = []
+        
         #loop over models check dimensions and dicts, build objective functions, create fim and beta lists 
         for m in range(self.num_models):
             model = models[m]['Model']
             objective_type = models[m]['Objective']
+            params = models[m]['Parameters']
 
             #NOTE:model D score must be weighted/rooted log-divided according to number of params, need to check this
             if objective_type =='D':
@@ -84,9 +81,13 @@ class Design:
             #NOTE:should maybe be an 'output' list for model selection objective; T-optimality etc.
             self.fim_list.append(np.zeros((model.num_param,model.num_param) ))
             #ParamList.append(cs.MX.sym('beta_model'+str(m),model.Nb))
+
+            self.model_list.append()
+            self.objective_list.append()
+            self.param_list.append()
             
             # REMOVED !!!!!!!!!!!!!!!!!
-            #param_list.append(Params)
+            #
 
         #counter to track the total number inputs across exact and approx, must sum to total for the model(s)
         input_num_check = 0
@@ -128,8 +129,45 @@ class Design:
         if not(self.input_dim == self.exact_input_num + self.approx_input_num):
             raise Exception('All input variables must be passed as either approximate or exact, and the total number of inputs passed must be the same as recieved by the model(s)!\n'
                         'There are '+str(self.approx_input_num)+' approximate inputs and '+str(self.exact_input_num)+' exact inputs passed but model(s) expect '+str(InputDim)+'!')
-    
 
+        [] = self._weighted_optim_settup
+
+        #SETTUP OPTIM VARS, BOUNDS and MAP here
+
+        sample_weight_symbols
+        self.exact_symbol_archetypes
+
+        #OptimSymbolList += [NewSampleWeight]
+        #set the starting weights so that all grid points at all archetypes have equal weights NOTE: should probably clean this up, conditional on approx and exact being passed
+        #OptimVariableStart += [1/(NumApproxGrid*NumExactArchetypes*NumObservGroups)]
+        #apply appropriate bounds for the sampling weight NOTE: upper bound 1 should be scaled by passed observation weights when this functionality is added
+        #LowerBoundVariables += [0]
+        #UpperBoundVariables += [1]
+
+        #add a constraint function to ensure sample weights sum to 1
+        OptimConstraints += [ApproxWeightSum - 1]
+        #bound the constrain function output to 0
+        LowerBoundConstraints += [0]
+        UppperBoundConstraints += [0]
+
+        OverallObjectiveSymbol=0
+        for m in range(NumModels): 
+            OverallObjectiveSymbol += ObjectiveFuncs[m](FIMList[m])/NumModels
+
+        #NOTE: should be checking solution for convergence, should allow use to pass options to ipopt
+        # Create an IPOPT solver
+        IPOPTProblemStructure = {'f': OverallObjectiveSymbol, 'x': cs.vertcat(*OptimSymbolList), 'g': cs.vertcat(*OptimConstraints)}
+        print('Setting up optimization problem, this can take some time...')
+        #"verbose":True,
+        IPOPTSolver = cs.nlpsol('solver', 'ipopt', IPOPTProblemStructure,{'ipopt.hessian_approximation':'limited-memory'}) #NOTE: need to give option to turn off full hessian (or coloring), may need to restucture problem mx/sx, maybe use quadratic programming in full approx mode?
+        print('Problem set up complete.')
+        # Solve the NLP with IPOPT call
+        print('Begining optimization...')
+        IPOPTSolutionStruct = IPOPTSolver(x0=OptimVariableStart, lbx=LowerBoundVariables, ubx=UpperBoundVariables, lbg=LowerBoundConstraints, ubg=UppperBoundConstraints)
+        OptimSolution = IPOPTSolutionStruct['x'].full().flatten()
+
+
+    def _weighted_optim_settup(self, approx_inputs, options):
         #PACKAGE THIS AS A FUNCTION; returns obs vars, samp sum and fim symbols?
         # declare sum for approximate weights
         approx_weight_sum = 0
@@ -167,50 +205,20 @@ class Design:
                     # this is used to scale sampling weight so FIM stays normalized w.r.t. sample number
                     group_size = len(observ_list)
                     #loop over observatino variables in sample group
-                    for var in obs:
+                    for observ_name in obs:
                         #loop over each model
-                        for mod in range(NumModels):
+                        for mod in range(self.num_models):
                             #get the model 
-                            Model = models[mod]['Model']
+                            model = models[mod]['Model']
                             #NOTE: Bayesian sigma point loop goes here
                             #get the model's parameter symbols
-                            Params = ParamList[mod]
+                            param = models[mod]['Model'][mod]
                             #add the weighted FIM to the running total for the experiment (for each model)
-                            FIMList[mod]= FIMList[mod] + (NewSampleWeight / group_size) * Model.FIM[var](Params,InputVector)
+                            self.fim_list[mod] += (new_sample_weight / group_size) * model.fisher_info_matrix[observ_name](param,input_vector)
 
                 j+=1
             i+=1
 
-
-        #SETTUP OPTIM VARS, BOUNDS and MAP here
-        #OptimSymbolList += [NewSampleWeight]
-        #set the starting weights so that all grid points at all archetypes have equal weights NOTE: should probably clean this up, conditional on approx and exact being passed
-        #OptimVariableStart += [1/(NumApproxGrid*NumExactArchetypes*NumObservGroups)]
-        #apply appropriate bounds for the sampling weight NOTE: upper bound 1 should be scaled by passed observation weights when this functionality is added
-        #LowerBoundVariables += [0]
-        #UpperBoundVariables += [1]
-
-        #add a constraint function to ensure sample weights sum to 1
-        OptimConstraints += [ApproxWeightSum - 1]
-        #bound the constrain function output to 0
-        LowerBoundConstraints += [0]
-        UppperBoundConstraints += [0]
-
-        OverallObjectiveSymbol=0
-        for m in range(NumModels): 
-            OverallObjectiveSymbol += ObjectiveFuncs[m](FIMList[m])/NumModels
-
-        #NOTE: should be checking solution for convergence, should allow use to pass options to ipopt
-        # Create an IPOPT solver
-        IPOPTProblemStructure = {'f': OverallObjectiveSymbol, 'x': cs.vertcat(*OptimSymbolList), 'g': cs.vertcat(*OptimConstraints)}
-        print('Setting up optimization problem, this can take some time...')
-        #"verbose":True,
-        IPOPTSolver = cs.nlpsol('solver', 'ipopt', IPOPTProblemStructure,{'ipopt.hessian_approximation':'limited-memory'}) #NOTE: need to give option to turn off full hessian (or coloring), may need to restucture problem mx/sx, maybe use quadratic programming in full approx mode?
-        print('Problem set up complete.')
-        # Solve the NLP with IPOPT call
-        print('Begining optimization...')
-        IPOPTSolutionStruct = IPOPTSolver(x0=OptimVariableStart, lbx=LowerBoundVariables, ubx=UpperBoundVariables, lbg=LowerBoundConstraints, ubg=UppperBoundConstraints)
-        OptimSolution = IPOPTSolutionStruct['x'].full().flatten()
 
     def _approx_settup(self, approx_inputs, options):
         """
