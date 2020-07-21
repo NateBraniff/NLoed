@@ -5,7 +5,7 @@ import numpy as np
 import casadi as cs
 import pandas as pd
 from nloed import Model
-from nloed import design
+#from nloed import design
 import time
 
 xs = cs.SX.sym('xs',2)

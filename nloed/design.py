@@ -9,7 +9,7 @@ class Design:
     A class for statisical models in the NLoed package
     """
 
-    def __init__(self, models, approx_inputs=None, exact_inputs=None, observ_groups=None, fixed_design=None, options={}):
+    def __init__(self, models, parameters, objective, approx_inputs=None, exact_inputs=None, observ_groups=None, fixed_design=None, options={}):
 
         default_options = \
           { 'NumGridPoints':       [5,       lambda x: isinstance(x,int) and x>0 ]}
@@ -23,140 +23,112 @@ class Design:
             if not key in options.keys() :
                 options[key] = default_options[key][0]
 
-        #set common dimensions for all model
-        self.input_dim = models[0]['Model'].num_input
-        self.observ_dim = models[0]['Model'].num_observ
         #set common dicts for inputs and observations, NOTE: could later allow for different orderings
-        self.input_dict = models[0]['Model'].input_name_dict
+        #self.input_dict = models[0]['Model'].input_name_dict
         # REMOVED !!!!!!!!!!!!!!!!!
         #self.observ_dict = models[0]['Model'].ObservNameDict #THIS DOESN'T EXIST ANYMORE
-        #create lists for reverse lookup, index to name mapping NOTE: can get these from model[0] now
-        self.input_name_list = models[0]['Model'].input_name_list
-        self.observ_name_list = models[0]['Model'].observ_name_list
 
-        #check if observ passed 
-        if not(observ_groups):
-            observ_groups = [[obs] for obs in self.observ_name_list]
-        observ_group_num = len(observ_groups)
+        model_input = models
+        if not isinstance(models,list):
+            model_input = [models]
+        param_input = parameters
+        if not isinstance(parameters[0],list):
+            param_input = [parameters]    
 
-        #get number of models
+        #model data init
         self.num_models = len(models)
-        # fim list for each model, keeps a running sum of symbols for each model (and prior parameter evaluation)
-        self.fim_list = []
-        # List of beta symbols for each model 
-        # or create sigma points first and nest loop within model loop for fim, with fim list sigmaXmodels big
-        self.param_list = []
-        #list for casadi objective functions for each model, as matrix dim.s change, we need to define at run-time
-        self.objective_func = []
-        if not('Model' in models[0]):
-                raise Exception('Missing objective for model at index '+str(0)+' in models list!')
-        
-        self.model_list = []
-        self.objective_list = []
-        self.param_list = []
+        self.input_dim = models[0].num_input
+        self.observ_dim = models[0].num_observ
+        self.input_name_list = models[0].input_name_list
+        self.observ_name_list = models[0].observ_name_list
         
         #loop over models check dimensions and dicts, build objective functions, create fim and beta lists 
-        for m in range(self.num_models):
-            model = models[m]['Model']
-            objective_type = models[m]['Objective']
-            params = models[m]['Parameters']
+        for i in range(self.num_models):
+            model = model_input[m]
+            params = param_input[m]
 
-            #NOTE:model D score must be weighted/rooted log-divided according to number of params, need to check this
+            #need to handle model weights in model, currently will treat as equal
+            #if params contains a covariance matrix, generate param list and weights
+            #ParamList used for bayesian priors
+            #need to handle weights in params at some point, currently will treat as equal
+
+            #NOTE: model D score must be weighted/rooted log-divided according to number of params, need to check this
             if objective_type =='D':
                 matrix = cs.SX.sym('Matrx',model.num_param, model.num_param)
                 r_factorial = cs.qr(matrix)[1]
                 normed_log_det = cs.trace(cs.log(r_factorial))/model.num_param
-                self.objective_func.append( cs.Function('ObjFunc'+str(m),[matrix],[-normed_log_det]) )
-            elif objective_type == 'Ds':
-                print('Not implemented!')
-            elif objective_type == 'T':
-                print('Not implemented!')
-            elif objective_type == 'Custom':
-                print('Not implemented!')
+                objective_func = cs.Function('ObjFunc'+str(m),[matrix],[-normed_log_det]) 
+            #elif objective_type == 'A':
+            #    print('Not implemented!')
+            #elif objective_type == 'Ds':
+            #    print('Not implemented!')
+            #elif objective_type == 'Custom':
+            #    print('Not implemented!')
             else:
                 raise Exception('Unknown objective: '+str(objective_type)+'!')
 
             #create the fim list for summing fim symbolics in group loop and parameter symbols for each model 
-            #ParamList used for bayesian priors
-            #NOTE:should maybe be an 'output' list for model selection objective; T-optimality etc.
-            self.fim_list.append(np.zeros((model.num_param,model.num_param) ))
-            #ParamList.append(cs.MX.sym('beta_model'+str(m),model.Nb))
-
-            self.model_list.append()
-            self.objective_list.append()
-            self.param_list.append()
+            self.model_list.append(model)
+            self.param_list.append(params)
+            self.objective_list.append(objective_func)
             
-            # REMOVED !!!!!!!!!!!!!!!!!
-            #
-
+        #observ struct
+        if not(observ_groups):
+            observ_groups = [[obs] for obs in self.observ_name_list]
+        self.observ_group_list = observ_groups
+        self.num_observ_group = len(observ_groups)
+        
         #counter to track the total number inputs across exact and approx, must sum to total for the model(s)
         input_num_check = 0
         #if user has passed approximate inputs
         if  approx_inputs:
-            self.approx_input_flag = True
-            [self.approx_input_grid,
-             self.approx_grid_length,
-             self.approx_input_names,
-             self.approx_input_num] = self._approx_settup(approx_inputs, options)
+            approx_input_flag = True
+            [approx_input_grid,
+             approx_grid_length,
+             approx_input_names,
+             approx_input_num] = self._approx_settup(approx_inputs, options)
         else:
-            self.approx_input_flag = False
-            self.approx_input_grid=[[]]
-            self.approx_grid_length = 1
-            self.approx_input_names = []
-            self.approx_input_num = 0
+            approx_input_flag = False
+            approx_input_grid=[[]]
+            approx_grid_length = 1
+            approx_input_names = []
+            approx_input_num = 0
 
         #NOTE: CONVERT APPOX GRID TO DICT of LISTS, PASS NAME, GET LIST OF GRID ELEMENTS FOR GIVEN NAME
 
-
         #if the user has passed exact inputs
         if exact_inputs:
-            self.exact_input_flag = True
-            [self.exact_symbol_archetypes,
-             self.exact_lowerbounds,
-             self.exact_upperbounds,
-             self.exact_archetype_num,
-             self.exact_input_names,
-             self.exact_input_num] = self._exact_settup(exact_inputs, options)
+            exact_input_flag = True
+            [exact_symbol_archetypes,
+             exact_symbol_list,
+             exact_lowerbounds,
+             exact_upperbounds,
+             exact_archetype_num,
+             exact_symbol_num,
+             exact_input_num,
+             exact_input_names] = self._exact_settup(exact_inputs, options)
         else:
-            self.exact_input_flag = False
-            self.exact_symbol_archetypes = [[]]
-            self.exact_lowerbound = [[]]
-            self.exact_upperbound = [[]]
-            self.exact_archetype_num = 1
-            self.exact_input_names = []
-            self.exact_input_num = 0
+            exact_input_flag = False
+            exact_symbol_archetypes = [[]]
+            exact_symbol_list =[]
+            exact_lowerbound = [[]]
+            exact_upperbound = [[]]
+            exact_archetype_num = 1
+            exact_symbol_num = 0
+            exact_input_num = 0
+            exact_input_names = []
 
         if not(self.input_dim == self.exact_input_num + self.approx_input_num):
             raise Exception('All input variables must be passed as either approximate or exact, and the total number of inputs passed must be the same as recieved by the model(s)!\n'
                         'There are '+str(self.approx_input_num)+' approximate inputs and '+str(self.exact_input_num)+' exact inputs passed but model(s) expect '+str(InputDim)+'!')
 
-        [] = self._weighted_optim_settup
+        [fim_list, weight_sum, weight_symbols] = self._weighting_settup(options)
 
-        #SETTUP OPTIM VARS, BOUNDS and MAP here
-
-        sample_weight_symbols
-        self.exact_symbol_archetypes
-
-        #OptimSymbolList += [NewSampleWeight]
-        #set the starting weights so that all grid points at all archetypes have equal weights NOTE: should probably clean this up, conditional on approx and exact being passed
-        #OptimVariableStart += [1/(NumApproxGrid*NumExactArchetypes*NumObservGroups)]
-        #apply appropriate bounds for the sampling weight NOTE: upper bound 1 should be scaled by passed observation weights when this functionality is added
-        #LowerBoundVariables += [0]
-        #UpperBoundVariables += [1]
-
-        #add a constraint function to ensure sample weights sum to 1
-        OptimConstraints += [ApproxWeightSum - 1]
-        #bound the constrain function output to 0
-        LowerBoundConstraints += [0]
-        UppperBoundConstraints += [0]
-
-        OverallObjectiveSymbol=0
-        for m in range(NumModels): 
-            OverallObjectiveSymbol += ObjectiveFuncs[m](FIMList[m])/NumModels
+        ipopt_problem_struct = self._optim_settup(fim_list, weight_sum, weight_symbols, options)
 
         #NOTE: should be checking solution for convergence, should allow use to pass options to ipopt
         # Create an IPOPT solver
-        IPOPTProblemStructure = {'f': OverallObjectiveSymbol, 'x': cs.vertcat(*OptimSymbolList), 'g': cs.vertcat(*OptimConstraints)}
+        #IPOPTProblemStructure = {'f': cumulative_objective_symbol, 'x': cs.vertcat(*OptimSymbolList), 'g': cs.vertcat(*OptimConstraints)}
         print('Setting up optimization problem, this can take some time...')
         #"verbose":True,
         IPOPTSolver = cs.nlpsol('solver', 'ipopt', IPOPTProblemStructure,{'ipopt.hessian_approximation':'limited-memory'}) #NOTE: need to give option to turn off full hessian (or coloring), may need to restucture problem mx/sx, maybe use quadratic programming in full approx mode?
@@ -166,14 +138,55 @@ class Design:
         IPOPTSolutionStruct = IPOPTSolver(x0=OptimVariableStart, lbx=LowerBoundVariables, ubx=UpperBoundVariables, lbg=LowerBoundConstraints, ubg=UppperBoundConstraints)
         OptimSolution = IPOPTSolutionStruct['x'].full().flatten()
 
+        def _optim_settup(self, fim_list, weight_symbols, weight_sum, options):
+            #SETTUP OPTIM VARS, BOUNDS and MAP here
 
-    def _weighted_optim_settup(self, approx_inputs, options):
+            optim_symbol_list = []
+            for i in range(weight_symbols):
+
+            # for i  in range(self.exact_archetype_num):
+            #     for j in range(self.approx_grid_length):
+            #         for k in range(self.num_observ_group):
+            #             optim_symbol_list += weight_symbols[i][j][k]
+            #             optim_init_list += [1/(self.approx_grid_length * self.exact_archetype_num * self.num_observ_group)]
+            #             weight_lower_bounds += [0]
+            #             weight_upper_bounds += [0]
+
+            #OptimSymbolList += [NewSampleWeight]
+            #set the starting weights so that all grid points at all archetypes have equal weights NOTE: should probably clean this up, conditional on approx and exact being passed
+            #OptimVariableStart += [1/(NumApproxGrid*NumExactArchetypes*NumObservGroups)]
+            #apply appropriate bounds for the sampling weight NOTE: upper bound 1 should be scaled by passed observation weights when this functionality is added
+            #LowerBoundVariables += [0]
+            #UpperBoundVariables += [1]
+
+            #add a constraint function to ensure sample weights sum to 1
+            OptimConstraints += [ApproxWeightSum - 1]
+            #bound the constrain function output to 0
+            LowerBoundConstraints += [0]
+            UppperBoundConstraints += [0]
+
+            cumulative_objective_symbol = 0
+            for m in range(NumModels): 
+                cumulative_objective_symbol += ObjectiveFuncs[m](FIMList[m])/NumModels
+
+            return {'f': cumulative_objective_symbol,
+                    'x': cs.vertcat(*OptimSymbolList),
+                    'g': cs.vertcat(*OptimConstraints)}
+
+    def _weighting_settup(self, approx_input_names, approx_input_grid, exact_input_names, exact_symbol_archetypes, options):
         #PACKAGE THIS AS A FUNCTION; returns obs vars, samp sum and fim symbols?
+
+        fim_list = []
+        for model in self.model_list:
+            self.fim_list.append(np.zeros((model.num_param,model.num_param)))
+
         # declare sum for approximate weights
-        approx_weight_sum = 0
-        sample_weight_symbols = []
+        weight_sum = 0
+        weight_symbol_list = []
+        weight_design_map = []
         # loop over exact symbol archetypes, or if exact wasn't passed then enter the loop only once
         for i  in range(self.exact_archetype_num):
+            current_exact_weights = []
             # loop over approximate grid, or if approx wasn't passed then enter the loop only once
             for j in range(self.approx_grid_length):
                 #create a list to hold the current input to the model
@@ -186,38 +199,47 @@ class Design:
                         input_list.append(cs.MX(approx_input_grid[j][input_name]))
                     elif input_name in self.exact_input_names:
                         #if in index corresponds to an exact input add the appropriate symbol to the input vector
-                        input_list.append(exact_symbol_archetypes[i][input_name])
+                        input_list.append(exact_symbol_archetypes[i][input_name]['Symbol'])
                     else:
                         #if we can't find the index k in either the approximate or exact indices, throw an error
                         raise Exception('Model input with index'+str(k)+' does not match any inputs passed as approximate or exact!')
                 #concatinate input list into a single MX
                 input_vector = cs.horzcat(*input_list)
+                #current_approx_weights = []
                 #loop over the obeservation groups
-                for k in range(observ_groups):
-                    observ_list = observ_groups[k]
+                for k in range(self.num_observ_group):
+                    obs_group = self.observ_group_list[k]
                     #create a sampling weight symbol for the current input and add it to the optimization variable list
-                    new_sample_weight = cs.MX.sym('sample_weight_'+ str(i)+'_'+ str(j)+'_'+ str(k))
-                    sample_weight_symbols.append(new_sample_weight)
+                    new_weight = cs.MX.sym('sample_weight_'+ str(i)+'_'+ str(j)+'_'+ str(k))
+                    weight_symbol_list.append(new_weight)
+
+                    map_info = {'Grid':i,
+                                'Archetype':exact_symbol_archetypes[i][input_name]['Index'],
+                                'Obs':obs_group}
+                    weight_design_map.append(map_info)
                     
                     #add sampling weight symbol to the running total, used to constrain sum of sampleing weights to 1 latee
-                    approx_weight_sum = approx_weight_sum + new_sample_weight
-                    #get the length of the observation group
+                    weight_sum += new_weight
+                    # get the length of the observation group
                     # this is used to scale sampling weight so FIM stays normalized w.r.t. sample number
-                    group_size = len(observ_list)
+                    group_size = len(obs_group)
                     #loop over observatino variables in sample group
-                    for observ_name in obs:
+                    for observ_name in obs_group:
                         #loop over each model
                         for mod in range(self.num_models):
                             #get the model 
-                            model = models[mod]['Model']
+                            model = self.model_list[mod]
                             #NOTE: Bayesian sigma point loop goes here
                             #get the model's parameter symbols
-                            param = models[mod]['Model'][mod]
+                            param = self.param_list[mod]
                             #add the weighted FIM to the running total for the experiment (for each model)
-                            self.fim_list[mod] += (new_sample_weight / group_size) * model.fisher_info_matrix[observ_name](param,input_vector)
+                            fim_list[mod] += (new_sample_weight / group_size)\
+                                * model.fisher_info_matrix[observ_name](param,input_vector)
+                
+                #current_exact_weights.append(current_approx_weights)
+            #.append(current_exact_weights)
 
-                j+=1
-            i+=1
+        return [fim_list, weight_sum, weight_symbol_list, weight_design_map]
 
 
     def _approx_settup(self, approx_inputs, options):
@@ -259,50 +281,53 @@ class Design:
             exact_input_num = len(exact_input_names)
             exact_input_bounds = exact_inputs['Bounds']
             exact_input_structure = exact_inputs['Structure']
-            #create a list of dicts for tracking existing symbols 
-            #arch_list_keyword_symbol_dict = []
-            #arch_list_keyword_opim_dict = []
             #add a dictionary to the list for each exact input
-            for i in range(exact_input_num):
-                keyword_symbol_dict_list.append({})
-                #keyword_index_dict_list.append({})
+            for j in range(exact_input_num):
+                keyword_symbol_list_dict.append({})
             #create a list to store casadi optimization symbols for exact input archetypes
-            symbol_archetypes = []
-            lowerbound_archetypes = []
-            upperbound_archetypes = []
+            exact_symbol_archetypes = []
+            exact_symbol_list = []
+            exact_lowerbounds = []
+            exact_upperbounds = []
+            symbol_index = 0
             #loop over exact input structure and create archetype symbol list for exact inputs provided
             for i in range(len(exact_input_structure)):
                 keyword_row = exact_input_structure[i]
-                archetype_row_dict = {}
-                lowerbound_row_dict =[]
-                upperbound_row_dict = {}
+                exact_archetype_row_dict = {}
+                #archetype_map_row_dict = {}
                 #current_arch_index_list = []
                 for j in range(len(keyword_row)):
-                    input_name = self.exact_input_names[j]
+                    input_name = exact_input_names[j]
                     keyword = keyword_row[j]
                     #check if this keyword has been seen before 
                     # NOTE: should really only restrict the use to unique keyworks per column of ExactInputStructure, otherwise we can get bad behaviour
-                    if keyword in keyword_symbol_dict_list[j]:
+                    if keyword in keyword_symbol_list_dict[j].keys():
                         #if the keyword has been seen then a symbol already exists, add the casadi symbol to the current archetype list
-                        archetype_row_dict[input_name] = keyword_symbol_dict_list[j][keyword]
+                        exact_archetype_row_dict[input_name] = keyword_symbol_list_dict[j][keyword]
                     else:
                         #if the keyword is new, a casadi symbol does not exist, create optimizaton symbols for the corresponding exact input
                         new_exact_symbol = cs.MX.sym('ExactSym_'+input_name+'_entry'+str(i)+'_elmnt'+ str(j))
+                        symbol_index_pair = {'Symbol':new_exact_symbol,'Index':symbol_index}
                         #now add the new casadi symbol to the current archetype list
-                        archetype_row_dict[input_name] = new_exact_symbol
-                        #get the current bounds
-                        lowerbound_row_dict[input_name] = self.exact_input_bounds[j][0]
-                        upperbound_row_dict[input_name] = self.exact_input_bounds[j][1]
+                        exact_archetype_row_dict[input_name] = symbol_index_pair
+                        keyword_symbol_list_dict[j][keyword]=symbol_index_pair
+                        exact_symbol_list.append(new_exact_symbol)
+                        exact_lowerbounds.append(exact_input_bounds[j][0])
+                        exact_upperbounds.append(exact_input_bounds[j][1])
+                        symbol_index += 1
                 #add the current archetype list to the list of archetype lists
-                symbol_archetypes.append(archetype_row_dict)
-                lowerbound_archetypes.append(lowerbound_row_dict)
-                upperbound_archetypes.append(upperbound_row_dict)
-                exact_archetype_num = len(symbol_archetypes)
-                #append the current archetype's index list to the ArchetypeIndex_To_OptimIndices list within the optimal solution map
-                #ArchetypeIndex_To_OptimIndices.append(current_arch_index_list) 
-                #NumExactArchetypes=len(ExactSymbolArchetypes)
+                exact_symbol_archetypes.append(exact_archetype_row_dict)
+                exact_archetype_num = len(exact_symbol_archetypes)
+                exact_symbol_num = len(exact_symbol_list)
 
-            return [symbol_archetypes, lowerbound_archetypes, upperbound_archetypes, exact_archetype_num, exact_input_names, exact_input_num]
+            return [exact_symbol_archetypes,
+                    exact_symbol_list,
+                    exact_lowerbounds,
+                    exact_upperbounds,
+                    exact_archetype_num,
+                    exact_symbol_num,
+                    exact_input_num,
+                    exact_input_names]
 
     #Function that recursively builds a grid point list from a set of candidate levels of the provided inputs
     def _creategrid(input_names,input_candidates,constraints):
