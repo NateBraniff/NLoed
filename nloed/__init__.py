@@ -1,6 +1,6 @@
 #__all__ = ['model', 'design']
 
 from .model import Model
-#from .design import design
+from .design import design
 
 #print('sup')
