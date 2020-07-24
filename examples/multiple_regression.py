@@ -3,12 +3,12 @@ from nloed import Model
 from nloed import Design
 
 
-xs = cs.SX.sym('xs',1)
-xnames = ['x']
-ps = cs.SX.sym('ps',2)
-pnames = ['Intercept','Slope']
+xs = cs.SX.sym('xs',2)
+xnames = ['x1','x2']
+ps = cs.SX.sym('ps',4)
+pnames = ['Intercept','Slope1','Slope2','Interaction']
 
-lin_predictor = ps[0] + ps[1]*xs[0] 
+lin_predictor = ps[0] + ps[1]*xs[0] + ps[2]*xs[1] + ps[3]*xs[0]*xs[1] 
 
 mean, var = lin_predictor, 0.1
 normal_stats = cs.vertcat(mean, var)
@@ -16,8 +16,11 @@ y = cs.Function('y',[xs,ps],[normal_stats])
 
 lin_model = Model([(y,'Normal')],xnames,pnames)
 
+approx_inputs={'Inputs':['x1'],'Bounds':[(-1,1)]}
+exact_inputs={'Inputs':['x2'],'Bounds':[(-1,1)],'Structure':[['A'],['B']]}
+#exact_inputs={'Inputs':['x1','x2'],'Bounds':[(-1,1),(-1,1)],'Structure':[['x1_lvl1','x2_lvl1'],['x1_lvl1','x2_lvl2'],['x1_lvl2','x2_lvl2']]}
 #    def __init__(self, models, parameters, objective, approx_inputs=None, exact_inputs=None, observ_groups=None, fixed_design=None, options={}):
-lin_design = Design(lin_model,[1,1],'D',['x'])
+lin_design = Design(lin_model,[1,1],'D',approx_inputs,exact_inputs)#approx_inputs
 
 
 

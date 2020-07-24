@@ -31,11 +31,11 @@ class Design:
             param_input = [parameters]    
 
         #model data init
-        self.num_models = len(models)
-        self.input_dim = models[0].num_input
-        self.observ_dim = models[0].num_observ
-        self.input_name_list = models[0].input_name_list
-        self.observ_name_list = models[0].observ_name_list
+        self.num_models = len(model_input)
+        self.input_dim = model_input[0].num_input
+        self.observ_dim = model_input[0].num_observ
+        self.input_name_list = model_input[0].input_name_list
+        self.observ_name_list = model_input[0].observ_name_list
         
         self.model_list = []
         self.param_list = []
@@ -142,6 +142,8 @@ class Design:
                                                       weight_sum,
                                                       options)
 
+
+        test=0
         #NOTE: should be checking solution for convergence, should allow use to pass options to ipopt
         # Create an IPOPT solver
         #IPOPTProblemStructure = {'f': cumulative_objective_symbol, 'x': cs.vertcat(*OptimSymbolList), 'g': cs.vertcat(*OptimConstraints)}
@@ -282,7 +284,7 @@ class Design:
             approx_input_candidates.extend([np.linspace(b[0],b[1],num_points).tolist()])
         #call recursive createGrid function to generate ApproxInputGrid, a list of all possible permuations of xlist's that also satisfy inequality OptimConstraintsaints
         #NOTE: currently, createGrid doesn't actually check the inequality OptimConstraintsaints, need to add, and perhaps add points on inequality boundary??!
-        approx_input_grid = self._create_grid(approx_input_names, approx_input_candidates, approx_input_constr)
+        approx_input_grid = self._create_grid(cp.deepcopy(approx_input_names), approx_input_candidates, approx_input_constr)
         approx_grid_length = len(approx_input_grid)
 
         return [approx_input_grid, approx_grid_length, approx_input_names, approx_input_num]
@@ -338,14 +340,14 @@ class Design:
             exact_archetype_num = len(exact_symbol_archetypes)
             exact_symbol_num = len(exact_symbol_list)
 
-            return [exact_symbol_archetypes,
-                    exact_symbol_list,
-                    exact_lowerbounds,
-                    exact_upperbounds,
-                    exact_archetype_num,
-                    exact_symbol_num,
-                    exact_input_num,
-                    exact_input_names]
+        return [exact_symbol_archetypes,
+                exact_symbol_list,
+                exact_lowerbounds,
+                exact_upperbounds,
+                exact_archetype_num,
+                exact_symbol_num,
+                exact_input_num,
+                exact_input_names]
 
     #Function that recursively builds a grid point list from a set of candidate levels of the provided inputs
     def _create_grid(self,input_names,input_candidates,constraints):
