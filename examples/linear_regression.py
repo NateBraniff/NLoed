@@ -51,8 +51,8 @@ eval_dat = mixed_model.evaluate(design,[0.5,1.1,2.1,0.3],opts)
 
 mixed_data = mixed_model.sample(design,[0.5,1.1,2.1,0.3])
 fit_options={'Confidence':'Profiles',
-            'InitParamBounds':[(-5,5),(-5,5),(-5,5),(-5,5)],
-            'InitSearchNumber':7}
+             'InitParamBounds':[(-5,5),(-5,5),(-5,5),(-5,5)],
+             'InitSearchNumber':7}
 mixed_fit = mixed_model.fit(mixed_data, options=fit_options)
 
 

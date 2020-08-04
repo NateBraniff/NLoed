@@ -1,5 +1,6 @@
 import casadi as cs
 import numpy as np
+import pandas as pd
 import random as rn
 import copy as cp
 
@@ -108,8 +109,8 @@ class Design:
             #exact_input_flag = False
             exact_symbol_archetypes = [[]]
             exact_symbol_list =[]
-            exact_lowerbounds = [[]]
-            exact_upperbounds = [[]]
+            exact_lowerbounds = []
+            exact_upperbounds = []
             exact_archetype_num = 1
             exact_symbol_num = 0
             exact_input_num = 0
@@ -133,6 +134,7 @@ class Design:
          optim_init,
          var_lowerbounds,
          var_upperbounds,
+         constraints,
          constraint_lowerbounds,
          constraint_upperbounds] = self._optim_settup(fim_list,
                                                       exact_symbol_list,
@@ -141,27 +143,60 @@ class Design:
                                                       weight_symbol_list,
                                                       weight_sum,
                                                       options)
+        
+        #NOTE: should test init, and error out if init is nonvalid
 
-
-        test=0
         #NOTE: should be checking solution for convergence, should allow use to pass options to ipopt
-        # Create an IPOPT solver
+        #Create an IPOPT solver
         #IPOPTProblemStructure = {'f': cumulative_objective_symbol, 'x': cs.vertcat(*OptimSymbolList), 'g': cs.vertcat(*OptimConstraints)}
-        # print('Setting up optimization problem, this can take some time...')
-        # #"verbose":True,
-        # IPOPTSolver = cs.nlpsol('solver', 'ipopt', IPOPTProblemStructure,{'ipopt.hessian_approximation':'limited-memory'}) #NOTE: need to give option to turn off full hessian (or coloring), may need to restucture problem mx/sx, maybe use quadratic programming in full approx mode?
-        # print('Problem set up complete.')
-        # # Solve the NLP with IPOPT call
-        # print('Begining optimization...')
-        # IPOPTSolutionStruct = IPOPTSolver(x0=OptimVariableStart, lbx=LowerBoundVariables, ubx=UpperBoundVariables, lbg=LowerBoundConstraints, ubg=UppperBoundConstraints)
-        # OptimSolution = IPOPTSolutionStruct['x'].full().flatten()
+        #print('Setting up optimization problem, this can take some time...')
+        #"verbose":True,
+        ipopt_solver = cs.nlpsol('solver', 'ipopt', ipopt_problem_struct,{'ipopt.hessian_approximation':'limited-memory'}) #NOTE: need to give option to turn off full hessian (or coloring), may need to restucture problem mx/sx, maybe use quadratic programming in full approx mode?
+        #print('Problem set up complete.')
+        # Solve the NLP with IPOPT call
+        #print('Begining optimization...')
+        ipopt_solution_struct = ipopt_solver(x0=optim_init,
+                                             lbx=var_lowerbounds,
+                                             ubx=var_upperbounds,
+                                             lbg=constraint_lowerbounds,
+                                             ubg=constraint_upperbounds)
+        optim_solution = ipopt_solution_struct['x'].full().flatten()
+
+        optim_exact_values = optim_solution[:exact_symbol_num]
+        optim_weights = optim_solution[exact_symbol_num:]
+
+        approximate_design = pd.DataFrame(columns=self.input_name_list+['Variable', 'Weights'])
+
+        for i in range(len(optim_weights)):
+            weight = optim_weights[i]
+            if weight>0.0:
+                design_row_prototype = {}
+                input_map = weight_design_map[i]['InputMap']
+                for x in self.input_name_list:
+                    if input_map[x]['Type'] == 'A':
+                        design_row_prototype[x] = approx_input_grid[input_map[x]['Index']][x]
+                    elif input_map[x]['Type'] == 'E':
+                        design_row_prototype[x] = optim_exact_values[input_map[x]['Index']]
+                design_row_prototype['Weights'] = weight
+
+                observ_map = weight_design_map[i]['ObsMap']
+                for obs in observ_map:
+                    design_row = cp.deepcopy(design_row_prototype)
+                    design_row['Variable'] = obs
+                    approximate_design = approximate_design.append(design_row, ignore_index=True)
+
+        self.approx_design = approximate_design
 
     def _optim_settup(self, fim_list, exact_symbol_list, exact_lowerbounds, exact_upperbounds, weight_symbol_list, weight_sum, options):
         #SETTUP OPTIM VARS, BOUNDS and MAP here
 
         optim_symbol_list = exact_symbol_list + weight_symbol_list
-        optim_init = 0.5*(exact_upperbounds + exact_lowerbounds)\
+        optim_init = [np.random.uniform(exact_lowerbounds[i],exact_upperbounds[i],1)[0]\
+                                for i in range(len(exact_symbol_list))]\
                      + [1/len(weight_symbol_list)] * len(weight_symbol_list)
+        # optim_init = [0.5*(exact_upperbounds[i] + exact_lowerbounds[i])\
+        #                         for i in range(len(exact_symbol_list))]\
+        #              + [1/len(weight_symbol_list)] * len(weight_symbol_list)
         # optim_init = 0.5*(exact_upperbounds + exact_lowerbounds)\
         #                     +[1/(self.approx_grid_length \
         #                             * self.exact_archetype_num \
@@ -188,6 +223,7 @@ class Design:
                 optim_init,
                 var_lowerbounds,
                 var_upperbounds,
+                constraint_funcs,
                 constraint_lowerbounds,
                 constraint_upperbounds]
 
@@ -209,15 +245,18 @@ class Design:
             for j in range(len(approx_input_grid)):
                 #create a list to hold the current input to the model
                 input_list = []
+                input_map_dict = {}
                 #loop over model inputs
                 for input_name in self.input_name_list:
                     #check if input index is in approximate or exact inputs
                     if input_name in approx_input_names:
                         #if in index corresponds to an approximate input add the appropriate numerical grid values to the input vector
                         input_list.append(cs.MX(approx_input_grid[j][input_name]))
+                        input_map_dict[input_name] = {'Index':j,'Type':'A'}
                     elif input_name in exact_input_names:
                         #if in index corresponds to an exact input add the appropriate symbol to the input vector
                         input_list.append(exact_symbol_archetypes[i][input_name]['Symbol'])
+                        input_map_dict[input_name] = {'Index':exact_symbol_archetypes[i][input_name]['Index'],'Type':'E'}
                     else:
                         #if we can't find the index k in either the approximate or exact indices, throw an error
                         raise Exception('Model input with index'+str(k)+' does not match any inputs passed as approximate or exact!')
@@ -231,9 +270,8 @@ class Design:
                     new_weight = cs.MX.sym('sample_weight_'+ str(i)+'_'+ str(j)+'_'+ str(k))
                     weight_symbol_list.append(new_weight)
 
-                    map_info = {'Grid':i,
-                                'Archetype':exact_symbol_archetypes[i][input_name]['Index'],
-                                'Obs':obs_group}
+                    map_info = {'InputMap':input_map_dict,
+                                'ObsMap':obs_group}
                     weight_design_map.append(map_info)
                     
                     #add sampling weight symbol to the running total, used to constrain sum of sampleing weights to 1 latee
@@ -252,7 +290,7 @@ class Design:
                             param = self.param_list[mod]
                             #add the weighted FIM to the running total for the experiment (for each model)
                             fim_list[mod] += (new_weight / group_size)\
-                                * model.fisher_info_matrix[observ_name](param,input_vector)
+                                * model.fisher_info_matrix[observ_name](input_vector,param)
                 
                 #current_exact_weights.append(current_approx_weights)
             #.append(current_exact_weights)

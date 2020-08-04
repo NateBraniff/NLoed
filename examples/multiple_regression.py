@@ -17,13 +17,14 @@ y = cs.Function('y',[xs,ps],[normal_stats])
 lin_model = Model([(y,'Normal')],xnames,pnames)
 
 approx_inputs={'Inputs':['x1'],'Bounds':[(-1,1)]}
+#approx_inputs={'Inputs':['x1','x2'],'Bounds':[(-1,1),(-1,1)]}
 exact_inputs={'Inputs':['x2'],'Bounds':[(-1,1)],'Structure':[['A'],['B']]}
 #exact_inputs={'Inputs':['x1','x2'],'Bounds':[(-1,1),(-1,1)],'Structure':[['x1_lvl1','x2_lvl1'],['x1_lvl1','x2_lvl2'],['x1_lvl2','x2_lvl2']]}
 #    def __init__(self, models, parameters, objective, approx_inputs=None, exact_inputs=None, observ_groups=None, fixed_design=None, options={}):
-lin_design = Design(lin_model,[1,1],'D',approx_inputs,exact_inputs)#approx_inputs
+lin_design = Design(lin_model,[1,1,1,1],'D',approx_inputs,exact_inputs)#approx_inputs
 
 
-
+t=0
 # design = pd.DataFrame({ 'x1':[-1,-1,-1,0,0,0,1,1,1]*3,
 #                         'x2':[-1,0,1,-1,0,1,-1,0,1]*3,
 #                         'Variable':['y_norm']*9+['y_bern']*9+['y_pois']*9,
