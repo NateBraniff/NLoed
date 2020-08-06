@@ -23,6 +23,8 @@ exact_inputs={'Inputs':['x2'],'Bounds':[(-1,1)],'Structure':[['A'],['B']]}
 #    def __init__(self, models, parameters, objective, approx_inputs=None, exact_inputs=None, observ_groups=None, fixed_design=None, options={}):
 lin_design = Design(lin_model,[1,1,1,1],'D',approx_inputs,exact_inputs)#approx_inputs
 
+lin_design.round(10)
+
 
 t=0
 # design = pd.DataFrame({ 'x1':[-1,-1,-1,0,0,0,1,1,1]*3,

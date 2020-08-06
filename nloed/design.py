@@ -183,9 +183,47 @@ class Design:
                 for obs in observ_map:
                     design_row = cp.deepcopy(design_row_prototype)
                     design_row['Variable'] = obs
+                    design_row['Weights'] = design_row['Weights']/len(observ_map)
                     approximate_design = approximate_design.append(design_row, ignore_index=True)
 
         self.approx_design = approximate_design
+
+    def round(self, sample_size, options={}):
+        """
+        This function 
+        Args:
+        Return:
+        """
+        default_options = { }
+        options=cp.deepcopy(options)
+        for key in options.keys():
+            if not key in options.keys():
+                raise Exception('Invalid option key; '+key+'!')
+            elif not default_options[key][1](options[key]):
+                raise Exception('Invalid value; '+str(options[key])+', passed for option key; '+key+'!')
+        for key in default_options.keys():
+            if not key in options.keys() :
+                options[key] = default_options[key][0]
+
+        l = len(self.approx_design.index)
+        nu = sample_size - l/2
+
+        apportion = np.ceil(nu*self.approx_design['Weights'])
+
+        while not sum(apportion)==sample_size:
+            if sum(apportion)<sample_size:
+                thresh = np.divide(apportion,self.approx_design['Weights'])
+                thresh_set = np.where(thresh == thresh.min())
+            elif sum(apportion)>sample_size:
+                thresh = np.divide(apportion-1,self.approx_design['Weights'])
+                thresh_set = np.where(thresh == thresh.max())
+
+                
+
+
+        t=0
+
+
 
     def _optim_settup(self, fim_list, exact_symbol_list, exact_lowerbounds, exact_upperbounds, weight_symbol_list, weight_sum, options):
         #SETTUP OPTIM VARS, BOUNDS and MAP here
@@ -297,7 +335,6 @@ class Design:
         weight_num = len(weight_symbol_list)
 
         return [fim_list, weight_symbol_list, weight_sum, weight_num, weight_design_map]
-
 
     def _approx_settup(self, approx_inputs, options):
         """
