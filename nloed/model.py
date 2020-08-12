@@ -674,7 +674,15 @@ class Model:
         return output_data
 
     #NOTE: should maybe rename this
-    def evaluate(self,inputs,param,options={}):
+    def evaluate(self, designs, param, options={}):
+        """
+        This function 
+
+        Args:
+
+        Return:
+
+        """
         #maybe this should move to the design class(??)
         #For D (full cov/bias),  Ds (partial cov/bias),  T separation using the delta method?! but need two models
         # assess model/design,  returns various estimates of cov,  bias,  confidence regions/intervals
@@ -702,21 +710,21 @@ class Model:
         # itemized_design.drop('Replicats',axis=1,inplace=True)
         # itemized_design.reset_index(drop=True,inplace=True)
 
-        if isinstance(inputs, pd.DataFrame):
-            inputset_list = [inputs]
+        if isinstance(designs, pd.DataFrame):
+            designset_list = [designs]
         else:
-            inputset_list = inputs
+            designset_list = designs
 
         eval_data_list = []
         #loop over the number of replicates
-        for i in range(len(inputset_list)):
-            inputset = inputset_list[i]
+        for i in range(len(designset_list)):
+            designset = designset_list[i]
 
             fisher_info_sum = np.zeros((self.num_param,self.num_param))
-            for index,row in inputset.iterrows():
+            for index,row in designset.iterrows():
                 input_row = row[self.input_name_list].to_numpy()
                 observ_name = row['Variable']
-                if 'Replicats' in inputset:
+                if 'Replicats' in designset:
                     reps = row['Replicats']
                 else:
                     reps = 1
@@ -729,7 +737,7 @@ class Model:
             #NOTE: could add empirical FIM comp (some observed FIM) for montecarlo method
 
             if options['Method'] == 'MonteCarlo':
-                sample_data = self.sample(inputset, param,options['SampleNumber'], options={'Verbose':True})
+                sample_data = self.sample(designset, param,options['SampleNumber'], options={'Verbose':True})
                 sample_fits = self.fit(sample_data, start_param=param, options={'Verbose':True})
 
             if options['Covariance']:
@@ -772,7 +780,7 @@ class Model:
             eval_data_list.append(eval_data)
 
                 
-        if isinstance(inputs, pd.DataFrame):
+        if isinstance(designs, pd.DataFrame):
             #if a single design was passed and there replicate count is 1,  return a single dataset
             return eval_data_list[0]
         else:

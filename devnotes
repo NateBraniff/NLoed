@@ -23,6 +23,6 @@ Install Casadi and Numpy (must be run in dev dir): pip install casadi, pip insta
 
 Git clone repo into dev dir: git clone https://github.com/NateBraniff/NLoed
 
-Instal nloed in edit mode (mist run in dev dir): pip install -e .
+Install nloed in edit mode (mist run in dev dir): pip install -e .
 
 

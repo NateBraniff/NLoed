@@ -2,7 +2,6 @@ import casadi as cs
 from nloed import Model
 from nloed import Design
 
-
 xs = cs.SX.sym('xs',2)
 xnames = ['x1','x2']
 ps = cs.SX.sym('ps',4)
@@ -21,9 +20,9 @@ approx_inputs={'Inputs':['x1'],'Bounds':[(-1,1)]}
 exact_inputs={'Inputs':['x2'],'Bounds':[(-1,1)],'Structure':[['A'],['B']]}
 #exact_inputs={'Inputs':['x1','x2'],'Bounds':[(-1,1),(-1,1)],'Structure':[['x1_lvl1','x2_lvl1'],['x1_lvl1','x2_lvl2'],['x1_lvl2','x2_lvl2']]}
 #    def __init__(self, models, parameters, objective, approx_inputs=None, exact_inputs=None, observ_groups=None, fixed_design=None, options={}):
-lin_design = Design(lin_model,[1,1,1,1],'D',approx_inputs,exact_inputs)#approx_inputs
+opt_design = Design(lin_model,[1,1,1,1],'D',approx_inputs,exact_inputs)#approx_inputs
 
-lin_design.round(10)
+rounded_design = opt_design.round(10)
 
 
 t=0

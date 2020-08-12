@@ -2,151 +2,75 @@
 Add a docstring
 """
 import numpy as np
-import pandas as pd
 import casadi as cs
+import pandas as pd
 from nloed import Model
-from nloed import Design
+#from nloed import design
+import time
 
-####################################################################################################
-# SET UP MODEL
-####################################################################################################
+xs = cs.SX.sym('xs',2)
+xnames = ['x1','x2']
+ps = cs.SX.sym('ps',4)
+pnames = ['Intercept','x1-Main','x2-Main','Interaction']
 
-#define input and parameters
-x = cs.SX.sym('x',1)
-xnames = ['x']
-p = cs.SX.sym('p',2)
-pnames = ['Intercept','Slope']
+lin_predictor = ps[0] + ps[1]*xs[0] + ps[2]*xs[1] + ps[3]*xs[0]*xs[1]
 
-#define the deterministic model
-lin_predictor = p[0] + p[1]*x[0] 
+design = pd.DataFrame({ 'x1':[-1,-1,-1,0,0,0,1,1,1]*3,
+                        'x2':[-1,0,1,-1,0,1,-1,0,1]*3,
+                        'Variable':['y_norm']*9+['y_bern']*9+['y_pois']*9,
+                        'Replicats':[5]*9*3})
 
-#link the deterministic model to the sampling statistics (here normal mean and variance)
+predict_inputs = pd.DataFrame({ 'x1':[-1,-1,-1,0,0,0,1,1,1]*3,
+                                'x2':[-1,0,1,-1,0,1,-1,0,1]*3,
+                                'Variable':['y_norm']*9+['y_bern']*9+['y_pois']*9})
+
+#mixed model
 mean, var = lin_predictor, 0.1
 normal_stats = cs.vertcat(mean, var)
+y_norm_func = cs.Function('y_norm',[xs,ps],[normal_stats])
 
-#create a casadi function mapping input and parameters to sampling statistics (mean and var)
-y = cs.Function('y',[x,p],[normal_stats])
+rate = cs.exp(lin_predictor)
+poisson_stats = rate
+y_pois_func = cs.Function('y_pois',[xs,ps],[poisson_stats])
 
-# enter the function as a tuple with label indicating normal error, into observation list
-observ_list = [(y,'Normal')]
+prob = cs.exp(lin_predictor)/(1+cs.exp(lin_predictor))
+bern_stats = prob
+y_bern_func = cs.Function('y_bern',[xs,ps],[bern_stats])
 
-#instantiate nloed model class
-nloed_model = Model(observ_list,xnames,pnames)
+mixed_response = [  (y_norm_func,'Normal'),
+                    (y_bern_func,'Bernoulli'),
+                    (y_pois_func,'Poisson')]
 
-####################################################################################################
-# GENERATE OPTIMAL DESIGN
-####################################################################################################
-
-#set up the design algorithm to use exact (continuous) optimization with two unique inputs points
-exact_inputs={'Inputs':['x'],'Bounds':[(-1,1)],'Structure':[['x1'],['x2']]}
-
-# generate the optimal approximate (relaxed) design
-relaxed_design = Design(nloed_model,[1,1],'D',exact_inputs=exact_inputs)
-
-#generate a rounded exact design 
-exact_design = relaxed_design.round(10)
-
-print(exact_design)
-
-####################################################################################################
-# GENERATE SAMPLE DATA & FIT MODEL
-####################################################################################################
-
-#generate some data, to stand in for an initial experiment
-data = nloed_model.sample(exact_design,[1,1])
-
-#pass some additional options to fitting alglorithm, including Profile likelihood
-fit_options={'Confidence':'Profiles',
-             'InitParamBounds':[(-5,5),(-5,5)],
-             'InitSearchNumber':7}
-#fit the model to the init data
-fit_info = nloed_model.fit(data, options=fit_options)
-
-print(fit_info)
-
-fit_params = fit_info['Estimate'].to_numpy().flatten()
-
-####################################################################################################
-# EVALUATE DESIGN & PREDICT OUTPUT
-####################################################################################################
+mixed_model = Model(mixed_response,xnames,pnames)
 
 opts={'Covariance':True,'Bias':True,'MSE':True,'SampleNumber':100}
-diagnostic_info = nloed_model.evaluate(exact_design,fit_params,opts)
+eval_dat = mixed_model.evaluate(design,[0.5,1.1,2.1,0.3],opts)
 
-print(diagnostic_info)
+opts={'Method':'MonteCarlo','Covariance':True,'Bias':True,'MSE':True,'SampleNumber':100}
+eval_dat = mixed_model.evaluate(design,[0.5,1.1,2.1,0.3],opts)
 
-prediction_inputs = pd.DataFrame({ 'x':np.random.uniform(-1,1,10),
-                                'Variable':['y']*10})
+mixed_data = mixed_model.sample(design,[0.5,1.1,2.1,0.3])
+fit_options={'Confidence':'Profiles',
+             'InitParamBounds':[(-5,5),(-5,5),(-5,5),(-5,5)],
+             'InitSearchNumber':7}
+mixed_fit = mixed_model.fit(mixed_data, options=fit_options)
 
-cov_mat = diagnostic_info['Covariance'].to_numpy()
-pred_options = {'PredictionInterval':True,
+
+
+fit_pars = mixed_fit['Estimate'].to_numpy().flatten()
+print(fit_pars)
+
+#evaluate goes here
+
+cov_mat = np.diag([0.1,0.1,0.1,0.1])
+pred_options = {'Method':'MonteCarlo',
+                'PredictionInterval':True,
                 'ObservationInterval':True,
                 'Sensitivity':True}
-predictions = nloed_model.predict(prediction_inputs,
-                                  fit_params,
-                                  covariance_matrix = cov_mat,
-                                  options=pred_options)
+predictions_dlta = mixed_model.predict(predict_inputs,fit_pars,covariance_matrix = cov_mat,options=pred_options)
 
-
-print(predictions)
 
 t=0
-# design = pd.DataFrame({ 'x1':[-1,-1,-1,0,0,0,1,1,1]*3,
-#                         'x2':[-1,0,1,-1,0,1,-1,0,1]*3,
-#                         'Variable':['y_norm']*9+['y_bern']*9+['y_pois']*9,
-#                         'Replicats':[5]*9*3})
-
-# predict_inputs = pd.DataFrame({ 'x1':[-1,-1,-1,0,0,0,1,1,1]*3,
-#                                 'x2':[-1,0,1,-1,0,1,-1,0,1]*3,
-#                                 'Variable':['y_norm']*9+['y_bern']*9+['y_pois']*9})
-
-# #mixed model
-# mean, var = lin_predictor, 0.1
-# normal_stats = cs.vertcat(mean, var)
-# y_norm_func = cs.Function('y_norm',[xs,ps],[normal_stats])
-
-# rate = cs.exp(lin_predictor)
-# poisson_stats = rate
-# y_pois_func = cs.Function('y_pois',[xs,ps],[poisson_stats])
-
-# prob = cs.exp(lin_predictor)/(1+cs.exp(lin_predictor))
-# bern_stats = prob
-# y_bern_func = cs.Function('y_bern',[xs,ps],[bern_stats])
-
-# mixed_response = [  (y_norm_func,'Normal'),
-#                     (y_bern_func,'Bernoulli'),
-#                     (y_pois_func,'Poisson')]
-
-# mixed_model = Model(mixed_response,xnames,pnames)
-
-# opts={'Covariance':True,'Bias':True,'MSE':True,'SampleNumber':100}
-# eval_dat = mixed_model.evaluate(design,[0.5,1.1,2.1,0.3],opts)
-
-# opts={'Method':'MonteCarlo','Covariance':True,'Bias':True,'MSE':True,'SampleNumber':100}
-# eval_dat = mixed_model.evaluate(design,[0.5,1.1,2.1,0.3],opts)
-
-# mixed_data = mixed_model.sample(design,[0.5,1.1,2.1,0.3])
-# fit_options={'Confidence':'Profiles',
-#              'InitParamBounds':[(-5,5),(-5,5),(-5,5),(-5,5)],
-#              'InitSearchNumber':7}
-# mixed_fit = mixed_model.fit(mixed_data, options=fit_options)
-
-
-
-# fit_pars = mixed_fit['Estimate'].to_numpy().flatten()
-# print(fit_pars)
-
-# #evaluate goes here
-
-# cov_mat = np.diag([0.1,0.1,0.1,0.1])
-# pred_options = {'Method':'MonteCarlo',
-#                 'PredictionInterval':True,
-#                 'ObservationInterval':True,
-#                 'Sensitivity':True}
-# predictions_dlta = mixed_model.predict(predict_inputs,fit_pars,covariance_matrix = cov_mat,options=pred_options)
-
-
-# t=0
 
 # x = cs.SX.sym('x')
 # xnames = ['x']
@@ -471,6 +395,9 @@ t=0
 # # pred_struct1=linear1d.eval_model([1,1],1)
 # # pred_struct2=linear1d.eval_model([1,1],1,param_covariance=[[1,0],[0,1]])
 # # pred_struct3=linear1d.eval_model([1,1],1,sensitivity=True)
+
+
+
 
 
 

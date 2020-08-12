@@ -208,20 +208,63 @@ class Design:
         l = len(self.approx_design.index)
         nu = sample_size - l/2
 
-        apportion = np.ceil(nu*self.approx_design['Weights'])
+        candidate_design = cp.deepcopy(self.approx_design)
+        apportion = np.ceil(nu*self.approx_design['Weights']).to_numpy().astype(int)
+        candidate_design.drop('Weights',axis=1,inplace=True)
+        candidate_design['Replicats'] = apportion
 
-        while not sum(apportion)==sample_size:
-            if sum(apportion)<sample_size:
-                thresh = np.divide(apportion,self.approx_design['Weights'])
+        while not sum(candidate_design['Replicats'])==sample_size:
+            if sum(candidate_design['Replicats'])<sample_size:
+                thresh = np.divide(candidate_design['Replicats'],self.approx_design['Weights'])
                 thresh_set = np.where(thresh == thresh.min())
-            elif sum(apportion)>sample_size:
-                thresh = np.divide(apportion-1,self.approx_design['Weights'])
+                inc = 1
+            elif sum(candidate_design['Replicats'])>sample_size:
+                thresh = np.divide(candidate_design['Replicats']-1,self.approx_design['Weights'])
                 thresh_set = np.where(thresh == thresh.max())
+                inc = -1
 
-                
+            candidate_design.iloc[rn.choice(thresh_set), candidate_design.columns.get_loc('Replicats')] +=inc
+
+            # candidate_list = []
+            # for ind in thresh_set:
+            #     new_candidate = cp.deepcopy(candidate_design)
+            #     new_candidate.iloc[0, new_candidate.columns.get_loc('Replicats')] +=1
+            #     for models
+            #         self.model_list[0].evaluate(candidate_design,self.param_list[0],{'Covariance':False})['FIM'].to_numpy()
+            #     candidate_list.append(new_candidate)
+        return candidate_design
+
+    def power(self, sample_size, options={}):
+        """
+        This function 
+        Args:
+        Return:
+        """
+        print('not implemented')
+        # function for power analysis with given design and model
+
+        #pre N: asymptotic confidence intervals only 
+        #enter an N range Nmin to Nmax (or just single N)
+        #discretize with multiple N -> sigma/boostrap CI's/Cov's at each N (jitter at each N?!) [graphical, thershold]
+        #                           -> FDS/D-eff(Opt-eff) plots [graphical, thershold]
+        #                           -> what about T optimality designs, what about bayesian CI's??
+
+        # Discretize (depends on N):    basic Adam's apportionment, 
+        #                               other rounding options (naive...)
+        # Sample Size Selection (N?):   assesment of confidence interval size with design replication or N selection
+        #                               similar FDS/D-eff/relative D-eff plots for selecting sample size
+        # Fine Tuning:                  jitter/tuning of exact design
 
 
-        t=0
+
+        #use sigma points (or if needed monte carlo simulation) to determine 'power curve', shrinking of parameter error (bias +var) with n design replications
+        #perhaps combine with rounding methods?? to allow for rounded variations of the same design.
+        # rounding should probably happen here
+
+        #include a prediction variance plot for verifying genral equivlance theorem plot (either as a var vs X or a stem plot for support points in high dim)
+        #FDS-like plots, prediction variance limit vs fraction of design space with lower variance than limit, used to compare designs and sample sizes, along with CI's (ellipses or intervals)
+        #d-efficiency plots for comparing sample size (normed to approx max for each sample size) vs relative efficiency (normed to lowest sample size approx or rounded exact)
+        #    shows 'real'improvment from extra samples rather than distance from unachievable ideal, howevver regular d-efficiency may motivate adding a single point to achieve near theoretical max
 
 
 
