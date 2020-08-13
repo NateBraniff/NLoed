@@ -2,11 +2,14 @@
 Add a docstring
 """
 import numpy as np
-import casadi as cs
 import pandas as pd
+import casadi as cs
 from nloed import Model
-#from nloed import design
-import time
+from nloed import Design
+
+####################################################################################################
+# SET UP MODEL
+####################################################################################################
 
 xs = cs.SX.sym('xs',2)
 xnames = ['x1','x2']
@@ -15,16 +18,6 @@ pnames = ['Intercept','x1-Main','x2-Main','Interaction']
 
 lin_predictor = ps[0] + ps[1]*xs[0] + ps[2]*xs[1] + ps[3]*xs[0]*xs[1]
 
-design = pd.DataFrame({ 'x1':[-1,-1,-1,0,0,0,1,1,1]*3,
-                        'x2':[-1,0,1,-1,0,1,-1,0,1]*3,
-                        'Variable':['y_norm']*9+['y_bern']*9+['y_pois']*9,
-                        'Replicats':[5]*9*3})
-
-predict_inputs = pd.DataFrame({ 'x1':[-1,-1,-1,0,0,0,1,1,1]*3,
-                                'x2':[-1,0,1,-1,0,1,-1,0,1]*3,
-                                'Variable':['y_norm']*9+['y_bern']*9+['y_pois']*9})
-
-#mixed model
 mean, var = lin_predictor, 0.1
 normal_stats = cs.vertcat(mean, var)
 y_norm_func = cs.Function('y_norm',[xs,ps],[normal_stats])
@@ -43,31 +36,62 @@ mixed_response = [  (y_norm_func,'Normal'),
 
 mixed_model = Model(mixed_response,xnames,pnames)
 
-opts={'Covariance':True,'Bias':True,'MSE':True,'SampleNumber':100}
-eval_dat = mixed_model.evaluate(design,[0.5,1.1,2.1,0.3],opts)
+####################################################################################################
+# GENERATE DESIGN
+####################################################################################################
 
-opts={'Method':'MonteCarlo','Covariance':True,'Bias':True,'MSE':True,'SampleNumber':100}
-eval_dat = mixed_model.evaluate(design,[0.5,1.1,2.1,0.3],opts)
+true_param = [0.5,1.1,2.1,0.3]
 
-mixed_data = mixed_model.sample(design,[0.5,1.1,2.1,0.3])
-fit_options={'Confidence':'Profiles',
-             'InitParamBounds':[(-5,5),(-5,5),(-5,5),(-5,5)],
-             'InitSearchNumber':7}
-mixed_fit = mixed_model.fit(mixed_data, options=fit_options)
+approx_inputs={'Inputs':['x1'],'Bounds':[(-1,1)]}
+exact_inputs={'Inputs':['x2'],'Bounds':[(-1,1)],'Structure':[['level1'],['level2']]}
+opt_design = Design(mixed_model,true_param,'D',approx_inputs,exact_inputs)
+
+sample_size = 10
+exact_design = opt_design.round(sample_size)
+
+####################################################################################################
+# GENERATE SAMPLE DATA & FIT MODEL
+####################################################################################################
+
+# mixed_data = mixed_model.sample(design,true_param)
+# fit_options={'Confidence':'Profiles',
+#              'InitParamBounds':[(-5,5),(-5,5),(-5,5),(-5,5)],
+#              'InitSearchNumber':7}
+# mixed_fit = mixed_model.fit(mixed_data, options=fit_options)
 
 
 
-fit_pars = mixed_fit['Estimate'].to_numpy().flatten()
-print(fit_pars)
+# design = pd.DataFrame({ 'x1':[-1,-1,-1,0,0,0,1,1,1]*3,
+#                         'x2':[-1,0,1,-1,0,1,-1,0,1]*3,
+#                         'Variable':['y_norm']*9+['y_bern']*9+['y_pois']*9,
+#                         'Replicats':[5]*9*3})
 
-#evaluate goes here
+# predict_inputs = pd.DataFrame({ 'x1':[-1,-1,-1,0,0,0,1,1,1]*3,
+#                                 'x2':[-1,0,1,-1,0,1,-1,0,1]*3,
+#                                 'Variable':['y_norm']*9+['y_bern']*9+['y_pois']*9})
 
-cov_mat = np.diag([0.1,0.1,0.1,0.1])
-pred_options = {'Method':'MonteCarlo',
-                'PredictionInterval':True,
-                'ObservationInterval':True,
-                'Sensitivity':True}
-predictions_dlta = mixed_model.predict(predict_inputs,fit_pars,covariance_matrix = cov_mat,options=pred_options)
+
+# opts={'Covariance':True,'Bias':True,'MSE':True,'SampleNumber':100}
+# eval_dat = mixed_model.evaluate(design,[0.5,1.1,2.1,0.3],opts)
+
+# opts={'Method':'MonteCarlo','Covariance':True,'Bias':True,'MSE':True,'SampleNumber':100}
+# eval_dat = mixed_model.evaluate(design,[0.5,1.1,2.1,0.3],opts)
+
+
+
+
+
+# fit_pars = mixed_fit['Estimate'].to_numpy().flatten()
+# print(fit_pars)
+
+# #evaluate goes here
+
+# cov_mat = np.diag([0.1,0.1,0.1,0.1])
+# pred_options = {'Method':'MonteCarlo',
+#                 'PredictionInterval':True,
+#                 'ObservationInterval':True,
+#                 'Sensitivity':True}
+# predictions_dlta = mixed_model.predict(predict_inputs,fit_pars,covariance_matrix = cov_mat,options=pred_options)
 
 
 t=0

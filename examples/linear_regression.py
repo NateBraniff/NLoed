@@ -43,8 +43,9 @@ exact_inputs={'Inputs':['x'],'Bounds':[(-1,1)],'Structure':[['x1'],['x2']]}
 # generate the optimal approximate (relaxed) design
 relaxed_design = Design(nloed_model,[1,1],'D',exact_inputs=exact_inputs)
 
+sample_size = 10
 #generate a rounded exact design 
-exact_design = relaxed_design.round(10)
+exact_design = relaxed_design.round(sample_size)
 
 print(exact_design)
 
@@ -70,14 +71,14 @@ fit_params = fit_info['Estimate'].to_numpy().flatten()
 # EVALUATE DESIGN & PREDICT OUTPUT
 ####################################################################################################
 
+#get estimated covariance, bias and MSE of parameter fit (use asymptotic method here) 
 opts={'Covariance':True,'Bias':True,'MSE':True,'SampleNumber':100}
 diagnostic_info = nloed_model.evaluate(exact_design,fit_params,opts)
-
 print(diagnostic_info)
 
+#generate predictions with error bars fdor a random selection of inputs)
 prediction_inputs = pd.DataFrame({ 'x':np.random.uniform(-1,1,10),
                                 'Variable':['y']*10})
-
 cov_mat = diagnostic_info['Covariance'].to_numpy()
 pred_options = {'PredictionInterval':True,
                 'ObservationInterval':True,
@@ -86,8 +87,6 @@ predictions = nloed_model.predict(prediction_inputs,
                                   fit_params,
                                   covariance_matrix = cov_mat,
                                   options=pred_options)
-
-
 print(predictions)
 
 t=0

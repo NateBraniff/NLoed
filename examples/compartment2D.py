@@ -7,6 +7,11 @@ import matplotlib.pyplot as plt
 from nloed import Model
 from nloed import design
 
+
+####################################################################################################
+# SET UP RHS OF ODE
+####################################################################################################
+
 #states and controls
 # y = cs.MX.sym('y',2)
 # u = cs.MX.sym('u')
@@ -21,6 +26,10 @@ ode = cs.Function('ode',[y,u,p],[rhs])
 
 dt = 1
 
+####################################################################################################
+# DEFINE RK-4 STEP ALGEBRA
+####################################################################################################
+
 # # Create symbolics for RK4 integration, as shown in Casadi examples
 k1 = ode(y, u, p)
 k2 = ode(y + dt/2.0*k1, u, p)
@@ -34,7 +43,9 @@ step = cs.Function('step',[y, u, p],[y_step])
 # opts = {'tf':dt}
 # step = cs.integrator('F', 'cvodes', ode_sys, opts)
 
-##########################################################################################
+####################################################################################################
+# DEFINE TIME DISCRETIZATION, AND CONSTRUCT DETERMINISTIC MODEL VIA INTEGRATION
+####################################################################################################
 
 steps_per_sample = [1,2,3,5] 
 #steps_per_sample = [1,9] 
@@ -46,7 +57,6 @@ cntrls_per_run = 3
 #####  -or-  #####
 y0 = cs.SX.sym('y0',2)
 uvec = cs.SX.sym('uvec',3)
-
 x = cs.vertcat(y0,uvec)
 
 #Loop over the ste function to create symbolics for integrating across a sample interval
@@ -64,11 +74,9 @@ for i in range(cntrls_per_run):
     sample_list.append(y_sample)
     times.append(cntr*dt)
 
-design = pd.DataFrame({ 'mrna_ic':[1],
-                        'prot_ic':[1],
-                        'cntrl_1':[0.1],
-                        'cntrl_2':[1],
-                        'cntrl_3':[0.1]})
+####################################################################################################
+# CONSTRUCT MRNA and PROTEIN MEAN/VAR STATS, CREATE INTO MODEL
+####################################################################################################
 
 ode_response = []
 response_names=[]
@@ -89,15 +97,29 @@ for i in range(len(sample_list)):
   response_names.append(prot_name)
   replicates.append(reps)
 
+xnames = ['mrna_ic','prot_ic','cntrl_1','cntrl_2','cntrl_3']
+pnames = ['alpha','delta','beta','gamma']
+
+ode_model = Model(ode_response,xnames,pnames)
+
+####################################################################################################
+# MANUALLY CREATE A DESIGN FOR TESTING
+####################################################################################################
+
+design = pd.DataFrame({ 'mrna_ic':[1],
+                        'prot_ic':[1],
+                        'cntrl_1':[0.1],
+                        'cntrl_2':[1],
+                        'cntrl_3':[0.1]})
+
 design=design.reindex(design.index.repeat(len(response_names)))
 design['Variable'] = response_names
 design['Replicats'] = replicates
 design = design.sort_values(by='Variable').reset_index()
 
-xnames = ['mrna_ic','prot_ic','cntrl_1','cntrl_2','cntrl_3']
-pnames = ['alpha','delta','beta','gamma']
-
-ode_model = Model(ode_response,xnames,pnames)
+####################################################################################################
+# TESTING PREDICTIONS AND EVAL
+####################################################################################################
 
 predict_inputs = pd.DataFrame({ 'mrna_ic':[1]*len(response_names),
                                 'prot_ic':[1]*len(response_names),

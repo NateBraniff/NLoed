@@ -312,7 +312,7 @@ class Model:
             'InitialStep':      [.01,                   lambda x: isinstance(x,float) and 0<x],
             'MaxSteps':         [2000,                  lambda x: isinstance(x,int) and 1<x],
             'SearchFactor':     [5,                     lambda x: isinstance(x,float) and 0<x],
-            'SearchBound':      [3,                     lambda x: isinstance(x,float) and 0<x],
+            'SearchBound':      [3.0,                     lambda x: isinstance(x,float) and 0<x],
             'InitParamBounds':  [False,                 lambda x: isinstance(x,list) or isinstance(x,np.ndarray)],
             'InitSearchNumber': [3,                     lambda x: isinstance(x,int) and 0<x],
             'Verbose':          [True,                  lambda x: isinstance(x,int) and 0<x]}
@@ -1145,7 +1145,7 @@ class Model:
     def __logliksearch(self, profile_loglik_solver, marginal_param, options, forward=True):
         """ 
         This function performs a root finding algorithm using solver_list objects
-        It uses halley's method to find the radius value (relative to the mle) where the loglik ratio equals the chi-squared level
+        It uses halley's method (currently bisection as of summer 2020) to find the radius value (relative to the mle) where the loglik ratio equals the chi-squared level
         This radius runs along the direction specified in the solver_list when they are created
         Halley's method is a higher order extension of newton's method for finding roots
 

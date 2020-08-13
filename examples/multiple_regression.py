@@ -1,6 +1,15 @@
+""" 
+Add a docstring
+"""
+import numpy as np
+import pandas as pd
 import casadi as cs
 from nloed import Model
 from nloed import Design
+
+####################################################################################################
+# SET UP MODEL
+####################################################################################################
 
 xs = cs.SX.sym('xs',2)
 xnames = ['x1','x2']
@@ -15,14 +24,64 @@ y = cs.Function('y',[xs,ps],[normal_stats])
 
 lin_model = Model([(y,'Normal')],xnames,pnames)
 
-approx_inputs={'Inputs':['x1'],'Bounds':[(-1,1)]}
-#approx_inputs={'Inputs':['x1','x2'],'Bounds':[(-1,1),(-1,1)]}
-exact_inputs={'Inputs':['x2'],'Bounds':[(-1,1)],'Structure':[['A'],['B']]}
-#exact_inputs={'Inputs':['x1','x2'],'Bounds':[(-1,1),(-1,1)],'Structure':[['x1_lvl1','x2_lvl1'],['x1_lvl1','x2_lvl2'],['x1_lvl2','x2_lvl2']]}
-#    def __init__(self, models, parameters, objective, approx_inputs=None, exact_inputs=None, observ_groups=None, fixed_design=None, options={}):
-opt_design = Design(lin_model,[1,1,1,1],'D',approx_inputs,exact_inputs)#approx_inputs
+####################################################################################################
+# GENERATE DESIGN
+####################################################################################################
 
-rounded_design = opt_design.round(10)
+true_param = [1,1,1,1]
+
+approx_inputs={'Inputs':['x1'],'Bounds':[(-1,1)]}
+exact_inputs={'Inputs':['x2'],'Bounds':[(-1,1)],'Structure':[['level1'],['level2']]}
+## approx_inputs={'Inputs':['x1','x2'],'Bounds':[(-1,1),(-1,1)]}
+## exact_inputs={'Inputs':['x1','x2'],'Bounds':[(-1,1),(-1,1)],'Structure':[['x1_lvl1','x2_lvl1'],['x1_lvl1','x2_lvl2'],['x1_lvl2','x2_lvl2']]}
+opt_design = Design(lin_model,true_param,'D',approx_inputs,exact_inputs)
+
+sample_size = 10
+exact_design = opt_design.round(sample_size)
+
+####################################################################################################
+# GENERATE SAMPLE DATA & FIT MODEL
+####################################################################################################
+
+#generate some data, to stand in for an initial experiment
+data = lin_model.sample(exact_design,true_param)
+
+#pass some additional options to fitting alglorithm, including Profile likelihood
+fit_options={'Confidence':'Profiles',
+             'InitParamBounds':[(-1,1),(-1,1),(-1,1),(-1,1)],
+             'InitSearchNumber':7,
+             'SearchBound':5.}
+#fit the model to the init data
+fit_info = lin_model.fit(data, options=fit_options)
+
+print(fit_info)
+
+fit_params = fit_info['Estimate'].to_numpy().flatten()
+
+####################################################################################################
+# EVALUATE DESIGN & PREDICT OUTPUT
+####################################################################################################
+
+#get estimated covariance, bias and MSE of parameter fit (use asymptotic method here) 
+opts={'Method':'MonteCarlo','Covariance':True,'Bias':True,'MSE':True,'SampleNumber':100}
+diagnostic_info = lin_model.evaluate(exact_design,fit_params,opts)
+print(diagnostic_info)
+
+#generate predictions with error bars fdor a random selection of inputs)
+prediction_inputs = pd.DataFrame({ 'Light':np.random.uniform(0,5,10),
+                                'Variable':['y']*10})
+cov_mat = diagnostic_info['Covariance'].to_numpy()
+pred_options = {'Method':'MonteCarlo',
+                'PredictionInterval':True,
+                'ObservationInterval':True,
+                'Sensitivity':True}
+predictions = lin_model.predict(prediction_inputs,
+                                  fit_params,
+                                  covariance_matrix = cov_mat,
+                                  options=pred_options)
+print(predictions)
+
+t=0
 
 
 t=0
