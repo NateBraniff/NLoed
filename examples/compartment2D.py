@@ -1,11 +1,15 @@
-import casadi as cs
-import pandas as pd
+""" 
+Add a docstring
+"""
 import numpy as np
+import pandas as pd
+import casadi as cs
+from nloed import Model
+from nloed import Design
+
 import re as re
 import copy as cp
 import matplotlib.pyplot as plt
-from nloed import Model
-from nloed import design
 
 
 ####################################################################################################
@@ -23,14 +27,13 @@ p = cs.SX.sym('p',4)
 
 rhs = cs.vertcat(cs.exp(p[0])*u -cs.exp(p[1])*y[0], cs.exp(p[2])*y[0]-cs.exp(p[3])*y[1])
 ode = cs.Function('ode',[y,u,p],[rhs])
-
 dt = 1
 
 ####################################################################################################
 # DEFINE RK-4 STEP ALGEBRA
 ####################################################################################################
 
-# # Create symbolics for RK4 integration, as shown in Casadi examples
+# Create symbolics for RK4 integration, as shown in Casadi examples
 k1 = ode(y, u, p)
 k2 = ode(y + dt/2.0*k1, u, p)
 k3 = ode(y + dt/2.0*k2, u, p)
@@ -101,6 +104,28 @@ xnames = ['mrna_ic','prot_ic','cntrl_1','cntrl_2','cntrl_3']
 pnames = ['alpha','delta','beta','gamma']
 
 ode_model = Model(ode_response,xnames,pnames)
+
+####################################################################################################
+# GENERATE DESIGN
+####################################################################################################
+
+true_pars = np.log([0.5,1.1,2.1,0.3])
+
+approx_inputs = {'Inputs':['mrna_ic','prot_ic','cntrl_1','cntrl_2','cntrl_3'],
+                 'Bounds':[(0,1),(0,1),(0,1),(0,1),(0,1)]}
+opt_design = Design(ode_model,true_pars,'D',approx_inputs)
+#exact_inputs = {'Inputs':['mrna_ic','prot_ic','cntrl_1','cntrl_2','cntrl_3'],
+#                 'Bounds':[(0,1),(0,1),(0,1),(0,1),(0,1),(0,1)],
+#                 'Structure':[['mrna_ic1','prot_ic1','c1_lvl1','c2_lvl1','c3_lvl1'],
+#                              ['mrna_ic2','prot_ic2','c1_lvl2','c2_lvl2','c3_lvl2'],
+#                              ['mrna_ic3','prot_ic3','c1_lvl3','c2_lvl3','c3_lvl3']]}
+#opt_design = Design(ode_model,true_pars,'D',exact_inputs=exact_inputs)
+
+sample_size = 30
+exact_design = opt_design.round(sample_size)
+
+print(exact_design)
+
 
 ####################################################################################################
 # MANUALLY CREATE A DESIGN FOR TESTING

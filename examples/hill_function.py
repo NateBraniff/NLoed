@@ -57,6 +57,8 @@ print(exact_design)
 #generate some data, to stand in for an initial experiment
 data = nloed_model.sample(exact_design,np.log(true_param))
 
+print(data)
+
 #pass some additional options to fitting alglorithm, including Profile likelihood
 fit_options={'Confidence':'Intervals',  #NOTE: ISSUE WITH PROFILES HERE
              'InitParamBounds':[(-1,4),(-1,4),(-1,4),(-1,4)],

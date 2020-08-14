@@ -325,7 +325,7 @@ class Model:
         for key in default_options.keys():
             if not key in options.keys() :
                 options[key] = default_options[key][0]
-        if not start_param:
+        if start_param is None:
             start_param = [0]*self.num_param
         # if not len(start_param) == self.num_param:
         #     raise Exception('Starting parameter mismatch, there were; '+str(len(start_param))+', provided but; '+str(self.num_param)+' needed!')

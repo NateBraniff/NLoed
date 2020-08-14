@@ -42,40 +42,52 @@ mixed_model = Model(mixed_response,xnames,pnames)
 
 true_param = [0.5,1.1,2.1,0.3]
 
-approx_inputs={'Inputs':['x1'],'Bounds':[(-1,1)]}
-exact_inputs={'Inputs':['x2'],'Bounds':[(-1,1)],'Structure':[['level1'],['level2']]}
+approx_inputs = {'Inputs':['x1'],'Bounds':[(-1,1)]}
+exact_inputs = {'Inputs':['x2'],'Bounds':[(-1,1)],'Structure':[['level1'],['level2']]}
 opt_design = Design(mixed_model,true_param,'D',approx_inputs,exact_inputs)
 
 sample_size = 10
 exact_design = opt_design.round(sample_size)
 
+print(exact_design)
+
 ####################################################################################################
 # GENERATE SAMPLE DATA & FIT MODEL
 ####################################################################################################
 
-# mixed_data = mixed_model.sample(design,true_param)
-# fit_options={'Confidence':'Profiles',
-#              'InitParamBounds':[(-5,5),(-5,5),(-5,5),(-5,5)],
-#              'InitSearchNumber':7}
-# mixed_fit = mixed_model.fit(mixed_data, options=fit_options)
+mixed_data = mixed_model.sample(exact_design,true_param)
 
+print(mixed_data)
 
+fit_options={'Confidence':'Profiles',
+             'InitParamBounds':[(-5,5),(-5,5),(-5,5),(-5,5)],
+             'InitSearchNumber':7}
+fit_info = mixed_model.fit(mixed_data, options=fit_options)
 
-# design = pd.DataFrame({ 'x1':[-1,-1,-1,0,0,0,1,1,1]*3,
-#                         'x2':[-1,0,1,-1,0,1,-1,0,1]*3,
-#                         'Variable':['y_norm']*9+['y_bern']*9+['y_pois']*9,
-#                         'Replicats':[5]*9*3})
+fit_params = fit_info['Estimate'].to_numpy().flatten()
 
-# predict_inputs = pd.DataFrame({ 'x1':[-1,-1,-1,0,0,0,1,1,1]*3,
-#                                 'x2':[-1,0,1,-1,0,1,-1,0,1]*3,
-#                                 'Variable':['y_norm']*9+['y_bern']*9+['y_pois']*9})
+####################################################################################################
+# PREDICTIONS AND EVALUATE
+####################################################################################################
 
+design = pd.DataFrame({ 'x1':[-1,-1,-1,0,0,0,1,1,1]*3,
+                        'x2':[-1,0,1,-1,0,1,-1,0,1]*3,
+                        'Variable':['y_norm']*9 + ['y_bern']*9 + ['y_pois']*9,
+                        'Replicats':[5]*9*3})
 
-# opts={'Covariance':True,'Bias':True,'MSE':True,'SampleNumber':100}
-# eval_dat = mixed_model.evaluate(design,[0.5,1.1,2.1,0.3],opts)
+predict_inputs = pd.DataFrame({ 'x1':[-1,-1,-1,0,0,0,1,1,1]*3,
+                                'x2':[-1,0,1,-1,0,1,-1,0,1]*3,
+                                'Variable':['y_norm']*9 + ['y_bern']*9 + ['y_pois']*9})
 
-# opts={'Method':'MonteCarlo','Covariance':True,'Bias':True,'MSE':True,'SampleNumber':100}
-# eval_dat = mixed_model.evaluate(design,[0.5,1.1,2.1,0.3],opts)
+opts={'Covariance':True,'Bias':True,'MSE':True,'SampleNumber':100}
+eval_dat = mixed_model.evaluate(design,fit_params,opts)
+
+print(eval_dat)
+
+opts={'Method':'MonteCarlo','Covariance':True,'Bias':True,'MSE':True,'SampleNumber':100}
+eval_dat = mixed_model.evaluate(design,fit_params,opts)
+
+print(eval_dat)
 
 
 

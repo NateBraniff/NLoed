@@ -39,12 +39,16 @@ opt_design = Design(lin_model,true_param,'D',approx_inputs,exact_inputs)
 sample_size = 10
 exact_design = opt_design.round(sample_size)
 
+print(exact_design)
+
 ####################################################################################################
 # GENERATE SAMPLE DATA & FIT MODEL
 ####################################################################################################
 
 #generate some data, to stand in for an initial experiment
 data = lin_model.sample(exact_design,true_param)
+
+print(data)
 
 #pass some additional options to fitting alglorithm, including Profile likelihood
 fit_options={'Confidence':'Profiles',
@@ -68,8 +72,9 @@ diagnostic_info = lin_model.evaluate(exact_design,fit_params,opts)
 print(diagnostic_info)
 
 #generate predictions with error bars fdor a random selection of inputs)
-prediction_inputs = pd.DataFrame({ 'Light':np.random.uniform(0,5,10),
-                                'Variable':['y']*10})
+prediction_inputs = pd.DataFrame({ 'x1':np.random.uniform(0,5,10),
+                                   'x2':np.random.uniform(0,5,10),
+                                   'Variable':['y']*10})
 cov_mat = diagnostic_info['Covariance'].to_numpy()
 pred_options = {'Method':'MonteCarlo',
                 'PredictionInterval':True,
@@ -83,8 +88,6 @@ print(predictions)
 
 t=0
 
-
-t=0
 # design = pd.DataFrame({ 'x1':[-1,-1,-1,0,0,0,1,1,1]*3,
 #                         'x2':[-1,0,1,-1,0,1,-1,0,1]*3,
 #                         'Variable':['y_norm']*9+['y_bern']*9+['y_pois']*9,
