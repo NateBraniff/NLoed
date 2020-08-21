@@ -42,9 +42,9 @@ mixed_model = Model(mixed_response,xnames,pnames)
 
 true_param = [0.5,1.1,2.1,0.3]
 
-approx_inputs = {'Inputs':['x1'],'Bounds':[(-1,1)]}
-exact_inputs = {'Inputs':['x2'],'Bounds':[(-1,1)],'Structure':[['level1'],['level2']]}
-opt_design = Design(mixed_model,true_param,'D',approx_inputs,exact_inputs)
+discrete_inputs = {'Inputs':['x1'],'Bounds':[(-1,1)]}
+continuous_inputs = {'Inputs':['x2'],'Bounds':[(-1,1)],'Structure':[['level1'],['level2']]}
+opt_design = Design(mixed_model,true_param,'D',discrete_inputs,continuous_inputs)
 
 sample_size = 10
 exact_design = opt_design.round(sample_size)
@@ -105,8 +105,6 @@ print(eval_dat)
 #                 'Sensitivity':True}
 # predictions_dlta = mixed_model.predict(predict_inputs,fit_pars,covariance_matrix = cov_mat,options=pred_options)
 
-
-t=0
 
 # x = cs.SX.sym('x')
 # xnames = ['x']

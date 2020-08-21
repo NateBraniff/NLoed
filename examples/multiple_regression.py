@@ -30,11 +30,11 @@ lin_model = Model([(y,'Normal')],xnames,pnames)
 
 true_param = [1,1,1,1]
 
-approx_inputs={'Inputs':['x1'],'Bounds':[(-1,1)]}
-exact_inputs={'Inputs':['x2'],'Bounds':[(-1,1)],'Structure':[['level1'],['level2']]}
-## approx_inputs={'Inputs':['x1','x2'],'Bounds':[(-1,1),(-1,1)]}
-## exact_inputs={'Inputs':['x1','x2'],'Bounds':[(-1,1),(-1,1)],'Structure':[['x1_lvl1','x2_lvl1'],['x1_lvl1','x2_lvl2'],['x1_lvl2','x2_lvl2']]}
-opt_design = Design(lin_model,true_param,'D',approx_inputs,exact_inputs)
+discrete_inputs={'Inputs':['x1'],'Bounds':[(-1,1)]}
+continuous_inputs={'Inputs':['x2'],'Bounds':[(-1,1)],'Structure':[['level1'],['level2']]}
+## discrete_inputs={'Inputs':['x1','x2'],'Bounds':[(-1,1),(-1,1)]}
+## continuous_inputs={'Inputs':['x1','x2'],'Bounds':[(-1,1),(-1,1)],'Structure':[['x1_lvl1','x2_lvl1'],['x1_lvl1','x2_lvl2'],['x1_lvl2','x2_lvl2']]}
+opt_design = Design(lin_model, true_param, 'D', discrete_inputs, continuous_inputs)
 
 sample_size = 10
 exact_design = opt_design.round(sample_size)

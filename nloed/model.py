@@ -1169,7 +1169,6 @@ class Model:
         #get the number of marginal parameters
         num_marginal_param = len(marginal_param)
 
-
         init_radius =  sign*options['InitialStep']
         upper_radius = init_radius / 10**(1/options['SearchFactor'])
         upper_ratio_gap = -st.chi2.ppf(options['ConfidenceLevel'],  self.num_param)

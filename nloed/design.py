@@ -10,7 +10,7 @@ class Design:
     A class for statisical models in the NLoed package
     """
 
-    def __init__(self, models, parameters, objective, approx_inputs=None, exact_inputs=None, observ_groups=None, fixed_design=None, options={}):
+    def __init__(self, models, parameters, objective, discrete_inputs=None, continuous_inputs=None, observ_groups=None, fixed_design=None, options={}):
 
         default_options = \
           { 'NumGridPoints':       [5,       lambda x: isinstance(x,int) and x>0 ]}
@@ -78,56 +78,56 @@ class Design:
         self.observ_group_list = observ_groups
         self.num_observ_group = len(observ_groups)
         
-        #if user has passed approximate inputs
-        if  approx_inputs:
-            #approx_input_flag = True
-            [approx_input_grid,
-             approx_grid_length,
-             approx_input_names,
-             approx_input_num] = self._approx_settup(approx_inputs, options)
+        #if user has passed discrete inputs
+        if  discrete_inputs:
+            #discrete_input_flag = True
+            [discrete_input_grid,
+             discrete_grid_length,
+             discrete_input_names,
+             discrete_input_num] = self._discrete_settup(discrete_inputs, options)
         else:
-            #approx_input_flag = False
-            approx_input_grid=[[]]
-            approx_grid_length = 1
-            approx_input_names = []
-            approx_input_num = 0
+            #discrete_input_flag = False
+            discrete_input_grid=[[]]
+            discrete_grid_length = 1
+            discrete_input_names = []
+            discrete_input_num = 0
 
         #NOTE: CONVERT APPOX GRID TO DICT of LISTS, PASS NAME, GET LIST OF GRID ELEMENTS FOR GIVEN NAME
 
-        #if the user has passed exact inputs
-        if exact_inputs:
-            #exact_input_flag = True
-            [exact_symbol_archetypes,
-             exact_symbol_list,
-             exact_lowerbounds,
-             exact_upperbounds,
-             exact_archetype_num,
-             exact_symbol_num,
-             exact_input_num,
-             exact_input_names] = self._exact_settup(exact_inputs, options)
+        #if the user has passed continuous inputs
+        if continuous_inputs:
+            #continuous_input_flag = True
+            [continuous_symbol_archetypes,
+             continuous_symbol_list,
+             continuous_lowerbounds,
+             continuous_upperbounds,
+             continuous_archetype_num,
+             continuous_symbol_num,
+             continuous_input_num,
+             continuous_input_names] = self._continuous_settup(continuous_inputs, options)
         else:
-            #exact_input_flag = False
-            exact_symbol_archetypes = [[]]
-            exact_symbol_list =[]
-            exact_lowerbounds = []
-            exact_upperbounds = []
-            exact_archetype_num = 1
-            exact_symbol_num = 0
-            exact_input_num = 0
-            exact_input_names = []
+            #continuous_input_flag = False
+            continuous_symbol_archetypes = [[]]
+            continuous_symbol_list =[]
+            continuous_lowerbounds = []
+            continuous_upperbounds = []
+            continuous_archetype_num = 1
+            continuous_symbol_num = 0
+            continuous_input_num = 0
+            continuous_input_names = []
 
-        if not(self.input_dim == exact_input_num + approx_input_num):
-            raise Exception('All input variables must be passed as either approximate or exact, and the total number of inputs passed must be the same as recieved by the model(s)!\n'
-                        'There are '+str(approx_input_num)+' approximate inputs and '+str(exact_input_num)+' exact inputs passed but model(s) expect '+str(self.input_dim)+'!')
+        if not(self.input_dim == continuous_input_num + discrete_input_num):
+            raise Exception('All input variables must be passed as either discrete or continuous, and the total number of inputs passed must be the same as recieved by the model(s)!\n'
+                        'There are '+str(discrete_input_num)+' discrete inputs and '+str(continuous_input_num)+' continuous inputs passed but model(s) expect '+str(self.input_dim)+'!')
 
         [fim_list,
          weight_symbol_list,
          weight_sum,
          weight_num,
-         weight_design_map] = self._weighting_settup(approx_input_names,
-                                                     approx_input_grid,
-                                                     exact_input_names,
-                                                     exact_symbol_archetypes,
+         weight_design_map] = self._weighting_settup(discrete_input_names,
+                                                     discrete_input_grid,
+                                                     continuous_input_names,
+                                                     continuous_symbol_archetypes,
                                                      options)
 
         [ipopt_problem_struct,
@@ -137,9 +137,9 @@ class Design:
          constraints,
          constraint_lowerbounds,
          constraint_upperbounds] = self._optim_settup(fim_list,
-                                                      exact_symbol_list,
-                                                      exact_lowerbounds,
-                                                      exact_upperbounds,
+                                                      continuous_symbol_list,
+                                                      continuous_lowerbounds,
+                                                      continuous_upperbounds,
                                                       weight_symbol_list,
                                                       weight_sum,
                                                       options)
@@ -151,7 +151,7 @@ class Design:
         #IPOPTProblemStructure = {'f': cumulative_objective_symbol, 'x': cs.vertcat(*OptimSymbolList), 'g': cs.vertcat(*OptimConstraints)}
         #print('Setting up optimization problem, this can take some time...')
         #"verbose":True,
-        ipopt_solver = cs.nlpsol('solver', 'ipopt', ipopt_problem_struct,{'ipopt.hessian_approximation':'limited-memory'}) #NOTE: need to give option to turn off full hessian (or coloring), may need to restucture problem mx/sx, maybe use quadratic programming in full approx mode?
+        ipopt_solver = cs.nlpsol('solver', 'ipopt', ipopt_problem_struct,{'ipopt.hessian_approximation':'limited-memory'}) #NOTE: need to give option to turn off full hessian (or coloring), may need to restucture problem mx/sx, maybe use quadratic programming in full discrete mode?
         #print('Problem set up complete.')
         # Solve the NLP with IPOPT call
         #print('Begining optimization...')
@@ -162,8 +162,8 @@ class Design:
                                              ubg=constraint_upperbounds)
         optim_solution = ipopt_solution_struct['x'].full().flatten()
 
-        optim_exact_values = optim_solution[:exact_symbol_num]
-        optim_weights = optim_solution[exact_symbol_num:]
+        optim_continuous_values = optim_solution[:continuous_symbol_num]
+        optim_weights = optim_solution[continuous_symbol_num:]
 
         approximate_design = pd.DataFrame(columns=self.input_name_list+['Variable', 'Weights'])
 
@@ -174,9 +174,9 @@ class Design:
                 input_map = weight_design_map[i]['InputMap']
                 for x in self.input_name_list:
                     if input_map[x]['Type'] == 'A':
-                        design_row_prototype[x] = approx_input_grid[input_map[x]['Index']][x]
+                        design_row_prototype[x] = discrete_input_grid[input_map[x]['Index']][x]
                     elif input_map[x]['Type'] == 'E':
-                        design_row_prototype[x] = optim_exact_values[input_map[x]['Index']]
+                        design_row_prototype[x] = optim_continuous_values[input_map[x]['Index']]
                 design_row_prototype['Weights'] = weight
 
                 observ_map = weight_design_map[i]['ObsMap']
@@ -186,7 +186,7 @@ class Design:
                     design_row['Weights'] = design_row['Weights']/len(observ_map)
                     approximate_design = approximate_design.append(design_row, ignore_index=True)
 
-        self.approx_design = approximate_design
+        self.approximate_design = approximate_design
 
     def round(self, sample_size, options={}):
         """
@@ -205,21 +205,21 @@ class Design:
             if not key in options.keys() :
                 options[key] = default_options[key][0]
 
-        l = len(self.approx_design.index)
+        l = len(self.approximate_design.index)
         nu = sample_size - l/2
 
-        candidate_design = cp.deepcopy(self.approx_design)
-        apportion = np.ceil(nu*self.approx_design['Weights']).to_numpy().astype(int)
+        candidate_design = cp.deepcopy(self.approximate_design)
+        apportion = np.ceil(nu*self.approximate_design['Weights']).to_numpy().astype(int)
         candidate_design.drop('Weights',axis=1,inplace=True)
         candidate_design['Replicats'] = apportion
 
         while not sum(candidate_design['Replicats'])==sample_size:
             if sum(candidate_design['Replicats'])<sample_size:
-                thresh = np.divide(candidate_design['Replicats'],self.approx_design['Weights'])
+                thresh = np.divide(candidate_design['Replicats'],self.approximate_design['Weights'])
                 thresh_set = np.where(thresh == thresh.min())
                 inc = 1
             elif sum(candidate_design['Replicats'])>sample_size:
-                thresh = np.divide(candidate_design['Replicats']-1,self.approx_design['Weights'])
+                thresh = np.divide(candidate_design['Replicats']-1,self.approximate_design['Weights'])
                 thresh_set = np.where(thresh == thresh.max())
                 inc = -1
 
@@ -253,7 +253,7 @@ class Design:
         #                               other rounding options (naive...)
         # Sample Size Selection (N?):   assesment of confidence interval size with design replication or N selection
         #                               similar FDS/D-eff/relative D-eff plots for selecting sample size
-        # Fine Tuning:                  jitter/tuning of exact design
+        # Fine Tuning:                  jitter/tuning of continuous design
 
 
 
@@ -263,28 +263,28 @@ class Design:
 
         #include a prediction variance plot for verifying genral equivlance theorem plot (either as a var vs X or a stem plot for support points in high dim)
         #FDS-like plots, prediction variance limit vs fraction of design space with lower variance than limit, used to compare designs and sample sizes, along with CI's (ellipses or intervals)
-        #d-efficiency plots for comparing sample size (normed to approx max for each sample size) vs relative efficiency (normed to lowest sample size approx or rounded exact)
+        #d-efficiency plots for comparing sample size (normed to discrete max for each sample size) vs relative efficiency (normed to lowest sample size discrete or rounded continuous)
         #    shows 'real'improvment from extra samples rather than distance from unachievable ideal, howevver regular d-efficiency may motivate adding a single point to achieve near theoretical max
 
 
 
-    def _optim_settup(self, fim_list, exact_symbol_list, exact_lowerbounds, exact_upperbounds, weight_symbol_list, weight_sum, options):
+    def _optim_settup(self, fim_list, continuous_symbol_list, continuous_lowerbounds, continuous_upperbounds, weight_symbol_list, weight_sum, options):
         #SETTUP OPTIM VARS, BOUNDS and MAP here
 
-        optim_symbol_list = exact_symbol_list + weight_symbol_list
-        optim_init = [np.random.uniform(exact_lowerbounds[i],exact_upperbounds[i],1)[0]\
-                                for i in range(len(exact_symbol_list))]\
+        optim_symbol_list = continuous_symbol_list + weight_symbol_list
+        optim_init = [np.random.uniform(continuous_lowerbounds[i],continuous_upperbounds[i],1)[0]\
+                                for i in range(len(continuous_symbol_list))]\
                      + [1/len(weight_symbol_list)] * len(weight_symbol_list)
-        # optim_init = [0.5*(exact_upperbounds[i] + exact_lowerbounds[i])\
-        #                         for i in range(len(exact_symbol_list))]\
+        # optim_init = [0.5*(continuous_upperbounds[i] + continuous_lowerbounds[i])\
+        #                         for i in range(len(continuous_symbol_list))]\
         #              + [1/len(weight_symbol_list)] * len(weight_symbol_list)
-        # optim_init = 0.5*(exact_upperbounds + exact_lowerbounds)\
-        #                     +[1/(self.approx_grid_length \
-        #                             * self.exact_archetype_num \
+        # optim_init = 0.5*(continuous_upperbounds + continuous_lowerbounds)\
+        #                     +[1/(self.discrete_grid_length \
+        #                             * self.continuous_archetype_num \
         #                             * self.num_observ_group)] * len(weight_symbol_list)
 
-        var_lowerbounds = exact_lowerbounds + [0]*len(weight_symbol_list)
-        var_upperbounds = exact_upperbounds + [1]*len(weight_symbol_list)
+        var_lowerbounds = continuous_lowerbounds + [0]*len(weight_symbol_list)
+        var_upperbounds = continuous_upperbounds + [1]*len(weight_symbol_list)
 
         #add a constraint function to ensure sample weights sum to 1
         constraint_funcs = [weight_sum - 1]
@@ -308,42 +308,42 @@ class Design:
                 constraint_lowerbounds,
                 constraint_upperbounds]
 
-    def _weighting_settup(self, approx_input_names, approx_input_grid, exact_input_names, exact_symbol_archetypes, options):
+    def _weighting_settup(self, discrete_input_names, discrete_input_grid, continuous_input_names, continuous_symbol_archetypes, options):
         #PACKAGE THIS AS A FUNCTION; returns obs vars, samp sum and fim symbols?
 
         fim_list = []
         for model in self.model_list:
             fim_list.append(np.zeros((model.num_param,model.num_param)))
 
-        # declare sum for approximate weights
+        # declare sum for discrete weights
         weight_sum = 0
         weight_symbol_list = []
         weight_design_map = []
-        # loop over exact symbol archetypes, or if exact wasn't passed then enter the loop only once
-        for i  in range(len(exact_symbol_archetypes)):
-            #current_exact_weights = []
-            # loop over approximate grid, or if approx wasn't passed then enter the loop only once
-            for j in range(len(approx_input_grid)):
+        # loop over continuous symbol archetypes, or if continuous wasn't passed then enter the loop only once
+        for i  in range(len(continuous_symbol_archetypes)):
+            #current_continuous_weights = []
+            # loop over discrete grid, or if discrete wasn't passed then enter the loop only once
+            for j in range(len(discrete_input_grid)):
                 #create a list to hold the current input to the model
                 input_list = []
                 input_map_dict = {}
                 #loop over model inputs
                 for input_name in self.input_name_list:
-                    #check if input index is in approximate or exact inputs
-                    if input_name in approx_input_names:
-                        #if in index corresponds to an approximate input add the appropriate numerical grid values to the input vector
-                        input_list.append(cs.MX(approx_input_grid[j][input_name]))
+                    #check if input index is in discrete or continuous inputs
+                    if input_name in discrete_input_names:
+                        #if in index corresponds to an discrete input add the appropriate numerical grid values to the input vector
+                        input_list.append(cs.MX(discrete_input_grid[j][input_name]))
                         input_map_dict[input_name] = {'Index':j,'Type':'A'}
-                    elif input_name in exact_input_names:
-                        #if in index corresponds to an exact input add the appropriate symbol to the input vector
-                        input_list.append(exact_symbol_archetypes[i][input_name]['Symbol'])
-                        input_map_dict[input_name] = {'Index':exact_symbol_archetypes[i][input_name]['Index'],'Type':'E'}
+                    elif input_name in continuous_input_names:
+                        #if in index corresponds to an continuous input add the appropriate symbol to the input vector
+                        input_list.append(continuous_symbol_archetypes[i][input_name]['Symbol'])
+                        input_map_dict[input_name] = {'Index':continuous_symbol_archetypes[i][input_name]['Index'],'Type':'E'}
                     else:
-                        #if we can't find the index k in either the approximate or exact indices, throw an error
-                        raise Exception('Model input with index'+str(k)+' does not match any inputs passed as approximate or exact!')
+                        #if we can't find the index k in either the discrete or continuous indices, throw an error
+                        raise Exception('Model input with index'+str(k)+' does not match any inputs passed as discrete or continuous!')
                 #concatinate input list into a single MX
                 input_vector = cs.horzcat(*input_list)
-                #current_approx_weights = []
+                #current_discrete_weights = []
                 #loop over the obeservation groups
                 for k in range(self.num_observ_group):
                     obs_group = self.observ_group_list[k]
@@ -373,99 +373,110 @@ class Design:
                             fim_list[mod] += (new_weight / group_size)\
                                 * model.fisher_info_matrix[observ_name](input_vector,param)
                 
-                #current_exact_weights.append(current_approx_weights)
-            #.append(current_exact_weights)
+                #current_continuous_weights.append(current_discrete_weights)
+            #.append(current_continuous_weights)
         weight_num = len(weight_symbol_list)
 
         return [fim_list, weight_symbol_list, weight_sum, weight_num, weight_design_map]
 
-    def _approx_settup(self, approx_inputs, options):
+    def _discrete_settup(self, discrete_inputs, options):
         """
         This function 
         Args:
         Return:
         """
-        #get names, number and indices of approximate inputs
-        approx_input_names =  approx_inputs['Inputs']
-        approx_input_num = len(approx_input_names)
-        approx_input_bounds =  approx_inputs['Bounds']
+        #get names, number and indices of discrete inputs
+        discrete_input_names =  discrete_inputs['Inputs']
+        discrete_input_num = len(discrete_input_names)
+        
         #check if inquality OptimConstraintsains have been passed, if so store them 
-        approx_input_constr = []
-        if 'Constraints' in  approx_inputs:
-            approx_input_constr  =  approx_inputs['Constraints']          
-        #set resolution of grid NOTE: this should be able to be specified by the user, will change
-        num_points = options['NumGridPoints']
-        #create a list for storing possible levels of each approxmate input
-        approx_input_candidates = []
-        #loop over bounds passed, and use resolution and bounds to populate xlist
-        for b in approx_input_bounds:
-            approx_input_candidates.extend([np.linspace(b[0],b[1],num_points).tolist()])
+        discrete_input_constr = []
+        if 'Constraints' in  discrete_inputs:
+            discrete_input_constr  =  discrete_inputs['Constraints']   
+
+        #create a list for storing possible levels of each discretemate input
+        discrete_input_candidates = []     
+        if 'Bounds' in   discrete_inputs:
+            #set resolution of grid NOTE: this should be able to be specified by the user, will change
+            num_points = options['NumGridPoints']
+            #loop over bounds passed, and use resolution and bounds to populate xlist
+            for bound in discrete_inputs['Bounds']:
+                discrete_input_candidates.append(np.linspace(bound[0],bound[1],num_points).tolist())
+        elif  'Grid' in discrete_inputs:
+            for grid in discrete_inputs['Grid']:
+                discrete_input_candidates.append(grid)
+        else:
+            raise Exception('Discerete inputs must be passed with either input \'Bounds\' or a pre-defined list of \'Grid\' candidats!')
+        
         #call recursive createGrid function to generate ApproxInputGrid, a list of all possible permuations of xlist's that also satisfy inequality OptimConstraintsaints
         #NOTE: currently, createGrid doesn't actually check the inequality OptimConstraintsaints, need to add, and perhaps add points on inequality boundary??!
-        approx_input_grid = self._create_grid(cp.deepcopy(approx_input_names), approx_input_candidates, approx_input_constr)
-        approx_grid_length = len(approx_input_grid)
+        discrete_input_grid = self._create_grid(cp.deepcopy(discrete_input_names), discrete_input_candidates, discrete_input_constr)
+        discrete_grid_length = len(discrete_input_grid)
 
-        return [approx_input_grid, approx_grid_length, approx_input_names, approx_input_num]
+        return [discrete_input_grid, discrete_grid_length, discrete_input_names, discrete_input_num]
 
-    def _exact_settup(self, exact_inputs, options):
+    def _continuous_settup(self, continuous_inputs, options):
         """
         This function 
         Args:
         Return:
         """
-        #get names, number and indices of exact inputs
-        exact_input_names = exact_inputs['Inputs']
-        exact_input_num = len(exact_input_names)
-        exact_input_bounds = exact_inputs['Bounds']
-        exact_input_structure = exact_inputs['Structure']
+        #get names, number and indices of continuous inputs
+        continuous_input_names = continuous_inputs['Inputs']
+        continuous_input_num = len(continuous_input_names)
+        continuous_input_bounds = continuous_inputs['Bounds']
+        continuous_input_structure = continuous_inputs['Structure']
+        # if 'Initial' in continuous_inputs:
+        #     for 
+        #     continuous_input_init = continuous_inputs['Initial']
         keyword_symbol_list_dict = []
-        #add a dictionary to the list for each exact input
-        for j in range(exact_input_num):
+        #add a dictionary to the list for each continuous input
+        for j in range(continuous_input_num):
             keyword_symbol_list_dict.append({})
-        #create a list to store casadi optimization symbols for exact input archetypes
-        exact_symbol_archetypes = []
-        exact_symbol_list = []
-        exact_lowerbounds = []
-        exact_upperbounds = []
+        #create a list to store casadi optimization symbols for continuous input archetypes
+        continuous_symbol_archetypes = []
+        continuous_symbol_list = []
+        continuous_lowerbounds = []
+        continuous_upperbounds = []
         symbol_index = 0
-        #loop over exact input structure and create archetype symbol list for exact inputs provided
-        for i in range(len(exact_input_structure)):
-            keyword_row = exact_input_structure[i]
-            exact_archetype_row_dict = {}
+        #loop over continuous input structure and create archetype symbol list for continuous inputs provided
+        for i in range(len(continuous_input_structure)):
+            keyword_row = continuous_input_structure[i]
+            continuous_archetype_row_dict = {}
             #archetype_map_row_dict = {}
             #current_arch_index_list = []
             for j in range(len(keyword_row)):
-                input_name = exact_input_names[j]
+                input_name = continuous_input_names[j]
                 keyword = keyword_row[j]
                 #check if this keyword has been seen before 
                 # NOTE: should really only restrict the use to unique keyworks per column of ExactInputStructure, otherwise we can get bad behaviour
                 if keyword in keyword_symbol_list_dict[j].keys():
                     #if the keyword has been seen then a symbol already exists, add the casadi symbol to the current archetype list
-                    exact_archetype_row_dict[input_name] = keyword_symbol_list_dict[j][keyword]
+                    continuous_archetype_row_dict[input_name] = keyword_symbol_list_dict[j][keyword]
                 else:
-                    #if the keyword is new, a casadi symbol does not exist, create optimizaton symbols for the corresponding exact input
-                    new_exact_symbol = cs.MX.sym('ExactSym_'+input_name+'_entry'+str(i)+'_elmnt'+ str(j))
-                    symbol_index_pair = {'Symbol':new_exact_symbol,'Index':symbol_index}
+                    #if the keyword is new, a casadi symbol does not exist, create optimizaton symbols for the corresponding continuous input
+                    new_continuous_symbol = cs.MX.sym('ExactSym_'+input_name+'_entry'+str(i)+'_elmnt'+ str(j))
+                    symbol_index_pair = {'Symbol':new_continuous_symbol,'Index':symbol_index}
                     #now add the new casadi symbol to the current archetype list
-                    exact_archetype_row_dict[input_name] = symbol_index_pair
+                    continuous_archetype_row_dict[input_name] = symbol_index_pair
                     keyword_symbol_list_dict[j][keyword]=symbol_index_pair
-                    exact_symbol_list.append(new_exact_symbol)
-                    exact_lowerbounds.append(exact_input_bounds[j][0])
-                    exact_upperbounds.append(exact_input_bounds[j][1])
+                    continuous_symbol_list.append(new_continuous_symbol)
+                    continuous_lowerbounds.append(continuous_input_bounds[j][0])
+                    continuous_upperbounds.append(continuous_input_bounds[j][1])
                     symbol_index += 1
             #add the current archetype list to the list of archetype lists
-            exact_symbol_archetypes.append(exact_archetype_row_dict)
-            exact_archetype_num = len(exact_symbol_archetypes)
-            exact_symbol_num = len(exact_symbol_list)
+            continuous_symbol_archetypes.append(continuous_archetype_row_dict)
+            continuous_archetype_num = len(continuous_symbol_archetypes)
+            continuous_symbol_num = len(continuous_symbol_list)
 
-        return [exact_symbol_archetypes,
-                exact_symbol_list,
-                exact_lowerbounds,
-                exact_upperbounds,
-                exact_archetype_num,
-                exact_symbol_num,
-                exact_input_num,
-                exact_input_names]
+        return [continuous_symbol_archetypes,
+                continuous_symbol_list,
+                continuous_lowerbounds,
+                continuous_upperbounds,
+                continuous_archetype_num,
+                continuous_symbol_num,
+                continuous_input_num,
+                continuous_input_names]
 
     #Function that recursively builds a grid point list from a set of candidate levels of the provided inputs
     def _create_grid(self,input_names,input_candidates,constraints):
@@ -503,7 +514,7 @@ class Design:
         return rowpntr
 
 
-    # def design(models, approxinputs=None, exactinputs=None, observgroups=None, fixeddesign=None):
+    # def design(models, discreteinputs=None, continuousinputs=None, observgroups=None, fixeddesign=None):
     #     """ 
     #     Add a docstring
     #     """
@@ -517,12 +528,12 @@ class Design:
     #                   replicate arg for model structure
     #                   resolution option passing to IPOPT/custom options
     #                   custom grid/candidate list
-    #                   turn off observation selection for exact (forces you to observe all ouputs at each unique input level, no approx??, is this even possible in a simple way?)
+    #                   turn off observation selection for continuous (forces you to observe all ouputs at each unique input level, no discrete??, is this even possible in a simple way?)
     #Medium Changes:    passing in fixed design (or data, useful for MC simulations with past data or just previous fixed design)
-    #                   start values for exact
+    #                   start values for continuous
     #                   Ds optimality
     #Hard Changes:      partition into subfunctions
-    #                   exact/approx constraints
+    #                   continuous/discrete constraints
     #                   bayesian parameter prior with sigma points
     #                   Custom optimality
     #                   [NO] T optimality
@@ -555,17 +566,17 @@ class Design:
     #      list of settings as value, list of list for observations, need to implement a sort alg. for inputs to standardize inoput order
     #      need to combine non-unique elements, this will make implementing fixeddesign, power, fitting easier
     #      need to make sure weighting works out on grouped observations (half the optimal weight to each??)
-    #NOTE: with current code, struct matrix provided to exact doesn't allow for you to assign specific  observations to each input
-    #       inputs arechetype in a fully exact design, this is limiting, but forces user to select optimal observation vars (which maybe okay)
-    #       or they have to observe all (specific subset of) vars at each exact input archetype (probabyl okay, otherwise gets too complex I think)
+    #NOTE: with current code, struct matrix provided to continuous doesn't allow for you to assign specific  observations to each input
+    #       inputs arechetype in a fully continuous design, this is limiting, but forces user to select optimal observation vars (which maybe okay)
+    #       or they have to observe all (specific subset of) vars at each continuous input archetype (probabyl okay, otherwise gets too complex I think)
     #       user can lock in weight fractions (with observation weights field) to compensate for diff in obs. cost, but can't have a hard max on an assay type for example
     #NOTE: need to change design ouput so it can build dictionary (with proper obervartion vect handling), according to above
     #       maybe observations with no weight get 0 weight in design output, or blanks??, or we just list obervations that are observed
     #       but then we can't handle weights...
 
     #NOTE: Add to model later: Weight, Prior (cov, norm only, user can transform var), POI (parameters-of-interest)
-    #NOTE: Add to approx later: Constraints, Resolution (stepsize), Grid (user defined set of possible input levels, or full grid?)
-    #NOTE: Add to exact later: Replicates (code to default with full reps of all unique vec), Constraints, Start values (pass in struct matrix??)
+    #NOTE: Add to discrete later: Constraints, Resolution (stepsize), Grid (user defined set of possible input levels, or full grid?)
+    #NOTE: Add to continuous later: Replicates (code to default with full reps of all unique vec), Constraints, Start values (pass in struct matrix??)
     #NOTE: Add to obs later: Weights, if not passed, treat each observation as individual option
 
     #NOTE: should we avoid model 'Input' as it makes error strings awkward when talking about function inputs?!
@@ -577,8 +588,8 @@ class Design:
     #NOTE: current structure makes grid refinments difficult
     #NOTE: fixeddesign (observations), data or past fim (as function of beta???) Probably just pass in design/data, fim comp for data will ignore obseved y info anyways for asympotitic fim
     #NOTE: models must have the same x dim and input names, not same parameters though
-    #NOTE: should fixed be an approx design (by weight) or an exact design (count), approx does everything more flexible, exact enforces 'real' data
-    #NOTE: leaning towards approx, or auto configure for both
+    #NOTE: should fixed be an discrete design (by weight) or an continuous design (count), discrete does everything more flexible, continuous enforces 'real' data
+    #NOTE: leaning towards discrete, or auto configure for both
     #NOTE: should sort design output so it has a common ordering (ie by x1, then x2 etc.), should group non-unique elements and merge their weights
 
     #OLD DISCUSSION
@@ -607,9 +618,9 @@ class Design:
     # how to do constrained and curvature/bias optimality measures
 
 
-    # #check that either exact xor approx has been passed 
-    # if not( approxinputs) and not(exactinputs):
-    #     raise Exception('The design function requires at least one of the approximate or exact values to be passed!')
+    # #check that either continuous xor discrete has been passed 
+    # if not( discreteinputs) and not(continuousinputs):
+    #     raise Exception('The design function requires at least one of the discrete or continuous values to be passed!')
 
     # #get number of models
     # NumModels=len(models)
@@ -642,7 +653,7 @@ class Design:
     #     Model = models[m]['Model']
     #     Params = models[m]['Parameters']
     #     ObjectiveType = models[m]['Objective']
-    #     #check if each model has the exact same dimensions and input/ouput naming, if not throw error
+    #     #check if each model has the continuous same dimensions and input/ouput naming, if not throw error
     #     if not(ObservDim == Model.NumObserv):
     #         raise Exception('All model output dimensions must match!')
     #     if not(InputDim == Model.NumInputs ):
@@ -679,30 +690,30 @@ class Design:
     #     #ParamList.append(cs.MX.sym('beta_model'+str(m),model.Nb))
     #     ParamList.append(Params)
 
-    # #counter to track the total number inputs across exact and approx, must sum to total for the model(s)
+    # #counter to track the total number inputs across continuous and discrete, must sum to total for the model(s)
     # InputNumCheck=0
-    # #if user has passed approximate inputs
-    # if  approxinputs:
-    #     #get names, number and indices of approximate inputs
-    #     ApproxInputNames =  approxinputs['Inputs']
+    # #if user has passed discrete inputs
+    # if  discreteinputs:
+    #     #get names, number and indices of discrete inputs
+    #     ApproxInputNames =  discreteinputs['Inputs']
     #     ApproxInputNum = len(ApproxInputNames)
     #     ApproxInputIndices = [InputDict[a] for a in ApproxInputNames] 
-    #     #add approx inputs to the total input number (used to check all inputs are accounted for after loading exact)
+    #     #add discrete inputs to the total input number (used to check all inputs are accounted for after loading continuous)
     #     InputNumCheck = InputNumCheck + ApproxInputNum
-    #     #check if approximate bounds have been passed, if not throw error, if so get them
-    #     if not('Bounds' in  approxinputs):
+    #     #check if discrete bounds have been passed, if not throw error, if so get them
+    #     if not('Bounds' in  discreteinputs):
     #         raise Exception('Approximate inputs have no bounds!')
-    #     ApproxInputBounds =  approxinputs['Bounds']
-    #     #check if we have bounds for each approx input
+    #     ApproxInputBounds =  discreteinputs['Bounds']
+    #     #check if we have bounds for each discrete input
     #     if not(ApproxInputNum == len(ApproxInputBounds)):
-    #         raise Exception('There are '+str(len(ApproxInputNames))+' approximate inputs listed, but there are '+str(len(ApproxInputBounds))+' bounds, these must match!')
+    #         raise Exception('There are '+str(len(ApproxInputNames))+' discrete inputs listed, but there are '+str(len(ApproxInputBounds))+' bounds, these must match!')
     #     #check if inquality OptimConstraintsains have been passed, if so store them 
     #     ApproxInputConstr = []
-    #     if 'Constraints' in  approxinputs:
-    #         ApproxInputConstr  =  approxinputs['Constraints']          
+    #     if 'Constraints' in  discreteinputs:
+    #         ApproxInputConstr  =  discreteinputs['Constraints']          
     #     #set resolution of grid NOTE: this should be able to be specified by the user, will change
     #     N = 5
-    #     #create a list for storing possible levels of each approxmate input
+    #     #create a list for storing possible levels of each discretemate input
     #     ApproxInputCandidates = []
     #     #loop over bounds passed, and use resolution and bounds to populate xlist
     #     for b in ApproxInputBounds:
@@ -712,64 +723,64 @@ class Design:
     #     ApproxInputGrid = creategrid(ApproxInputCandidates,ApproxInputConstr)
     #     NumApproxGrid=len(ApproxInputGrid)
     # else:
-    #     NumApproxGrid=1 #NOTE: this is ugly, but needed for now so that while loops and weight initialization works out if approx isn't passed
+    #     NumApproxGrid=1 #NOTE: this is ugly, but needed for now so that while loops and weight initialization works out if discrete isn't passed
     #     ApproxInputIndices=[]
 
-    # # these data structures are used to track where exact input symbols, approx input-observation weights end up in the final optimization solution
+    # # these data structures are used to track where continuous input symbols, discrete input-observation weights end up in the final optimization solution
     # # OptimSolutionMap is a dictionary mapping optimization vector input indices (only ones that correspond to a sample weights)
     # # to a dictionary with information on reconstructing the corresponding intput vector and observation group
     # OptimSolutionMap={}
-    # # List_Of_SampleWeightOptimIndices is a list of optimization vector indices that correspond to a sample weight (as opposed to an exact input value)
+    # # List_Of_SampleWeightOptimIndices is a list of optimization vector indices that correspond to a sample weight (as opposed to an continuous input value)
     # List_Of_SampleWeightOptimIndices=[]
-    # # ArchetypeIndex_To_OptimIndices ia a list that maps and index in the exact archetype list to the set of optimizaion vector indices that contain the archetype exact input value after optimization
+    # # ArchetypeIndex_To_OptimIndices ia a list that maps and index in the continuous archetype list to the set of optimizaion vector indices that contain the archetype continuous input value after optimization
     # # one-to-many, ordering here is identical to user-passed ordering
     # ArchetypeIndex_To_OptimIndices=[]
-    # # Keyword_To_OptimIndex is a dictionary that maps a keyword passed via the exactinput 'Structure' field to an index in the optimization vector (one-to-one)
+    # # Keyword_To_OptimIndex is a dictionary that maps a keyword passed via the continuousinput 'Structure' field to an index in the optimization vector (one-to-one)
     # Keyword_To_OptimIndex={}
 
-    # # list of optimization variables (exact input settings and approximate weights), and a list of starting values
+    # # list of optimization variables (continuous input settings and discrete weights), and a list of starting values
     # OptimSymbolList = []
     # OptimVariableStart = []
-    # # list of Casadi expressions for (non-)linear ineqaulity constraints on exact settings (e.g. g(X)>0), and linear constraints on approx problem (i.e. sum(xi)=1)
+    # # list of Casadi expressions for (non-)linear ineqaulity constraints on continuous settings (e.g. g(X)>0), and linear constraints on discrete problem (i.e. sum(xi)=1)
     # OptimConstraints = []
     # # lower and upper bounds for optimization variables and for optimization constraints in OptimConstraints
     # LowerBoundVariables = []
     # UpperBoundVariables = []
     # LowerBoundConstraints = []
     # UppperBoundConstraints = []
-    # #if the user has passed exact inputs
-    # if exactinputs:
-    #     #get names, number and indices of exact inputs
-    #     ExactInputNames = exactinputs['Inputs']
+    # #if the user has passed continuous inputs
+    # if continuousinputs:
+    #     #get names, number and indices of continuous inputs
+    #     ExactInputNames = continuousinputs['Inputs']
     #     ExactInputNum = len(ExactInputNames)
     #     ExactInputIndices = [InputDict[e] for e in ExactInputNames]
     #     #add these to the total input number check for this group
     #     InputNumCheck = InputNumCheck + ExactInputNum
-    #     #if no bounds passed for exact inputs, throw error, if not get the exact input bounds
-    #     if not('Bounds' in exactinputs):
+    #     #if no bounds passed for continuous inputs, throw error, if not get the continuous input bounds
+    #     if not('Bounds' in continuousinputs):
     #         raise Exception('Exact inputs have no bounds!')
-    #     ExactInputBounds=exactinputs['Bounds']
-    #     #if the number of bounds don't match the exact names, throw error
+    #     ExactInputBounds=continuousinputs['Bounds']
+    #     #if the number of bounds don't match the continuous names, throw error
     #     if not(ExactInputNum == len(ExactInputBounds)):
-    #         raise Exception('There are '+str(len(ExactInputNames))+' exact inputs listed, but there are '+str(len(ExactInputBounds))+' bounds, these must match!')
-    #     #if structure for exact inputs is not provided throw error, else get
-    #     if not('Structure' in exactinputs):
-    #         raise Exception('No exact input structure was provided!')
-    #     ExactInputStructure = exactinputs['Structure']
+    #         raise Exception('There are '+str(len(ExactInputNames))+' continuous inputs listed, but there are '+str(len(ExactInputBounds))+' bounds, these must match!')
+    #     #if structure for continuous inputs is not provided throw error, else get
+    #     if not('Structure' in continuousinputs):
+    #         raise Exception('No continuous input structure was provided!')
+    #     ExactInputStructure = continuousinputs['Structure']
     #     #create a list of dicts for tracking existing symbols 
     #     ExistingExactSymbols = []
-    #     #add a dictionary to the list for each exact input
+    #     #add a dictionary to the list for each continuous input
     #     for i in range(ExactInputNum):
     #         ExistingExactSymbols.append({})
-    #     #create a list to store casadi optimization symbols for exact input archetypes
+    #     #create a list to store casadi optimization symbols for continuous input archetypes
     #     ExactSymbolArchetypes=[]
-    #     #loop over exact input structure and create archetype symbol list for exact inputs provided
+    #     #loop over continuous input structure and create archetype symbol list for continuous inputs provided
     #     for i in range(len(ExactInputStructure)):
     #         ExactStructRow=ExactInputStructure[i]
     #         CurrentArchetype=[]
     #         CurrentArchOptimIndices=[]
     #         if not(len(ExactStructRow) == ExactInputNum):
-    #             raise Exception('Row number '+str(i)+' in the exact structure passed has a length of '+str(len(ExactStructRow))+' but should be '+str(ExactInputNum)+' long, with an element for each exact input!')
+    #             raise Exception('Row number '+str(i)+' in the continuous structure passed has a length of '+str(len(ExactStructRow))+' but should be '+str(ExactInputNum)+' long, with an element for each continuous input!')
     #         for j in range(len(ExactStructRow)):
     #             Keyword=ExactStructRow[j]
     #             #check if this keyword has been seen before NOTE: should really only restrict the use to unique keyworks per column of ExactInputStructure, otherwise we can get bad behaviour
@@ -779,7 +790,7 @@ class Design:
     #                 #add the index within OptimSymbolList corresponding to the existing symbol to the current archetype's index list
     #                 CurrentArchOptimIndices.append(Keyword_To_OptimIndex[Keyword])
     #             else:
-    #                 #if the keyword is new, a casadi symbol does not exist, create optimizaton symbols for the corresponding exact input
+    #                 #if the keyword is new, a casadi symbol does not exist, create optimizaton symbols for the corresponding continuous input
     #                 NewExactSymbol = cs.MX.sym('ExactSym_'+ExactInputNames[j]+'_entry'+str(i)+'_elmnt'+ str(j))
     #                 #now add the new casadi symbol to the current archetype list
     #                 CurrentArchetype.append(NewExactSymbol)
@@ -789,12 +800,12 @@ class Design:
     #                 Keyword_To_OptimIndex[Keyword]=len(OptimSymbolList)
     #                 #add the index within OptimSymbolList corresponding to the new symbol to the current archetype's index list
     #                 CurrentArchOptimIndices.append(len(OptimSymbolList))
-    #                 #add exact symbols for this group to optimzation symbol list
+    #                 #add continuous symbols for this group to optimzation symbol list
     #                 OptimSymbolList += [NewExactSymbol]
     #                 #get the current bounds
     #                 lb = ExactInputBounds[j][0]
     #                 ub = ExactInputBounds[j][1]
-    #                 #set the exact input start value randomly within bounds and add it to start value list
+    #                 #set the continuous input start value randomly within bounds and add it to start value list
     #                 OptimVariableStart += [rn.uniform(lb,ub)]
     #                 #get the upper and lower bound and add them to the opt var bound lists
     #                 LowerBoundVariables += [lb]
@@ -805,13 +816,13 @@ class Design:
     #         ArchetypeIndex_To_OptimIndices.append(CurrentArchOptimIndices) 
     #         NumExactArchetypes=len(ExactSymbolArchetypes)
     # else:
-    #     NumExactArchetypes=1 #NOTE: this is ugly, but needed for now so that while loops and weight initialization works out if exact isn't passed
+    #     NumExactArchetypes=1 #NOTE: this is ugly, but needed for now so that while loops and weight initialization works out if continuous isn't passed
     #     ExactInputIndices=[]
 
-    # #check if total inputs passed, exact + approx, is equal to total model inputs, if not throw error
+    # #check if total inputs passed, continuous + discrete, is equal to total model inputs, if not throw error
     # if not(InputNumCheck == InputDim):
-    #     raise Exception('All input variables must be passed as either approximate or exact, and the total number of inputs passed must be the same as recieved by the model(s)!\n'
-    #                     'There are '+str(ApproxInputNum)+' approximate inputs and '+str(ExactInputNum)+' exact inputs passed but model(s) expect '+str(InputDim)+'!')
+    #     raise Exception('All input variables must be passed as either discrete or continuous, and the total number of inputs passed must be the same as recieved by the model(s)!\n'
+    #                     'There are '+str(ApproxInputNum)+' discrete inputs and '+str(ExactInputNum)+' continuous inputs passed but model(s) expect '+str(InputDim)+'!')
     
     # #check if observ passed 
     # if not( observgroups):
@@ -833,37 +844,37 @@ class Design:
     #     ObservGroupIndices.append(CurrentIndices)
     
 
-    # # declare sum for approximate weights
+    # # declare sum for discrete weights
     # ApproxWeightSum = 0
     # #set up loop counters
     # i=0
-    # # loop over exact symbol archetypes, or if exact wasn't passed then enter the loop only once
-    # while i < NumExactArchetypes or (not(exactinputs) and i==0):
+    # # loop over continuous symbol archetypes, or if continuous wasn't passed then enter the loop only once
+    # while i < NumExactArchetypes or (not(continuousinputs) and i==0):
     #     j=0
-    #     # loop over approximate grid, or if approx wasn't passed then enter the loop only once
-    #     while j < NumApproxGrid or (not( approxinputs) and j==0):
+    #     # loop over discrete grid, or if discrete wasn't passed then enter the loop only once
+    #     while j < NumApproxGrid or (not( discreteinputs) and j==0):
     #         #create a list to hold the current input to the model
     #         InputList = []
-    #         #labels each input as exact 'E' or approximate 'A', for use in OptimSolutionMap
+    #         #labels each input as continuous 'E' or discrete 'A', for use in OptimSolutionMap
     #         CurrentInputTypeLabels=[]
-    #         #stores either the grid index (for approx inputs) or the opimal vector index (for exact inputs)
+    #         #stores either the grid index (for discrete inputs) or the opimal vector index (for continuous inputs)
     #         CurrentInputLookupIndices=[]
     #         #loop over model inputs
     #         for k in range(InputDim):
-    #             #check if input index is in approximate or exact inputs
+    #             #check if input index is in discrete or continuous inputs
     #             if k in ApproxInputIndices:
-    #                 #if in index corresponds to an approximate input add the appropriate numerical grid values to the input vector
+    #                 #if in index corresponds to an discrete input add the appropriate numerical grid values to the input vector
     #                 InputList.append(cs.MX(ApproxInputGrid[j][ApproxInputIndices.index(k)]))
     #                 CurrentInputTypeLabels.append('A')
     #                 CurrentInputLookupIndices.append(ApproxInputIndices.index(k))
     #             elif k in ExactInputIndices:
-    #                 #if in index corresponds to an exact input add the appropriate symbol to the input vector
+    #                 #if in index corresponds to an continuous input add the appropriate symbol to the input vector
     #                 InputList.append(ExactSymbolArchetypes[i][ExactInputIndices.index(k)])
     #                 CurrentInputTypeLabels.append('E')
     #                 CurrentInputLookupIndices.append(ArchetypeIndex_To_OptimIndices[i][k])
     #             else:
-    #                 #if we can't find the index k in either the approximate or exact indices, throw an error
-    #                 raise Exception('Model input with index'+str(k)+' does not match any inputs passed as approximate or exact!')
+    #                 #if we can't find the index k in either the discrete or continuous indices, throw an error
+    #                 raise Exception('Model input with index'+str(k)+' does not match any inputs passed as discrete or continuous!')
     #         #concatinate input list into a single MX
     #         InputVector=cs.horzcat(*InputList)
     #         #loop over the obeservation groups
@@ -873,11 +884,11 @@ class Design:
     #             NewSampleWeight = cs.MX.sym('SampWeight_'+ str(i)+'_'+ str(j)+'_'+ str(k))
     #             #label the current index in OptimSymbolList as a sample weight in the optimization variable map
     #             List_Of_SampleWeightOptimIndices.append(len(OptimSymbolList))
-    #             #add an entry mapping the current index in OptimSymbolList to the index of the current exact symbol archetype and approximate grid entry
+    #             #add an entry mapping the current index in OptimSymbolList to the index of the current continuous symbol archetype and discrete grid entry
     #             OptimSolutionMap[len(OptimSymbolList)]={'InputType':CurrentInputTypeLabels,'InputLookUpIndex':CurrentInputLookupIndices,'GridIndex':j,'ObsGroupIndices':obs} 
     #             #add sample weight symbol to the optimization symbol list
     #             OptimSymbolList += [NewSampleWeight]
-    #             #set the starting weights so that all grid points at all archetypes have equal weights NOTE: should probably clean this up, conditional on approx and exact being passed
+    #             #set the starting weights so that all grid points at all archetypes have equal weights NOTE: should probably clean this up, conditional on discrete and continuous being passed
     #             OptimVariableStart += [1/(NumApproxGrid*NumExactArchetypes*NumObservGroups)]
     #             #apply appropriate bounds for the sampling weight NOTE: upper bound 1 should be scaled by passed observation weights when this functionality is added
     #             LowerBoundVariables += [0]
@@ -917,7 +928,7 @@ class Design:
     # IPOPTProblemStructure = {'f': OverallObjectiveSymbol, 'x': cs.vertcat(*OptimSymbolList), 'g': cs.vertcat(*OptimConstraints)}
     # print('Setting up optimization problem, this can take some time...')
     # #"verbose":True,
-    # IPOPTSolver = cs.nlpsol('solver', 'ipopt', IPOPTProblemStructure,{'ipopt.hessian_approximation':'limited-memory'}) #NOTE: need to give option to turn off full hessian (or coloring), may need to restucture problem mx/sx, maybe use quadratic programming in full approx mode?
+    # IPOPTSolver = cs.nlpsol('solver', 'ipopt', IPOPTProblemStructure,{'ipopt.hessian_discreteimation':'limited-memory'}) #NOTE: need to give option to turn off full hessian (or coloring), may need to restucture problem mx/sx, maybe use quadratic programming in full discrete mode?
     # print('Problem set up complete.')
     # # Solve the NLP with IPOPT call
     # print('Begining optimization...')
@@ -941,14 +952,14 @@ class Design:
     #     NewInputRow = []
     #     #loop over input indices to the full model
     #     for k in range(InputDim):
-    #         #get the current type 'A' approx, 'E' exact
+    #         #get the current type 'A' discrete, 'E' continuous
     #         CurrentType=CurrentInputTypeList[k]
-    #         #check if input is approximate or exact
+    #         #check if input is discrete or continuous
     #         if CurrentType =='A':
-    #             #if approx, look up the approxgrid location and the input index within the grid and add to new row
+    #             #if discrete, look up the discretegrid location and the input index within the grid and add to new row
     #             NewInputRow.append(round(ApproxInputGrid[CurrentApproxGridIndex][CurrentInputLookupIndices[k]],4))
     #         elif CurrentType =='E':
-    #             #if exact, look up the optimal solution of the given exact input and add to the new row
+    #             #if continuous, look up the optimal solution of the given continuous input and add to the new row
     #             NewInputRow.append(round(OptimSolution[CurrentInputLookupIndices[k]],4))
     #         else:
     #             #this should never be reached

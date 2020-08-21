@@ -37,12 +37,12 @@ nloed_model = Model(observ_list,xnames,pnames)
 # GENERATE OPTIMAL DESIGN
 ####################################################################################################
 
-#set up the design algorithm to use exact (continuous) optimization with two unique inputs points
-exact_inputs={'Inputs':['Light'],'Bounds':[(.1,5)],'Structure':[['x1'],['x2'],['x3'],['x4']]}
+#set up the design algorithm to use continuous (continuous) optimization with two unique inputs points
+continuous_inputs={'Inputs':['Light'],'Bounds':[(.1,5)],'Structure':[['x1'],['x2'],['x3'],['x4']]}
 
 true_param = [1,5,2,1]
-# generate the optimal approximate (relaxed) design
-relaxed_design = Design(nloed_model,np.log(true_param),'D',exact_inputs=exact_inputs)
+# generate the optimal discreteimate (relaxed) design
+relaxed_design = Design(nloed_model,np.log(true_param),'D',continuous_inputs=continuous_inputs)
 
 sample_size = 30
 #generate a rounded exact design 
