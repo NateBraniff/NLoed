@@ -201,17 +201,21 @@ plt.show()
 # fit_info_opt = nloed_model.fit(data_opt, start_param=fit_params, options=fit_options)
 
 #GEN SIMULATED COV/BIAS ESTIMATES VIA SIMULATION + BACKTRANSFORMATION OF PARS
-data_init = nloed_model.sample(init_design,fit_params,design_replicats=500)
-fit_info_init = nloed_model.fit(data_init, start_param=fit_params)
-cov_init = np.cov(np.exp(fit_info_init.to_numpy().T))
+# data_init = nloed_model.sample(init_design,fit_params,design_replicats=500)
+# fit_info_init = nloed_model.fit(data_init, start_param=fit_params)
+# cov_init = np.cov(np.exp(fit_info_init.to_numpy().T))
 
-data_intu = nloed_model.sample(intuitive_design_tot,fit_params,design_replicats=500)
-fit_info_intu = nloed_model.fit(data_intu, start_param=fit_params)
-cov_intu = np.cov(np.exp(fit_info_intu.to_numpy().T))
+# stderr_intuA = np.sqrt(np.diag(diagnostic_info_intuA['Covariance']))
+# upper_bnd_intu = fit_params + 2*stderr_intuA
+# lower_bnd_intu = fit_params - 2*stderr_intuA
 
-data_opt = nloed_model.sample(opt_design_tot,fit_params,design_replicats=500)
-fit_info_opt = nloed_model.fit(data_opt, start_param=fit_params)
-cov_opt = np.cov(np.exp(fit_info_opt.to_numpy().T))
+# data_intu = nloed_model.sample(intuitive_design_tot,fit_params,design_replicats=500)
+# fit_info_intu = nloed_model.fit(data_intu, start_param=fit_params)
+# cov_intu = np.cov(np.exp(fit_info_intu.to_numpy().T))
+
+# data_opt = nloed_model.sample(opt_design_tot,fit_params,design_replicats=500)
+# fit_info_opt = nloed_model.fit(data_opt, start_param=fit_params)
+# cov_opt = np.cov(np.exp(fit_info_opt.to_numpy().T))
 
 
 
