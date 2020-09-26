@@ -62,7 +62,7 @@ y0 = cs.SX.sym('y0',2)
 # control values (one per control interval)
 uvec = cs.SX.sym('uvec',3)
 # control values (one per control interval)
-x = cs.vertcat(y0,uvec)
+ vi
 
 # create list to store symbols for each sample point
 sample_list=[]

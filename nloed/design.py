@@ -13,7 +13,8 @@ class Design:
     def __init__(self, models, parameters, objective, discrete_inputs=None, continuous_inputs=None, observ_groups=None, fixed_design=None, options={}):
 
         default_options = \
-          { 'NumGridPoints':       [5,       lambda x: isinstance(x,int) and x>0 ]}
+                 { 'LockWeights':         [False,    lambda x: isinstance(x,bool)],
+                    'NumGridPoints':       [5,        lambda x: isinstance(x,int) and x>0 ] } #NumGridPoints is removed now (sept '20)
         options=cp.deepcopy(options)
         for key in options.keys():
             if not key in options.keys():
@@ -73,7 +74,9 @@ class Design:
             self.objective_list.append(objective_func)
             
         #observ struct
-        if not(observ_groups):
+        if options['LockWeights']:
+            observ_groups = [[obs for obs in self.observ_name_list]]
+        elif not(observ_groups):
             observ_groups = [[obs] for obs in self.observ_name_list]
         self.observ_group_list = observ_groups
         self.num_observ_group = len(observ_groups)
@@ -104,7 +107,8 @@ class Design:
              continuous_archetype_num,
              continuous_symbol_num,
              continuous_input_num,
-             continuous_input_names] = self._continuous_settup(continuous_inputs, options)
+             continuous_input_names,
+             continuous_init] = self._continuous_settup(continuous_inputs, options)
         else:
             #continuous_input_flag = False
             continuous_symbol_archetypes = [[]]
@@ -115,6 +119,7 @@ class Design:
             continuous_symbol_num = 0
             continuous_input_num = 0
             continuous_input_names = []
+            continuous_init = []
 
         if not(self.input_dim == continuous_input_num + discrete_input_num):
             raise Exception('All input variables must be passed as either discrete or continuous, and the total number of inputs passed must be the same as recieved by the model(s)!\n'
@@ -124,10 +129,12 @@ class Design:
          weight_symbol_list,
          weight_sum,
          weight_num,
+         weight_init,
          weight_design_map] = self._weighting_settup(discrete_input_names,
                                                      discrete_input_grid,
                                                      continuous_input_names,
                                                      continuous_symbol_archetypes,
+                                                     fixed_design,
                                                      options)
 
         [ipopt_problem_struct,
@@ -140,8 +147,10 @@ class Design:
                                                       continuous_symbol_list,
                                                       continuous_lowerbounds,
                                                       continuous_upperbounds,
+                                                      continuous_init,
                                                       weight_symbol_list,
                                                       weight_sum,
+                                                      weight_init,
                                                       options)
         
         #NOTE: should test init, and error out if init is nonvalid
@@ -151,7 +160,10 @@ class Design:
         #IPOPTProblemStructure = {'f': cumulative_objective_symbol, 'x': cs.vertcat(*OptimSymbolList), 'g': cs.vertcat(*OptimConstraints)}
         #print('Setting up optimization problem, this can take some time...')
         #"verbose":True,
-        ipopt_solver = cs.nlpsol('solver', 'ipopt', ipopt_problem_struct,{'ipopt.hessian_approximation':'limited-memory'}) #NOTE: need to give option to turn off full hessian (or coloring), may need to restucture problem mx/sx, maybe use quadratic programming in full discrete mode?
+        ipopt_solver = cs.nlpsol('solver', 'ipopt', ipopt_problem_struct, 
+                                    {'ipopt.hessian_approximation':'exact',#'limited-memory',
+                                    'ipopt.max_iter':10000})
+                                    #NOTE: need to give option to turn off full hessian (or coloring), may need to restucture problem mx/sx, maybe use quadratic programming in full discrete mode?
         #print('Problem set up complete.')
         # Solve the NLP with IPOPT call
         #print('Begining optimization...')
@@ -163,13 +175,17 @@ class Design:
         optim_solution = ipopt_solution_struct['x'].full().flatten()
 
         optim_continuous_values = optim_solution[:continuous_symbol_num]
-        optim_weights = optim_solution[continuous_symbol_num:]
+
+        if not options["LockWeights"]:
+            optim_weights = optim_solution[continuous_symbol_num:]
+        else:
+            optim_weights = weight_init
 
         approximate_design = pd.DataFrame(columns=self.input_name_list+['Variable', 'Weights'])
 
         for i in range(len(optim_weights)):
             weight = optim_weights[i]
-            if weight>0.0:
+            if weight>1e-4:
                 design_row_prototype = {}
                 input_map = weight_design_map[i]['InputMap']
                 for x in self.input_name_list:
@@ -215,12 +231,12 @@ class Design:
 
         while not sum(candidate_design['Replicats'])==sample_size:
             if sum(candidate_design['Replicats'])<sample_size:
-                thresh = np.divide(candidate_design['Replicats'],self.approximate_design['Weights'])
-                thresh_set = np.where(thresh == thresh.min())
+                thresh = np.divide(candidate_design['Replicats'].to_numpy(),self.approximate_design['Weights'].to_numpy())
+                thresh_set = np.where(thresh == thresh.min())[0]
                 inc = 1
             elif sum(candidate_design['Replicats'])>sample_size:
-                thresh = np.divide(candidate_design['Replicats']-1,self.approximate_design['Weights'])
-                thresh_set = np.where(thresh == thresh.max())
+                thresh = np.divide(candidate_design['Replicats'].to_numpy()-1,self.approximate_design['Weights'].to_numpy())
+                thresh_set = np.where(thresh == thresh.max())[0]
                 inc = -1
 
             candidate_design.iloc[rn.choice(thresh_set), candidate_design.columns.get_loc('Replicats')] +=inc
@@ -255,8 +271,6 @@ class Design:
         #                               similar FDS/D-eff/relative D-eff plots for selecting sample size
         # Fine Tuning:                  jitter/tuning of continuous design
 
-
-
         #use sigma points (or if needed monte carlo simulation) to determine 'power curve', shrinking of parameter error (bias +var) with n design replications
         #perhaps combine with rounding methods?? to allow for rounded variations of the same design.
         # rounding should probably happen here
@@ -266,15 +280,38 @@ class Design:
         #d-efficiency plots for comparing sample size (normed to discrete max for each sample size) vs relative efficiency (normed to lowest sample size discrete or rounded continuous)
         #    shows 'real'improvment from extra samples rather than distance from unachievable ideal, howevver regular d-efficiency may motivate adding a single point to achieve near theoretical max
 
-
-
-    def _optim_settup(self, fim_list, continuous_symbol_list, continuous_lowerbounds, continuous_upperbounds, weight_symbol_list, weight_sum, options):
+    def _optim_settup(self, fim_list, continuous_symbol_list, continuous_lowerbounds, continuous_upperbounds, continuous_init, weight_symbol_list, weight_sum, weight_init, options):
         #SETTUP OPTIM VARS, BOUNDS and MAP here
 
-        optim_symbol_list = continuous_symbol_list + weight_symbol_list
-        optim_init = [np.random.uniform(continuous_lowerbounds[i],continuous_upperbounds[i],1)[0]\
-                                for i in range(len(continuous_symbol_list))]\
-                     + [1/len(weight_symbol_list)] * len(weight_symbol_list)
+        if not options['LockWeights']:
+            optim_symbol_list = continuous_symbol_list + weight_symbol_list
+            optim_init = continuous_init + weight_init
+
+            var_lowerbounds = continuous_lowerbounds + [0]*len(weight_symbol_list)
+            var_upperbounds = continuous_upperbounds + [1]*len(weight_symbol_list)
+
+            #add a constraint function to ensure sample weights sum to 1
+            constraint_funcs = [weight_sum - 1]
+            #bound the constrain function output to 0
+            constraint_lowerbounds = [0]
+            constraint_upperbounds = [0]
+        else:
+            optim_symbol_list = continuous_symbol_list
+            optim_init = continuous_init
+
+            var_lowerbounds = continuous_lowerbounds
+            var_upperbounds = continuous_upperbounds
+
+            #add a constraint function to ensure sample weights sum to 1
+            constraint_funcs = []
+            #bound the constrain function output to 0
+            constraint_lowerbounds = []
+            constraint_upperbounds = []
+        #MOST RECENT
+        #optim_init = [np.random.uniform(continuous_lowerbounds[i],continuous_upperbounds[i],1)[0]\
+        #                        for i in range(len(continuous_symbol_list))]\
+        #             + [1/len(weight_symbol_list)] * len(weight_symbol_list)
+        #OLD COMMENTED OUT
         # optim_init = [0.5*(continuous_upperbounds[i] + continuous_lowerbounds[i])\
         #                         for i in range(len(continuous_symbol_list))]\
         #              + [1/len(weight_symbol_list)] * len(weight_symbol_list)
@@ -282,15 +319,6 @@ class Design:
         #                     +[1/(self.discrete_grid_length \
         #                             * self.continuous_archetype_num \
         #                             * self.num_observ_group)] * len(weight_symbol_list)
-
-        var_lowerbounds = continuous_lowerbounds + [0]*len(weight_symbol_list)
-        var_upperbounds = continuous_upperbounds + [1]*len(weight_symbol_list)
-
-        #add a constraint function to ensure sample weights sum to 1
-        constraint_funcs = [weight_sum - 1]
-        #bound the constrain function output to 0
-        constraint_lowerbounds = [0]
-        constraint_upperbounds = [0]
 
         cumulative_objective_symbol = 0
         for m in range(self.num_models): 
@@ -308,17 +336,40 @@ class Design:
                 constraint_lowerbounds,
                 constraint_upperbounds]
 
-    def _weighting_settup(self, discrete_input_names, discrete_input_grid, continuous_input_names, continuous_symbol_archetypes, options):
+    def _weighting_settup(self, discrete_input_names, discrete_input_grid, continuous_input_names, 
+                                continuous_symbol_archetypes, fixed_design, options):
         #PACKAGE THIS AS A FUNCTION; returns obs vars, samp sum and fim symbols?
 
         fim_list = []
         for model in self.model_list:
             fim_list.append(np.zeros((model.num_param,model.num_param)))
 
+        if fixed_design:
+            #fixed_design
+            pre_weight = fixed_design['Weight']
+            post_weight = 1 - pre_weight
+            pre_design = cp.deepcopy(fixed_design['Design'])
+            pre_design['Weights'] = pre_design['Replicats']/sum(pre_design['Replicats'])
+            pre_design.drop('Replicats',axis=1,inplace=True)
+            #loop over the number of replicates
+            for index,row in pre_design.iterrows():
+                for mod in range(self.num_models):
+                    #get the model 
+                    model = self.model_list[mod]
+                    input_row = row[self.input_name_list].to_numpy()
+                    observ_name = row['Variable']
+                    weight = row['Weights']
+                    fim_list[mod] += pre_weight * weight *\
+                                         model.fisher_info_matrix[observ_name](input_row, 
+                                                                        self.param_list[mod]).full()
+        else:
+            post_weight = 1
+
         # declare sum for discrete weights
         weight_sum = 0
         weight_symbol_list = []
         weight_design_map = []
+        weight_init = []
         # loop over continuous symbol archetypes, or if continuous wasn't passed then enter the loop only once
         for i  in range(len(continuous_symbol_archetypes)):
             #current_continuous_weights = []
@@ -347,16 +398,17 @@ class Design:
                 #loop over the obeservation groups
                 for k in range(self.num_observ_group):
                     obs_group = self.observ_group_list[k]
-                    #create a sampling weight symbol for the current input and add it to the optimization variable list
-                    new_weight = cs.MX.sym('sample_weight_'+ str(i)+'_'+ str(j)+'_'+ str(k))
-                    weight_symbol_list.append(new_weight)
-
+                    if not options['LockWeights']:
+                        #create a sampling weight symbol for the current input and add it to the optimization variable list
+                        new_weight = cs.MX.sym('sample_weight_'+ str(i)+'_'+ str(j)+'_'+ str(k))
+                        weight_symbol_list.append(new_weight)
+                        #add sampling weight symbol to the running total, used to constrain sum of sampleing weights to 1 latee
+                        weight_sum += new_weight
+                    else:
+                        new_weight = 1/len(continuous_symbol_archetypes)
                     map_info = {'InputMap':input_map_dict,
                                 'ObsMap':obs_group}
                     weight_design_map.append(map_info)
-                    
-                    #add sampling weight symbol to the running total, used to constrain sum of sampleing weights to 1 latee
-                    weight_sum += new_weight
                     # get the length of the observation group
                     # this is used to scale sampling weight so FIM stays normalized w.r.t. sample number
                     group_size = len(obs_group)
@@ -370,14 +422,19 @@ class Design:
                             #get the model's parameter symbols
                             param = self.param_list[mod]
                             #add the weighted FIM to the running total for the experiment (for each model)
-                            fim_list[mod] += (new_weight / group_size)\
+                            fim_list[mod] += post_weight*(new_weight / group_size)\
                                 * model.fisher_info_matrix[observ_name](input_vector,param)
                 
                 #current_continuous_weights.append(current_discrete_weights)
             #.append(current_continuous_weights)
         weight_num = len(weight_symbol_list)
 
-        return [fim_list, weight_symbol_list, weight_sum, weight_num, weight_design_map]
+        if not options['LockWeights']:
+            weight_init = [1/weight_num] * weight_num
+        else:
+            weight_init = [1/len(continuous_symbol_archetypes)] * len(continuous_symbol_archetypes)
+
+        return [fim_list, weight_symbol_list, weight_sum, weight_num, weight_init, weight_design_map]
 
     def _discrete_settup(self, discrete_inputs, options):
         """
@@ -395,24 +452,35 @@ class Design:
             discrete_input_constr  =  discrete_inputs['Constraints']   
 
         #create a list for storing possible levels of each discretemate input
-        discrete_input_candidates = []     
-        if 'Bounds' in   discrete_inputs:
-            #set resolution of grid NOTE: this should be able to be specified by the user, will change
-            num_points = options['NumGridPoints']
-            #loop over bounds passed, and use resolution and bounds to populate xlist
-            for bound in discrete_inputs['Bounds']:
-                discrete_input_candidates.append(np.linspace(bound[0],bound[1],num_points).tolist())
-        elif  'Grid' in discrete_inputs:
-            for grid in discrete_inputs['Grid']:
-                discrete_input_candidates.append(grid)
+        discrete_input_candidates = []
+        if not 'Grid' in discrete_inputs:
+            if 'Bounds' in   discrete_inputs:
+                #set resolution of grid NOTE: this should be able to be specified by the user, will change
+                if 'NumPoints' in discrete_inputs:
+                    num_points = discrete_inputs['NumPoints']
+                else:
+                    num_points = 5
+                #loop over bounds passed, and use resolution and bounds to populate xlist
+                for bound in discrete_inputs['Bounds']:
+                    discrete_input_candidates.append(np.linspace(bound[0],bound[1],num_points).tolist())
+            elif  'Candidates' in discrete_inputs:
+                for grid in discrete_inputs['Candidates']:
+                    discrete_input_candidates.append(grid)
+            else:
+                raise Exception('Discerete inputs must be passed with either input \'Bounds\' or a pre-defined list of \'Grid\' candidats!')
+            #call recursive createGrid function to generate ApproxInputGrid, a list of all possible permuations of xlist's that also satisfy inequality OptimConstraintsaints
+            #NOTE: currently, createGrid doesn't actually check the inequality OptimConstraintsaints, need to add, and perhaps add points on inequality boundary??!
+            discrete_input_grid = self._create_grid(cp.deepcopy(discrete_input_names), discrete_input_candidates, discrete_input_constr)
         else:
-            raise Exception('Discerete inputs must be passed with either input \'Bounds\' or a pre-defined list of \'Grid\' candidats!')
+            discrete_input_array = discrete_inputs['Grid']
+            discrete_input_grid = []
+            for row in discrete_input_array:
+                row_dict = {}
+                for indx in range(self.input_dim):
+                    row_dict[self.input_name_list[indx]] = row[indx]
+                discrete_input_grid.append(row_dict)
         
-        #call recursive createGrid function to generate ApproxInputGrid, a list of all possible permuations of xlist's that also satisfy inequality OptimConstraintsaints
-        #NOTE: currently, createGrid doesn't actually check the inequality OptimConstraintsaints, need to add, and perhaps add points on inequality boundary??!
-        discrete_input_grid = self._create_grid(cp.deepcopy(discrete_input_names), discrete_input_candidates, discrete_input_constr)
         discrete_grid_length = len(discrete_input_grid)
-
         return [discrete_input_grid, discrete_grid_length, discrete_input_names, discrete_input_num]
 
     def _continuous_settup(self, continuous_inputs, options):
@@ -426,6 +494,8 @@ class Design:
         continuous_input_num = len(continuous_input_names)
         continuous_input_bounds = continuous_inputs['Bounds']
         continuous_input_structure = continuous_inputs['Structure']
+        if 'Initial' in continuous_inputs:
+            continuous_input_init = continuous_inputs['Initial']
         # if 'Initial' in continuous_inputs:
         #     for 
         #     continuous_input_init = continuous_inputs['Initial']
@@ -438,16 +508,25 @@ class Design:
         continuous_symbol_list = []
         continuous_lowerbounds = []
         continuous_upperbounds = []
+        continuous_init = []
         symbol_index = 0
-        #loop over continuous input structure and create archetype symbol list for continuous inputs provided
+        #loop over continuous input structure rows 
         for i in range(len(continuous_input_structure)):
             keyword_row = continuous_input_structure[i]
             continuous_archetype_row_dict = {}
+            if continuous_input_init:
+                init_row = continuous_input_init[i]
             #archetype_map_row_dict = {}
             #current_arch_index_list = []
+            #loop over keywords in row
             for j in range(len(keyword_row)):
                 input_name = continuous_input_names[j]
                 keyword = keyword_row[j]
+                if continuous_input_init:
+                    init_val = init_row[j]
+                else:
+                    init_val = np.random.uniform(continuous_input_bounds[j][0],
+                                                 continuous_input_bounds[j][1],1)[0]
                 #check if this keyword has been seen before 
                 # NOTE: should really only restrict the use to unique keyworks per column of ExactInputStructure, otherwise we can get bad behaviour
                 if keyword in keyword_symbol_list_dict[j].keys():
@@ -463,6 +542,7 @@ class Design:
                     continuous_symbol_list.append(new_continuous_symbol)
                     continuous_lowerbounds.append(continuous_input_bounds[j][0])
                     continuous_upperbounds.append(continuous_input_bounds[j][1])
+                    continuous_init.append(init_val)
                     symbol_index += 1
             #add the current archetype list to the list of archetype lists
             continuous_symbol_archetypes.append(continuous_archetype_row_dict)
@@ -476,7 +556,8 @@ class Design:
                 continuous_archetype_num,
                 continuous_symbol_num,
                 continuous_input_num,
-                continuous_input_names]
+                continuous_input_names,
+                continuous_init]
 
     #Function that recursively builds a grid point list from a set of candidate levels of the provided inputs
     def _create_grid(self,input_names,input_candidates,constraints):

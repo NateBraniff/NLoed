@@ -73,7 +73,7 @@ class Model:
                 raise Exception('Error in observation tuple;  '+str(o)+', Casadi function must return a single vector of observation distribution statistics!')
             # obs_tuple[2].size_out(0)) NOTE: need to check size of inputs to function and if they match input/param names, are columns etc.
 
-        self.symbolics_boolean =options['ScalarSymbolics']
+        self.symbolics_boolean = options['ScalarSymbolics']
         self.num_observ = len(observ_struct)
         self.num_input = len(input_names)
         self.num_param = len(param_names) 
@@ -312,10 +312,10 @@ class Model:
             'InitialStep':      [.01,                   lambda x: isinstance(x,float) and 0<x],
             'MaxSteps':         [2000,                  lambda x: isinstance(x,int) and 1<x],
             'SearchFactor':     [5,                     lambda x: isinstance(x,float) and 0<x],
-            'SearchBound':      [3.0,                     lambda x: isinstance(x,float) and 0<x],
+            'SearchBound':      [3.0,                   lambda x: isinstance(x,float) and 0<x],
             'InitParamBounds':  [False,                 lambda x: isinstance(x,list) or isinstance(x,np.ndarray)],
             'InitSearchNumber': [3,                     lambda x: isinstance(x,int) and 0<x],
-            'Verbose':          [True,                  lambda x: isinstance(x,int) and 0<x]}
+            'Verbose':          [True,                  lambda x: isinstance(x,bool)]}
         options=cp.deepcopy(options)
         for key in options.keys():
             if not key in options.keys():
@@ -380,7 +380,7 @@ class Model:
         #print("at solver creation")
         archetype_loglik_optim_struct = {'f': -archetype_loglik_symbol, 'x': archetype_param_symbols,'p':archetype_observ_symbol}
         #archetype_fitting_solver = cs.nlpsol('solver', 'ipopt', archetype_loglik_optim_struct, {'ipopt.print_level':5, 'print_time':False,'ipopt.hessian_approximation':'limited-memory'}) 
-        archetype_fitting_solver = cs.nlpsol('solver', 'ipopt', archetype_loglik_optim_struct, {'ipopt.print_level':0, 'print_time':False }) 
+        archetype_fitting_solver = cs.nlpsol('solver', 'ipopt', archetype_loglik_optim_struct, {'ipopt.print_level':5, 'print_time':True }) 
         #print("done solver creation")
 
         if options['Verbose']:
@@ -621,7 +621,7 @@ class Model:
                     prediction_upper.append(mean + stddev_multiplier*stddev)
 
                 if options['ObservationInterval']:
-                    observation_mean.append(mean)
+                    #observation_mean.append(mean)
                     prediction_var = (self.model_sensitivity[observ_name](input_vec,param)\
                                     @ covariance_matrix\
                                     @ self.model_sensitivity[observ_name](input_vec,param))
@@ -644,7 +644,7 @@ class Model:
                                     for par in param_sample
                                         for value in self.observation_sampler[observ_name]\
                                             (input_vec,par,options['ObservationSampleNumber'])]
-                    observation_mean.append(np.mean(prior_predictive_sample))
+                    #observation_mean.append(np.mean(prior_predictive_sample))
                     observation_bounds = np.percentile(prior_predictive_sample,100*percentiles) 
                     observation_lower.append(observation_bounds[0])
                     observation_upper.append(observation_bounds[1])
@@ -664,7 +664,7 @@ class Model:
             output_data['Prediction','Lower'] = prediction_lower
             output_data['Prediction','Upper'] = prediction_upper
         if options['ObservationInterval']:
-            output_data['Observation','Mean'] = observation_mean
+            #output_data['Observation','Mean'] = observation_mean
             output_data['Observation','Lower'] = observation_lower
             output_data['Observation','Upper'] = observation_upper
         if options['Sensitivity']:
@@ -693,8 +693,8 @@ class Model:
                             'Covariance':               [True,          lambda x: isinstance(x,bool)],
                             'Bias':                     [False,         lambda x: isinstance(x,bool)],
                             'MSE':                      [False,         lambda x: isinstance(x,bool)],
-                            'SampleNumber':             [1000,          lambda x: isinstance(x,int) and 1<x]}
-                            #'FIM':                      [False,         lambda x: isinstance(x,bool)],
+                            'SampleNumber':             [1000,          lambda x: isinstance(x,int) and 1<x],
+                            'FIM':                      [False,         lambda x: isinstance(x,bool)]}
         
         options=cp.deepcopy(options)
         for key in options.keys():
@@ -720,19 +720,25 @@ class Model:
         for i in range(len(designset_list)):
             designset = designset_list[i]
 
-            fisher_info_sum = np.zeros((self.num_param,self.num_param))
-            for index,row in designset.iterrows():
-                input_row = row[self.input_name_list].to_numpy()
-                observ_name = row['Variable']
-                if 'Replicats' in designset:
-                    reps = row['Replicats']
-                else:
-                    reps = 1
-                fisher_info_sum += reps * self.fisher_info_matrix[observ_name](input_row, param).full()
+            upper_level = []
+            lower_level = []
+            eval_data = np.array([], dtype=np.int64).reshape(self.num_param,0)
 
-            #warning of error for singular matrix
-            columns_index = pd.MultiIndex.from_product([['FIM'],self.param_name_list])
-            eval_data = pd.DataFrame(np.array(fisher_info_sum),index=self.param_name_list,columns= columns_index)
+            if options['Method'] == 'Asymptotic' or options['FIM']:
+                fisher_info_sum = np.zeros((self.num_param,self.num_param))
+                for index,row in designset.iterrows():
+                    input_row = row[self.input_name_list].to_numpy()
+                    observ_name = row['Variable']
+                    if 'Replicats' in designset:
+                        reps = row['Replicats']
+                    else:
+                        reps = 1
+                    fisher_info_sum += reps * self.fisher_info_matrix[observ_name](input_row, param).full()
+
+                upper_level.extend(['FIM']*self.num_param)
+                lower_level.extend(self.param_name_list)
+                eval_data = np.hstack((eval_data,fisher_info_sum))
+                #NOTE: warning of error for singular matrix?           
 
             #NOTE: could add empirical FIM comp (some observed FIM) for montecarlo method
 
@@ -748,10 +754,12 @@ class Model:
                     cov_matrix = np.cov(sample_fits.to_numpy().T)
                 else:
                     print('Error')
-                cov_data = pd.DataFrame(cov_matrix,
-                                        index=self.param_name_list,
-                                        columns= columns_index)
-                eval_data = pd.concat([eval_data,cov_data],axis=1)
+                #cov_data = pd.DataFrame(cov_matrix,
+                #                        index=self.param_name_list,
+                #                       columns= columns_index)
+                upper_level.extend(['Covariance']*self.num_param)
+                lower_level.extend(self.param_name_list)
+                eval_data = np.hstack((eval_data,cov_matrix))#pd.concat([eval_data,cov_data],axis=1)
             if options['Bias']:
                 columns_index = pd.MultiIndex.from_product([['Bias'],['Bias']])
                 if options['Method'] == 'Asymptotic':
@@ -760,22 +768,31 @@ class Model:
                     bias_vec = np.mean(sample_fits.to_numpy(),0) - param
                 else:
                     print('Error')
-                bias_data = pd.DataFrame(bias_vec,
-                                        index=self.param_name_list,
-                                        columns=columns_index)
-                eval_data = pd.concat([eval_data,bias_data],axis=1)
+                # bias_data = pd.DataFrame(bias_vec,
+                #                         index=self.param_name_list,
+                #                         columns=columns_index)
+                # eval_data = pd.concat([eval_data,bias_data],axis=1)
+                upper_level.extend(['Bias'])
+                lower_level.extend(['Bias'])
+                eval_data = np.hstack((eval_data,bias_vec.reshape(self.num_param,1)))
             if options['MSE']:
                 columns_index = pd.MultiIndex.from_product([['MSE'],['MSE']])
                 if options['Method'] == 'Asymptotic':
                     mse_vec = np.diagonal(np.matrix(fisher_info_sum).I)
                 elif options['Method'] == 'MonteCarlo':
-                    mse_vec = np.mean((sample_fits - np.array([param,]*options['SampleNumber']))**2,0)
+                    mse_vec = np.mean((sample_fits.to_numpy() - np.array([param,]*options['SampleNumber']))**2,0)
                 else:
                     print('Error')
-                mse_data = pd.DataFrame(mse_vec,
-                                        index=self.param_name_list,
-                                        columns= columns_index)
-                eval_data = pd.concat([eval_data,mse_data],axis=1)
+                # mse_data = pd.DataFrame(mse_vec,
+                #                         index=self.param_name_list,
+                #                         columns= columns_index)
+                # eval_data = pd.concat([eval_data,mse_data],axis=1)
+                upper_level.extend(['MSE'])
+                lower_level.extend(['MSE'])
+                eval_data = np.hstack((eval_data,mse_vec.reshape(self.num_param,1)))
+
+                columns_index = pd.MultiIndex.from_arrays([upper_level,lower_level])
+                eval_data = pd.DataFrame(eval_data,index=self.param_name_list,columns= columns_index)
 
             eval_data_list.append(eval_data)
 
