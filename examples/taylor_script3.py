@@ -111,7 +111,7 @@ fixed_design = {'Weight':0.5,'Design':init_design}
 
 opts= {'LockWeights':False}
 # generate the optimal discreteimate (relaxed) design
-relaxed_design = Design(nloed_model,
+design_object = Design(nloed_model,
                         fit_params,
                         'D',
                         continuous_inputs=continuous_inputs,
@@ -120,7 +120,7 @@ relaxed_design = Design(nloed_model,
 
 sample_size = 15
 #generate a rounded exact design 
-opt_design = relaxed_design.round(sample_size)
+opt_design = design_object.round(sample_size)
 print(opt_design)
 
 ####################################################################################################
@@ -178,7 +178,6 @@ ax.set_title('Upper and Lower 95% CI Bounds Expressed in % Error')
 ax.set_xticks(x)
 ax.set_xticklabels(labels)
 ax.legend()
-
 fig.tight_layout()
 plt.show()
 

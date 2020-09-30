@@ -250,6 +250,15 @@ class Design:
             #     candidate_list.append(new_candidate)
         return candidate_design
 
+    def relaxed(self, options={}):
+        """
+        This function 
+        Args:
+        Return:
+        """
+        
+        return self.approximate_design
+
     def power(self, sample_size, options={}):
         """
         This function 
@@ -514,7 +523,7 @@ class Design:
         for i in range(len(continuous_input_structure)):
             keyword_row = continuous_input_structure[i]
             continuous_archetype_row_dict = {}
-            if continuous_input_init:
+            if 'Initial' in continuous_inputs:
                 init_row = continuous_input_init[i]
             #archetype_map_row_dict = {}
             #current_arch_index_list = []
@@ -522,7 +531,7 @@ class Design:
             for j in range(len(keyword_row)):
                 input_name = continuous_input_names[j]
                 keyword = keyword_row[j]
-                if continuous_input_init:
+                if 'Initial' in continuous_inputs:
                     init_val = init_row[j]
                 else:
                     init_val = np.random.uniform(continuous_input_bounds[j][0],

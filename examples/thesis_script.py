@@ -29,7 +29,6 @@ y2 = cs.Function('y2',[xs,ps],[normal_stats2])
 
 lin_model = Model([(y1,'Normal'),(y2,'Normal')],xnames,pnames)
 
-
 input_frame = pd.DataFrame({ 'x1':[-1,1,-1,1]*2,
                         'x2':[-1,1,-1,1]*2,
                         'Variable':['y1']*4 + ['y2']*4})
@@ -60,15 +59,28 @@ true_param = [1,1,1,1]
 
 #discrete_inputs={'Inputs':['x1'],'Candidates':[[-1],[-.5],[0],[.5],[1]]}
 #continuous_inputs={'Inputs':['x2'],'Bounds':[(-1,1)],'Structure':[['level1'],['level2']]}
-discrete_inputs={'Inputs':['x1','x2'],'Candidates':[[1,2,5,7,9],[-1, 0, 1]]}
+discrete_inputs={'Inputs':['x1','x2'],'Candidates':[[-1, 0, 1],[-1, 0, 1]]}
 #discrete_inputs={'Inputs':['x1','x2'],'Grid':[[-1,-1],[0,-1],[1,-1],[-1,0],[0,0],[1,0],[-1,1],[0,1],[1,1],[3,3]]}
 ## continuous_inputs={'Inputs':['x1','x2'],'Bounds':[(-1,1),(-1,1)],'Structure':[['x1_lvl1','x2_lvl1'],['x1_lvl1','x2_lvl2'],['x1_lvl2','x2_lvl2']]}
-opt_design = Design(lin_model, true_param, 'D', discrete_inputs)
+design_object = Design(lin_model, true_param, 'D', discrete_inputs)
+
+
+relaxed_design = design_object.relaxed()
+print('')
+print('')
+print(relaxed_design)
+print('')
+print('')
+
 
 sample_size = 10
-exact_design = opt_design.round(sample_size)
+exact_design = design_object.round(sample_size)
 
+print('')
+print('')
 print(exact_design)
+print('')
+print('')
 
 ####################################################################################################
 # GENERATE SAMPLE DATA & FIT MODEL

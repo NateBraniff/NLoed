@@ -475,7 +475,8 @@ class Model:
             param_output_matrix = np.concatenate([np.stack(fit_param_list), bound_param_matrix], axis=1)
         else:
             #if no intervals are requested, set column indext to single level, with just parameter names
-            column_index = self.param_name_list
+            #column_index = self.param_name_list
+            column_index = pd.MultiIndex.from_product([['Estimate'],self.param_name_list],names=['Value', 'Parameter'])
             param_output_matrix = np.stack(fit_param_list)
         #create ouput dataframe with all request parameter information
         param_data = pd.DataFrame(param_output_matrix, columns=column_index)
@@ -722,7 +723,7 @@ class Model:
 
             upper_level = []
             lower_level = []
-            eval_data = np.array([], dtype=np.int64).reshape(self.num_param,0)
+            eval_mat = np.array([], dtype=np.int64).reshape(self.num_param,0)
 
             if options['Method'] == 'Asymptotic' or options['FIM']:
                 fisher_info_sum = np.zeros((self.num_param,self.num_param))
@@ -735,10 +736,11 @@ class Model:
                         reps = 1
                     fisher_info_sum += reps * self.fisher_info_matrix[observ_name](input_row, param).full()
 
-                upper_level.extend(['FIM']*self.num_param)
-                lower_level.extend(self.param_name_list)
-                eval_data = np.hstack((eval_data,fisher_info_sum))
-                #NOTE: warning of error for singular matrix?           
+                if options['FIM']:
+                    upper_level.extend(['FIM']*self.num_param)
+                    lower_level.extend(self.param_name_list)
+                    eval_mat = np.hstack((eval_mat,fisher_info_sum))
+                    #NOTE: warning of error for singular matrix?           
 
             #NOTE: could add empirical FIM comp (some observed FIM) for montecarlo method
 
@@ -759,7 +761,7 @@ class Model:
                 #                       columns= columns_index)
                 upper_level.extend(['Covariance']*self.num_param)
                 lower_level.extend(self.param_name_list)
-                eval_data = np.hstack((eval_data,cov_matrix))#pd.concat([eval_data,cov_data],axis=1)
+                eval_mat = np.hstack((eval_mat,cov_matrix))#pd.concat([eval_data,cov_data],axis=1)
             if options['Bias']:
                 columns_index = pd.MultiIndex.from_product([['Bias'],['Bias']])
                 if options['Method'] == 'Asymptotic':
@@ -774,7 +776,7 @@ class Model:
                 # eval_data = pd.concat([eval_data,bias_data],axis=1)
                 upper_level.extend(['Bias'])
                 lower_level.extend(['Bias'])
-                eval_data = np.hstack((eval_data,bias_vec.reshape(self.num_param,1)))
+                eval_mat = np.hstack((eval_mat,bias_vec.reshape(self.num_param,1)))
             if options['MSE']:
                 columns_index = pd.MultiIndex.from_product([['MSE'],['MSE']])
                 if options['Method'] == 'Asymptotic':
@@ -789,10 +791,10 @@ class Model:
                 # eval_data = pd.concat([eval_data,mse_data],axis=1)
                 upper_level.extend(['MSE'])
                 lower_level.extend(['MSE'])
-                eval_data = np.hstack((eval_data,mse_vec.reshape(self.num_param,1)))
+                eval_mat = np.hstack((eval_mat,mse_vec.reshape(self.num_param,1)))
 
-                columns_index = pd.MultiIndex.from_arrays([upper_level,lower_level])
-                eval_data = pd.DataFrame(eval_data,index=self.param_name_list,columns= columns_index)
+            columns_index = pd.MultiIndex.from_arrays([upper_level,lower_level])
+            eval_data = pd.DataFrame(eval_mat,index=self.param_name_list,columns= columns_index)
 
             eval_data_list.append(eval_data)
 
