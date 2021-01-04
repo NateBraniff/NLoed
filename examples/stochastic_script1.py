@@ -15,81 +15,58 @@ import matplotlib.pyplot as plt
 #define input and parameters
 x = cs.SX.sym('x',1)
 xnames = ['Light']
-p = cs.SX.sym('p',4)
-pnames = ['alpha0','alpha','n','K']
+p = cs.SX.sym('p',5)
+pnames = ['alpha0','alpha','n','K','gamma']
 
 #define steady state 
 gfp_mean = cs.exp(p[0]) + cs.exp(p[1])*x[0]**cs.exp(p[2])/(cs.exp(p[3])**cs.exp(p[2])+x[0]**cs.exp(p[2]))
-gfp_std = 0.059*gfp_mean
+gfp_var = cs.exp(p[4])*gfp_mean
+
+geo_mean = cs.log(gfp_mean**2/cs.sqrt(gfp_mean**2 + gfp_var))
+geo_var = cs.log(1 + gfp_var/gfp_mean**2)
+#geo_mean = 2/3 * cs.log(gfp_mean) - 1/2 * cs.log(cs.exp(p[4]) + gfp_mean)
+#2 * cs.log(gfp_mean) - 1/2 * cs.log(p[4]*gfp_mean + gfp_mean**2)
+#geo_var = cs.log(cs.exp(p[4]) + gfp_mean) - cs.log(gfp_mean)
 
 #link the deterministic model to the sampling statistics (here normal mean and variance)
-normal_stats = cs.vertcat(gfp_mean, gfp_std**2)
+lognorm_stats = cs.vertcat(geo_mean, geo_var)
 
 #create a casadi function mapping input and parameters to sampling statistics (mean and var)
-y = cs.Function('GFP',[x,p],[normal_stats])
+y = cs.Function('GFP',[x,p],[lognorm_stats])
 
 # enter the function as a tuple with label indicating normal error, into observation list
-observ_list = [(y,'Normal')]
+observ_list = [(y,'Lognormal')]
 
 #instantiate nloed model class
 nloed_model = Model(observ_list, xnames, pnames)
 
-####################################################################################################
-# Fit
-####################################################################################################
-
-obs = [ 580,
-        544,
-        543,
-        766,
-        699,
-        570,
-        2064,
-        2171,
-        4598,
-        8814,
-        9919,
-        8860,
-        9584,
-        10295,
-        10672]
-
-init_data = pd.DataFrame({'Light':[.1]*3+[63]*3+[254]*3+[1022]*3+[4095]*3,
-                          'Variable':['GFP']*15,
-                          'Observation':obs}) 
-
-fit_options={'Confidence':'Intervals',  
-             'InitParamBounds':[(3,8),(5,10),(-1,1),(3,8)],
-             'InitSearchNumber':7,
-             'SearchBound':5.,
-             'Verbose':False}
-#fit the model to the init data
-# ,
-#              'MaxSteps': 10000,
-#              'InitialStep':0.1,
-#              'SearchBound':10.
-fit_info = nloed_model.fit(init_data, options=fit_options)
-
-print(np.exp(fit_info))
-
-fit_params = fit_info['Estimate'].to_numpy().flatten()
+nat_params = [5.53127845e+02, 9.52661655e+03, 2.41382438e+00, 3.62505725e+02, 5500]
+nominal_params = np.log(nat_params)
 
 ####################################################################################################
 # EVALUATE INITIAL DESIGN
 ####################################################################################################
 
-# init_design = pd.DataFrame({'Light':[.1]+[63]+[254]+[1022]+[4095],
-#                             'Variable':['GFP']*5,
-#                             'Replicats':[3]*5}) 
+init_design = pd.DataFrame({'Light':[.1]+[63]+[254]+[1022]+[4095],
+                            'Variable':['GFP']*5,
+                            'Replicates':[15000]*5}) 
 
-# #get estimated covariance, bias and MSE of parameter fit (use asymptotic method here) 
-# opts={'Method':'Asymptotic','FIM':True,'Covariance':True,'Bias':True,'MSE':True,'SampleNumber':500}
-# diagnostic_info_initA = nloed_model.evaluate(init_design, fit_params, opts)
-# print(diagnostic_info_initA)
+#get estimated covariance, bias and MSE of parameter fit (use asymptotic method here) 
+opts={'Method':'Asymptotic','FIM':True,'Covariance':True,'Bias':True,'MSE':True}
+diagnostic_info_initA = nloed_model.evaluate(init_design, nominal_params, opts)
+print(diagnostic_info_initA)
 
-# stderr_initA = np.sqrt(np.diag(diagnostic_info_initA['Covariance']))
-# upper_bnd_init = fit_params + 2*stderr_initA
-# lower_bnd_init = fit_params - 2*stderr_initA
+asymptotic_covariance = diagnostic_info_initA['Covariance']
+asymptotic_lower_bound = nominal_params - 2*np.sqrt(np.diag(asymptotic_covariance))
+asymptotic_upper_bound = nominal_params + 2*np.sqrt(np.diag(asymptotic_covariance))
+
+fim_bnds_array = np.vstack((asymptotic_lower_bound,
+                            nominal_params,
+                            asymptotic_upper_bound)).T
+fim_bnds0 = pd.DataFrame(np.exp(fim_bnds_array),
+                        index=['Alpha0','Alpha','n','K','gamma'],
+                        columns=['Lower','Estimate','Upper'])
+print(fim_bnds0)
 
 ####################################################################################################
 # GENERATE OPTIMAL DESIGN
@@ -101,24 +78,26 @@ continuous_inputs={'Inputs':['Light'],
                    'Structure':[['L1'],
                                 ['L2'],
                                 ['L3'],
-                                ['L4']],
+                                ['L4'],
+                                ['L5']],
                     'Initial':[[10],
                                [200],
                                [500],
+                               [1000],
                                [4000]]}
 
-#fixed_design = {'Weight':0.5,'Design':init_design}
+fixed_design = {'Weight':0.5,'Design':init_design}
 
 opts= {'LockWeights':False}
 # generate the optimal discreteimate (relaxed) design
 design_object = Design(nloed_model,
-                        fit_params,
+                        nominal_params,
                         'D',
                         continuous_inputs=continuous_inputs,
-                        #fixed_design=fixed_design,
+                        fixed_design=fixed_design,
                         options=opts)
 
-sample_size = 15
+sample_size = 75000
 relaxed_design = design_object.relaxed()
 print(relaxed_design)
 #generate a rounded exact design 
@@ -134,13 +113,21 @@ print(opt_design)
 opt_design_tot = pd.concat([init_design, opt_design], ignore_index=True)
 
 #get estimated covariance, bias and MSE of parameter fit (use asymptotic method here) 
-opts={'Method':'Asymptotic','FIM':True,'Covariance':True,'Bias':True,'MSE':True,'SampleNumber':500}
-diagnostic_info_optA = nloed_model.evaluate(opt_design_tot, fit_params, opts)
+opts={'Method':'Asymptotic','FIM':True,'Covariance':True,'Bias':True,'MSE':True}
+diagnostic_info_optA = nloed_model.evaluate(opt_design_tot, nominal_params, opts)
 print(diagnostic_info_optA)
 
-stderr_optA = np.sqrt(np.diag(diagnostic_info_optA['Covariance']))
-upper_bnd_opt = fit_params + 2*stderr_optA
-lower_bnd_opt = fit_params - 2*stderr_optA
+asymptotic_covariance = diagnostic_info_initA['Covariance']
+asymptotic_lower_bound = nominal_params - 2*np.sqrt(np.diag(asymptotic_covariance))
+asymptotic_upper_bound = nominal_params + 2*np.sqrt(np.diag(asymptotic_covariance))
+
+fim_bnds_array = np.vstack((asymptotic_lower_bound,
+                            nominal_params,
+                            asymptotic_upper_bound)).T
+fim_bnds = pd.DataFrame(np.exp(fim_bnds_array),
+                        index=['Alpha0','Alpha','n','K','gamma'],
+                        columns=['Lower','Estimate','Upper'])
+print(fim_bnds)
 
 #############################################
 #eval the intuitive design + initial design

@@ -62,7 +62,7 @@ y0 = cs.SX.sym('y0',2)
 # control values (one per control interval)
 uvec = cs.SX.sym('uvec',3)
 # control values (one per control interval)
- vi
+x = cs.vertcat(y0,uvec)
 
 # create list to store symbols for each sample point
 sample_list=[]
@@ -187,8 +187,8 @@ plot_data = ode_model.sample(predict_design,true_pars)
 print(plot_data)
 
 # create regular rexpressions (re package) search strings
-digit_re=re.compile('[a-z]+_t(\d+)')
-type_re=re.compile('([a-z]+)_t\d+')
+digit_re = re.compile('[a-z]+_t(\d+)')
+type_re = re.compile('([a-z]+)_t\d+')
 
 # use regular rexpressions (re package) to parse observations into times and rna/prot
 plot_data['Time'] = plot_data['Variable'].apply(lambda x: int(digit_re.search(x).group(1)))

@@ -14,19 +14,25 @@ class Model:
     """ 
     A class for statisical models in the NLoed package
     """
-    #Easy:      [DONE,  for normal data] implement data sampling
-    #Difficult: implement various cov/bias assesment methods,  also (profile) likelihood intervals/plots
-    #           add other distributions binomial/bernouli,  lognormal,  gamma,  exponential,  weibull etc.,  negative binomial
-    #           implement plotting function (move to utility.py?)
-    #NOTE: [maybe a gentle check,  i.e. did you mean this? no constraints]How to handle profile that goes negative for strictly positive parameter values???? perhaps error out and suggest reparameterization???
-    #NOTE: can we allow custom pdf's (with some extra work by the user)
-    #NOTE: [Yes] Add A-opt,  D-s Opt,  A-s Opt???,  Bias??? for exponential family (and log normal?) 
+
+    # FEATURES TO ADD
+    #NOTE: [Yes] Add A-opt,  D-s Opt,  A-s Opt???
+    #NOTE: Es-opt (next line)
     #NOTE: https://math.stackexchange.com/questions/269723/largest-eigenvalue-semidefinite-programming
     #NOTE: Data/design/experiment objects may need deep copies so internal lists aren't shared??
+
+    # CHECKS AND MESSAGES
+    #NOTE: [maybe a gentle check,  i.e. did you mean this? no constraints] How to handle profile that goes negative for strictly positive parameter values???? perhaps error out and suggest reparameterization???
     #NOTE: all names must be unique
     #NOTE: must enforce ordering of parameters in statistics function
     #NOTE: we need checks on inputs of fit and sample functions!!!
     #NOTE: should rename inputs to cavariates or controls or smthg
+
+    # COMMENTS AND VAR NAMING AND FUNCTION DOCSTRINGS
+
+    # TESTING
+
+    # DOCUMENTATION
 
     distribution_dict={ 'Normal':       ['Mean','Variance'],
                         'Poisson':      ['Rate'],
@@ -293,7 +299,7 @@ class Model:
         and plots of logliklihood profiles/traces and marginal projected confidence contours
 
         Args:
-            datasets: either; a dictionary for one dataset OR a list of dictionaries,  each design replicats OR a list of lists of dict's where each index in the outer lists has a unique design
+            datasets: either; a dictionary for one dataset OR a list of dictionaries,  each design replicates OR a list of lists of dict's where each index in the outer lists has a unique design
             options: optional,  a dictionary of user defined options
 
         Return:
@@ -335,7 +341,7 @@ class Model:
             # wrap it in a single list to match general case
             replicat_datasets = [datasets]
         else:
-            #else if dataset_struct input is a list of designs, each with a list of replicats,
+            #else if dataset_struct input is a list of designs, each with a list of replicates,
             # just pass on the input
             replicat_datasets = datasets
         #set confidence interval boolean
@@ -356,7 +362,7 @@ class Model:
             archetype_param_symbols = cs.MX.sym('archetype_param_symbols', self.num_param)
         
         archetype_loglik_symbol = 0
-        #for each design use the first replicat 
+        #for each design use the first replicate 
         archetype_dataset = replicat_datasets[0]
         # get onbservation count for this design
         num_observations = len(archetype_dataset.index)
@@ -387,10 +393,10 @@ class Model:
             progress_counter=0
             self._progress_bar(progress_counter, num_datasets, prefix = 'Fitting Dataset(s):')
 
-        #loop over replicats within each design
+        #loop over replicates within each design
         for r in range(num_datasets):
             #NOTE: could abstract below into a Casadi function to avoid input/observ loop on each dataset and replicat
-            #get the dataset from the replicat list
+            #get the dataset from the replicate list
             dataset = replicat_datasets[r]
             #create a vector of parameter symbols for this specific dataset,  each dataset gets its own,  these are used for ML optimization
             if self.symbolics_boolean:
@@ -461,7 +467,7 @@ class Model:
                     if options['Confidence']=="Contours":
                         self.__contourplot(param_vec, loglik_func_list[d], fig, options)
                 elif options['Confidence']=="Intervals":
-                    #if confidence intervals are requested, run confidenceintervals to get CI's and add them to replicat list
+                    #if confidence intervals are requested, run confidenceintervals to get CI's and add them to replicate list
                     interval_list = self.__confidence_intervals(param_vec, loglik_func_list[d], options)
                 #store the current boundary vector in the bound_list
                 bound_list.append( np.asarray(interval_list).T.flatten())
@@ -483,7 +489,7 @@ class Model:
         #return the dataframe
         return param_data
 
-    def sample(self, design, param, design_replicats=1,options={}):
+    def sample(self, designs, param, design_replicates=1,options={}):
         """
         This function generates datasets for a given design or list of designs,  with a given set of parameters,  with an optional number of replicates
 
@@ -493,12 +499,12 @@ class Model:
             replicates: optional,  an integer indicating the number of datasets to generate for each design,  default is 1
 
         Return:
-            design_datasets: either; a singel dataset for the given design,  OR,  a list of dataset replicats for the given design,  OR,  a list of list of dataset replicats for each design
+            design_datasets: either; a singel dataset for the given design,  OR,  a list of dataset replicates for the given design,  OR,  a list of list of dataset replicates for each design
         """
         #NOTE: needs checks on inputs
         #NOTE: should make the returned dataframe a multicolumn index to be consistent
         #NOTE: multiplex multiple parameter values??
-        #NOTE: actually maybe more important to be able to replicat designs N times
+        #NOTE: actually maybe more important to be able to replicate designs N times
         default_options = \
           { 'Verbose':          [True,                  lambda x: isinstance(x,int) and 0<x]}
         options=cp.deepcopy(options)
@@ -513,16 +519,18 @@ class Model:
         if not len(param) == self.num_param:
             raise Exception('Starting parameter mismatch, there were; '+str(len(param))+', provided but; '+str(self.num_param)+' needed!')
 
-        itemized_design = design.reindex(design.index.repeat(design['Replicats']))
-        itemized_design.drop('Replicats',axis=1,inplace=True)
+        #NOTE: NEED TO ADD LOOP OVER DESIGNS INPUT
+
+        itemized_design = designs.reindex(designs.index.repeat(designs['Replicates']))
+        itemized_design.drop('Replicates',axis=1,inplace=True)
         itemized_design.reset_index(drop=True,inplace=True)
         #create a list for replciated datasets of the current design
         replicat_datasets = []
         if options['Verbose']:
             progress_counter=0
-            self._progress_bar(progress_counter, design_replicats, prefix = 'Sampling Datasets:')
+            self._progress_bar(progress_counter, design_replicates, prefix = 'Sampling Datasets:')
         #loop over the number of replicates
-        for r in range(design_replicats):
+        for r in range(design_replicates):
             dataset=itemized_design.copy()
             observation_list = []
             for index,row in itemized_design.iterrows():
@@ -533,9 +541,9 @@ class Model:
             replicat_datasets.append(dataset)
             if options['Verbose']:
                 progress_counter += 1
-                self._progress_bar(progress_counter, design_replicats, prefix = 'Sampling Datasets:')
+                self._progress_bar(progress_counter, design_replicates, prefix = 'Sampling Datasets:')
                 
-        if design_replicats==1:
+        if design_replicates==1:
             #if a single design was passed and there replicate count is 1,  return a single dataset
             return replicat_datasets[0]
         else:
@@ -556,7 +564,7 @@ class Model:
 
         """
         #NOTE: evaluate model to predict mean and prediction interval for y
-        #NOTE: optional pass cov matrix,  for use with delta method/MC error bars on predictions
+        #NOTE: optional pass cov matrix, for use with delta method/MC error bars on predictions
         #NOTE: should multiplex over inputs
         # if isinstance(input_list, pd.DataFrame):
         #     input_list = [[input_list]]
@@ -707,8 +715,8 @@ class Model:
             if not key in options.keys() :
                 options[key] = default_options[key][0]
 
-        # itemized_design = design.reindex(design.index.repeat(design['Replicats']))
-        # itemized_design.drop('Replicats',axis=1,inplace=True)
+        # itemized_design = design.reindex(design.index.repeat(design['Replicates']))
+        # itemized_design.drop('Replicates',axis=1,inplace=True)
         # itemized_design.reset_index(drop=True,inplace=True)
 
         if isinstance(designs, pd.DataFrame):
@@ -730,8 +738,8 @@ class Model:
                 for index,row in designset.iterrows():
                     input_row = row[self.input_name_list].to_numpy()
                     observ_name = row['Variable']
-                    if 'Replicats' in designset:
-                        reps = row['Replicats']
+                    if 'Replicates' in designset:
+                        reps = row['Replicates']
                     else:
                         reps = 1
                     fisher_info_sum += reps * self.fisher_info_matrix[observ_name](input_row, param).full()
@@ -1513,7 +1521,7 @@ class factorial(cs.Callback):
     #     and plots of logliklihood profiles/traces and marginal projected confidence contours
 
     #     Args:
-    #         datasets: either; a dictionary for one dataset OR a list of dictionaries,  each design replicats OR a list of lists of dict's where each index in the outer lists has a unique design
+    #         datasets: either; a dictionary for one dataset OR a list of dictionaries,  each design replicates OR a list of lists of dict's where each index in the outer lists has a unique design
     #         start_param: a list of starting values for the parameters
     #         options: optional,  a dictionary of user defined options
 
@@ -1543,7 +1551,7 @@ class factorial(cs.Callback):
     #             options[key] = default_options[key][0]
     #     if not len(start_param) == self.num_param:
     #         raise Exception('Starting parameter mismatch, there were; '+str(len(start_param))+', provided but; '+str(self.num_param)+' needed!')
-    #     #this block allows the user to pass a dataset, list of datasets,  list of lists etc. for Design x Replicat fitting
+    #     #this block allows the user to pass a dataset, list of datasets,  list of lists etc. for Design x Replicate fitting
     #     if isinstance(dataset_struct, pd.DataFrame):
     #         #if a single dataset is passed vis the dataset_struct input,  wrap it in two lists so it matches general case
     #         design_datasets = [[dataset_struct]]
@@ -1551,7 +1559,7 @@ class factorial(cs.Callback):
     #         #else if dataset_struct input is a list of replciated datasets,  wrap it in a single list to match general case
     #         design_datasets = [dataset_struct]
     #     else:
-    #         #else if dataset_struct input is a list of designs, each with a list of replicats,  just pass on th input
+    #         #else if dataset_struct input is a list of designs, each with a list of replicates,  just pass on th input
     #         design_datasets = dataset_struct
     #     #set confidence interval boolean
     #     interval_bool = options['Confidence']=="Intervals" or options['Confidence']=="Profiles" or options['Confidence']=="Contours"
@@ -1559,7 +1567,7 @@ class factorial(cs.Callback):
     #     plot_bool = options['Confidence']=="Contours" or options['Confidence']=="Profiles"
     #     #get number of designs
     #     num_designs = len(design_datasets)
-    #     #get number of replicats for each design
+    #     #get number of replicates for each design
     #     num_replicat_list = [len(rep_list) for rep_list in design_datasets]
     #     #get total number of datasets
     #     num_datasets = sum(num_replicat_list)
@@ -1571,11 +1579,11 @@ class factorial(cs.Callback):
     #     archetype_param_symbols = cs.SX.sym('archetype_param_symbols', self.num_param)
     #     #loop over different designs (outer most list)
     #     for d in range(num_designs):
-    #         #get the set of replicats for this design
+    #         #get the set of replicates for this design
     #         replicat_datasets = design_datasets[d]
     #         #create a summation variable for the loglikelihood for a loglik_symbolset of the current design
     #         archetype_loglik_symbol = 0
-    #         #for each design use the first replicat 
+    #         #for each design use the first replicate 
     #         archetype_dataset = replicat_datasets[0]
     #         # get onbservation count for this design
     #         num_observations = len(archetype_dataset.index)
@@ -1595,10 +1603,10 @@ class factorial(cs.Callback):
     #         archetype_loglik_func = cs.Function('archetype_loglik_func'+str(d),
     #                                             [archetype_observ_symbol, archetype_param_symbols],
     #                                             [archetype_loglik_symbol])
-    #         #loop over replicats within each design
+    #         #loop over replicates within each design
     #         for r in range(num_replicat_list[d]):
     #             #NOTE: could abstract below into a Casadi function to avoid input/observ loop on each dataset and replicat
-    #             #get the dataset from the replicat list
+    #             #get the dataset from the replicate list
     #             dataset = replicat_datasets[r]
     #             #create a vector of parameter symbols for this specific dataset,  each dataset gets its own,  these are used for ML optimization
     #             fit_param_symbols = cs.SX.sym('fit_param_symbols'+'_'+str(d)+str(r), self.num_param)
@@ -1612,7 +1620,7 @@ class factorial(cs.Callback):
     #                                                  [dataset_loglik_symbol]))
     #             #set up the logliklihood symbols for given design and replicat
     #             param_symbols_list.append(fit_param_symbols)
-    #             #record the starting parameters for the given replicat and dataset
+    #             #record the starting parameters for the given replicate and dataset
     #             start_params_list.extend(start_param)
     #             #add the loglikelihood to the total 
     #             #NOTE: this relies on the distirbutivity of serperable optimization problem,  should confirm
@@ -1650,7 +1658,7 @@ class factorial(cs.Callback):
     #                 if options['Confidence']=="Contours":
     #                     self.__contourplot(param_vec, loglik_func_list[d], fig, options)
     #             elif options['Confidence']=="Intervals":
-    #                 #if confidence intervals are requested, run confidenceintervals to get CI's and add them to replicat list
+    #                 #if confidence intervals are requested, run confidenceintervals to get CI's and add them to replicate list
     #                 interval_list = self.__confidence_intervals(param_vec, loglik_func_list[d], options)
     #             #store the current boundary vector in the bound_list
     #             bound_list.append( np.asarray(interval_list).T.flatten())

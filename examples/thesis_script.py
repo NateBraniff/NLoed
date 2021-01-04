@@ -4,49 +4,155 @@ Add a docstring
 import numpy as np
 import pandas as pd
 import casadi as cs
-from nloed import Model
 from nloed import Design
 
-####################################################################################################
-# SET UP MODEL
-####################################################################################################
+###block 1
+from nloed import Model
+#create casadi symbols for the inputs
+x = cs.SX.sym('x',2)
+#create casadi symbols for the parameters
+theta = cs.SX.sym('theta',4)
+#define y1 sampling statistics; mean and variance
+mean_y1 = theta[0] + theta[1]*x[0] + theta[3]*x[0]*x[1] 
+var_y1 = 0.1
+#define y2 sampling statistics; mean and variance
+rate_y2 = cs.exp(theta[0] + theta[2]*x[1] + theta[3]*x[0]*x[1])
+#create a casadi function for y1 stats
+eta_y1 = cs.vertcat(mean_y1, var_y1)
+func_y1 = cs.Function('y1',[x,theta],[eta_y1])
+#create a casadi function for y2 stats
+eta_y2 = rate_y2
+func_y2 = cs.Function('y2',[x,theta],[eta_y2])
 
-xs = cs.SX.sym('xs',2)
-xnames = ['x1','x2']
-ps = cs.SX.sym('ps',4)
-pnames = ['Intercept','Slope1','Slope2','Interaction']
+###block 2
+#create observation list
+observ_list = [(func_y1,'Normal'),(func_y2,'Poisson')]
+#creat input name list
+input_names = ['x1','x2']
+#create parameter name list
+parameter_names = ['Theta0','Theta1','Theta2','Theta3']
+#create NLOED Model
+model_object = Model(observ_list, input_names, parameter_names)
 
-lin_predictor1 = ps[0] + ps[1]*xs[0] + ps[2]*xs[1] + ps[3]*xs[0]*xs[1] 
-lin_predictor2 = ps[0] + ps[1]*xs[0] + ps[2]*xs[1] + ps[3]*xs[0]*xs[1] 
-
-mean1, var1 = lin_predictor1, 0.1
-normal_stats1 = cs.vertcat(mean1, var1)
-y1 = cs.Function('y1',[xs,ps],[normal_stats1])
-
-mean2, var2 = lin_predictor2, 0.1
-normal_stats2 = cs.vertcat(mean2, var2)
-y2 = cs.Function('y2',[xs,ps],[normal_stats2])
-
-lin_model = Model([(y1,'Normal'),(y2,'Normal')],xnames,pnames)
-
-input_frame = pd.DataFrame({ 'x1':[-1,1,-1,1]*2,
-                        'x2':[-1,1,-1,1]*2,
-                        'Variable':['y1']*4 + ['y2']*4})
+###block 3
+design = pd.DataFrame({ 'x1':[0,-1,2,3]*2,
+                        'x2':[1,1,-1,0]*2,
+                        'Variable':['y1']*4 + ['y2']*4,
+                        'Replicates':[3,1,2,2]*2})
 print('')
 print('')
-print(input_frame)
+print(design)
 print('')
 print('')
 
-pred_options = {'Method':'Delta',
+###block 4
+design = pd.DataFrame({ 'x1':[0,-1,2,3]*2,
+                        'x2':[1,1,-1,0]*2,
+                        'Variable':['y1']*4 + ['y2']*4,
+                        'Replicates':[3,1,2,2]*2})
+#set nominal parameter values
+param = [0.1, 2, 0.4, 1.3]
+#declare specific options
+eval_opts={'Method':'MonteCarlo',
+           'FIM':True,
+           'Covariance':True,
+           'Bias':True,
+           'MSE':True,
+           'SampleNumber':100}
+#call the evaluate() function
+eval_info = model_object.evaluate(design, param, eval_opts)
+#print the resulting evaluation
+#print(eval_info)
+print('')
+print('')
+print(eval_info)
+print('')
+print('')
+
+### block 5
+#define a design
+design = pd.DataFrame({ 'x1':[0,-1,2,3]*2,
+                        'x2':[1,1,-1,0]*2,
+                        'Variable':['y1']*4 + ['y2']*4,
+                        'Replicates':[3,1,2,2]*2})
+#set nominal parameter values
+param = [0.1, 2, 0.4, 1.3]
+#call the sample() function
+dataset = model_object.sample(design, param, design_replicates=1)
+#print the resulting dataset
+#print(dataset)
+print('')
+print('')
+print(dataset)
+print('')
+print('')
+
+###block 6
+# set specific fitting options
+fit_opts={'Confidence':'None',
+             'InitParamBounds':[(-1,1),(-1,1),(-1,1),(-1,1)],
+             'InitSearchNumber':7,
+             'RadialNumber':60}
+#call the fit() function
+fit_info = model_object.fit(dataset, options=fit_opts)
+#print the fitting information
+#print(fit_info)
+print('')
+print('')
+print(fit_info)
+print('')
+print('')
+
+### block 7
+#create three datasets
+data1, data2, data3 = dataset = model_object.sample(design, param, design_replicates=3)
+# set up specific options for fitting
+fit_opts={'Confidence':'Intervals'}
+#combine datasets into a single list
+datasets = [data1, data2, data3]
+#call the fitting procedure
+fit_info = model_object.fit(datasets, options=fit_opts)
+#print the fitting information
+print(fit_info)
+print('')
+print('')
+print(fit_info)
+print('')
+print('')
+
+#define the inputs for predict()
+predict_inputs = pd.DataFrame({ 'x1':[-1,1,-1,1]*2,
+                                'x2':[-1,-1,1,1]*2,
+                               'Variable':['y1']*4 + ['y2']*4})
+#specify the parameter values
+params = [0.1, 2, 0.4, 1.3]
+#generate the predictions
+predictions = model_object.predict(predict_inputs, params)
+#display the predicted outputs
+print(predictions)
+print('')
+print('')
+print(predict_inputs)
+print('')
+print('')
+print(predictions)
+print('')
+print('')
+
+
+#define a covariance matrix for the parameters
+cov_mat = np.diag(np.array(param)*0.05)
+#specify desired option values
+predict_opts = {'Method':'MonteCarlo',
                 'PredictionInterval':True,
                 'ObservationInterval':True,
                 'Sensitivity':True}
-#pred_options = {'Sexnsitivity':True}
-cov = np.diag([1,1,1,1])
-#predictions = lin_model.predict(input_frame,[0.5,1.1,2.1,0.3])
-predictions = lin_model.predict(input_frame,[0.5,1.1,2.1,0.3],cov,options=pred_options)
-
+#generate the predictions
+predictions = model_object.predict(predict_inputs, params, cov_mat, predict_opts)
+#display the predicted outputs
+print(predictions)
+print('')
+print('')
 print(predictions)
 print('')
 print('')

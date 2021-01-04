@@ -227,24 +227,24 @@ class Design:
         candidate_design = cp.deepcopy(self.approximate_design)
         apportion = np.ceil(nu*self.approximate_design['Weights']).to_numpy().astype(int)
         candidate_design.drop('Weights',axis=1,inplace=True)
-        candidate_design['Replicats'] = apportion
+        candidate_design['Replicates'] = apportion
 
-        while not sum(candidate_design['Replicats'])==sample_size:
-            if sum(candidate_design['Replicats'])<sample_size:
-                thresh = np.divide(candidate_design['Replicats'].to_numpy(),self.approximate_design['Weights'].to_numpy())
+        while not sum(candidate_design['Replicates'])==sample_size:
+            if sum(candidate_design['Replicates'])<sample_size:
+                thresh = np.divide(candidate_design['Replicates'].to_numpy(),self.approximate_design['Weights'].to_numpy())
                 thresh_set = np.where(thresh == thresh.min())[0]
                 inc = 1
-            elif sum(candidate_design['Replicats'])>sample_size:
-                thresh = np.divide(candidate_design['Replicats'].to_numpy()-1,self.approximate_design['Weights'].to_numpy())
+            elif sum(candidate_design['Replicates'])>sample_size:
+                thresh = np.divide(candidate_design['Replicates'].to_numpy()-1,self.approximate_design['Weights'].to_numpy())
                 thresh_set = np.where(thresh == thresh.max())[0]
                 inc = -1
 
-            candidate_design.iloc[rn.choice(thresh_set), candidate_design.columns.get_loc('Replicats')] +=inc
+            candidate_design.iloc[rn.choice(thresh_set), candidate_design.columns.get_loc('Replicates')] +=inc
 
             # candidate_list = []
             # for ind in thresh_set:
             #     new_candidate = cp.deepcopy(candidate_design)
-            #     new_candidate.iloc[0, new_candidate.columns.get_loc('Replicats')] +=1
+            #     new_candidate.iloc[0, new_candidate.columns.get_loc('Replicates')] +=1
             #     for models
             #         self.model_list[0].evaluate(candidate_design,self.param_list[0],{'Covariance':False})['FIM'].to_numpy()
             #     candidate_list.append(new_candidate)
@@ -357,9 +357,10 @@ class Design:
             #fixed_design
             pre_weight = fixed_design['Weight']
             post_weight = 1 - pre_weight
+            #if 'Design' in fixed_design:
             pre_design = cp.deepcopy(fixed_design['Design'])
-            pre_design['Weights'] = pre_design['Replicats']/sum(pre_design['Replicats'])
-            pre_design.drop('Replicats',axis=1,inplace=True)
+            pre_design['Weights'] = pre_design['Replicates']/sum(pre_design['Replicates'])
+            pre_design.drop('Replicates',axis=1,inplace=True)
             #loop over the number of replicates
             for index,row in pre_design.iterrows():
                 for mod in range(self.num_models):
@@ -369,8 +370,14 @@ class Design:
                     observ_name = row['Variable']
                     weight = row['Weights']
                     fim_list[mod] += pre_weight * weight *\
-                                         model.fisher_info_matrix[observ_name](input_row, 
-                                                                        self.param_list[mod]).full()
+                                        model.fisher_info_matrix[observ_name](input_row, 
+                                                                    self.param_list[mod]).full()
+            # elif 'FIM' in fixed_design:
+            #     pre_fim = cp.deepcopy(fixed_design['FIM'])
+            #     for mod in range(self.num_models):
+            #         fim_list[mod] += pre_weight * pre_fim[mod]
+            # else:
+            #     raise Exception('Invalid key in fixed design data!')
         else:
             post_weight = 1
 
@@ -485,8 +492,8 @@ class Design:
             discrete_input_grid = []
             for row in discrete_input_array:
                 row_dict = {}
-                for indx in range(self.input_dim):
-                    row_dict[self.input_name_list[indx]] = row[indx]
+                for indx in range(discrete_input_num):
+                    row_dict[discrete_input_names[indx]] = row[indx]
                 discrete_input_grid.append(row_dict)
         
         discrete_grid_length = len(discrete_input_grid)
