@@ -10,4 +10,6 @@
 
 #edit install files
 /nloed.egg-info
+
+#mac file
 .DS_Store

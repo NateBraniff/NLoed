@@ -15,8 +15,8 @@ class Model:
     A class for statisical models in the NLoed package
     """
 
-    # FEATURES TO ADD
-    #NOTE: [Yes] Add A-opt,  D-s Opt,  A-s Opt???
+    # FEATURES TO ADD & TESTING
+    #NOTE: Add D-s Opt, A-opt, A-s Opt
     #NOTE: Es-opt (next line)
     #NOTE: https://math.stackexchange.com/questions/269723/largest-eigenvalue-semidefinite-programming
     #NOTE: Data/design/experiment objects may need deep copies so internal lists aren't shared??
@@ -29,8 +29,6 @@ class Model:
     #NOTE: should rename inputs to cavariates or controls or smthg
 
     # COMMENTS AND VAR NAMING AND FUNCTION DOCSTRINGS
-
-    # TESTING
 
     # DOCUMENTATION
 
@@ -68,7 +66,7 @@ class Model:
             if not isinstance(obs_tuple,tuple):
                 raise Exception('Error in observation entry; '+str(o)+', not a tuple, observation structure must be a list of tuples!')
             if not len(obs_tuple)==2:
-                raise Exception('Error in observation entry; '+str(o)+', wronge tuple dimension, length must be three!')
+                raise Exception('Error in observation entry; '+str(o)+', wronge tuple dimension, length must be two!')
             if not isinstance(obs_tuple[0],cs.Function):
                 raise Exception('Error in observation tuple; '+str(o)+', first tuple entry must be a Casadi function!') 
             if not isinstance(obs_tuple[1],str) and obs_tuple[1] in self.distribution_dict.keys():
