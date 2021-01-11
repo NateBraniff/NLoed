@@ -1,0 +1,3 @@
+include LICENSE
+include devnotes
+recursive-include examples *.py
