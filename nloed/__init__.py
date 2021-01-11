@@ -2,5 +2,3 @@
 
 from nloed.model import Model
 from nloed.design import Design
-
-#print('sup')
