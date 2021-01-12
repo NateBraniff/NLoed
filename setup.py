@@ -19,8 +19,6 @@ setuptools.setup(
         'casadi',
         'numpy',
         'pandas',
-        'math',
-        'copy',
         'scipy',
         'matplotlib',
     ],
