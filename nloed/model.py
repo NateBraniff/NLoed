@@ -1,14 +1,18 @@
+import os as os
+import sys as sys
+import copy as cp
+import math as mt
+#need to clean up this import style (below)
+from contextlib import contextmanager
+
 import casadi as cs
 import numpy as np
 import pandas as pd
-import math as mt
-import copy as cp
-import os as os
-import sys as sys
-from contextlib import contextmanager
+#need to clean up this import style (below x3)
+import matplotlib.pyplot as plt
 from scipy import stats as st
 from scipy.interpolate import splev,  splrep
-import matplotlib.pyplot as plt
+
 
 class Model:
     """ 

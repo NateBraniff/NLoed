@@ -1,9 +1,9 @@
-import casadi as cs
-import numpy as np
-import pandas as pd
 import random as rn
 import copy as cp
 
+import casadi as cs
+import numpy as np
+import pandas as pd
 
 class Design:
     """ 
@@ -407,7 +407,7 @@ class Design:
                         input_map_dict[input_name] = {'Index':continuous_symbol_archetypes[i][input_name]['Index'],'Type':'E'}
                     else:
                         #if we can't find the index k in either the discrete or continuous indices, throw an error
-                        raise Exception('Model input with index'+str(k)+' does not match any inputs passed as discrete or continuous!')
+                        raise Exception('Model input with name '+input_name+' does not match any inputs passed as discrete or continuous!')
                 #concatinate input list into a single MX
                 input_vector = cs.horzcat(*input_list)
                 #current_discrete_weights = []

@@ -1,15 +1,23 @@
-
+#DEV ENVIRONMENT
+#mac OSX
+.DS_Store
+#pyenv settings
+.python-version
 #VS code settings
 /.vscode
 
-#pyenv settings
-.python-version
+#RELEASE
+#source distribution (sdist) files
+/distribution
+#wheels build files
+/build
 
+#DEVELOPMENT
+#pip editable install files
+/nloed.egg-info
 #bytecode from importing and running lib
 /nloed/__pycache__
-
-#edit install files
-/nloed.egg-info
-
-#mac file
-.DS_Store
+#bytecode from importing and running lib
+/tests/__pycache__
+#ignore tests
+/.pytest_cache

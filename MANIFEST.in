@@ -1,3 +1,4 @@
 include LICENSE
 include devnotes
 recursive-include examples *.py
+recursive-include tests *.py

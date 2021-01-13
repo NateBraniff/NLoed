@@ -1,4 +1,4 @@
 #__all__ = ['model', 'design']
 
-from nloed.model import Model
-from nloed.design import Design
+from .model import Model
+from .design import Design
