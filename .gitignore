@@ -12,6 +12,7 @@
 #wheels build files
 /build
 
+
 #DEVELOPMENT
 #pip editable install files
 /nloed.egg-info
@@ -19,5 +20,7 @@
 /nloed/__pycache__
 #bytecode from importing and running lib
 /tests/__pycache__
-#ignore tests
+#ignore pytest
 /.pytest_cache
+#ignore tox 
+/.tox/*
