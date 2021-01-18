@@ -94,11 +94,8 @@
 \chapter{nloed}
 \label{\detokenize{modules:nloed}}\label{\detokenize{modules::doc}}
 
-\section{nloed package}
+\section{NLoed Package}
 \label{\detokenize{nloed:nloed-package}}\label{\detokenize{nloed::doc}}
-
-\subsection{Submodules}
-\label{\detokenize{nloed:submodules}}
 
 \subsection{NLoed’s Model Class}
 \label{\detokenize{nloed:module-nloed.model}}\label{\detokenize{nloed:nloed-s-model-class}}\index{module@\spxentry{module}!nloed.model@\spxentry{nloed.model}}\index{nloed.model@\spxentry{nloed.model}!module@\spxentry{module}}\index{Model (class in nloed.model)@\spxentry{Model}\spxextra{class in nloed.model}}
@@ -108,10 +105,295 @@
 Bases: \sphinxcode{\sphinxupquote{object}}
 
 A class for statisical models in the NLoed package
-\index{distribution\_dict (nloed.model.Model attribute)@\spxentry{distribution\_dict}\spxextra{nloed.model.Model attribute}}
+\index{\_\_confidence\_intervals() (nloed.model.Model method)@\spxentry{\_\_confidence\_intervals()}\spxextra{nloed.model.Model method}}
 
 \begin{fulllineitems}
-\phantomsection\label{\detokenize{nloed:nloed.model.Model.distribution_dict}}\pysigline{\sphinxbfcode{\sphinxupquote{distribution\_dict}}\sphinxbfcode{\sphinxupquote{ = \{\textquotesingle{}Bernoulli\textquotesingle{}: {[}\textquotesingle{}Probability\textquotesingle{}{]}, \textquotesingle{}Binomial\textquotesingle{}: {[}\textquotesingle{}Probability\textquotesingle{}{]}, \textquotesingle{}Exponential\textquotesingle{}: {[}\textquotesingle{}Rate\textquotesingle{}{]}, \textquotesingle{}Gamma\textquotesingle{}: {[}\textquotesingle{}Shape\textquotesingle{}, \textquotesingle{}Scale\textquotesingle{}{]}, \textquotesingle{}Lognormal\textquotesingle{}: {[}\textquotesingle{}GeoMean\textquotesingle{}, \textquotesingle{}GeoVariance\textquotesingle{}{]}, \textquotesingle{}Normal\textquotesingle{}: {[}\textquotesingle{}Mean\textquotesingle{}, \textquotesingle{}Variance\textquotesingle{}{]}, \textquotesingle{}Poisson\textquotesingle{}: {[}\textquotesingle{}Rate\textquotesingle{}{]}\}}}}
+\phantomsection\label{\detokenize{nloed:nloed.model.Model.__confidence_intervals}}\pysiglinewithargsret{\sphinxbfcode{\sphinxupquote{\_\_confidence\_intervals}}}{\emph{\DUrole{n}{mle\_params}}, \emph{\DUrole{n}{loglik\_func}}, \emph{\DUrole{n}{options}}}{}
+This function computes marginal parameter confidence intervals for the model
+around the MLE estimate using the profile likelihood
+\begin{quote}\begin{description}
+\item[{Parameters}] \leavevmode\begin{itemize}
+\item {} 
+\sphinxstyleliteralstrong{\sphinxupquote{mle\_params}} \textendash{} mle parameter estimates,  recieved from fitting
+
+\item {} 
+\sphinxstyleliteralstrong{\sphinxupquote{loglik\_func}} \textendash{} casadi logliklihood function for the given dataset
+
+\item {} 
+\sphinxstyleliteralstrong{\sphinxupquote{options}} \textendash{} an options dictionary for passing user options
+
+\end{itemize}
+
+\item[{Returns}] \leavevmode
+list of lists of upper and lower bounds for each parameter
+
+\item[{Return type}] \leavevmode
+interval\_list
+
+\end{description}\end{quote}
+
+\end{fulllineitems}
+
+\index{\_\_contourplot() (nloed.model.Model method)@\spxentry{\_\_contourplot()}\spxextra{nloed.model.Model method}}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{nloed:nloed.model.Model.__contourplot}}\pysiglinewithargsret{\sphinxbfcode{\sphinxupquote{\_\_contourplot}}}{\emph{\DUrole{n}{mle\_params}}, \emph{\DUrole{n}{loglik\_func}}, \emph{\DUrole{n}{figure}}, \emph{\DUrole{n}{options}}}{}
+This function plots the projections of the confidence volume in a 2d plane for each pair of parameters
+this creates marginal confidence contours for each pair of parameters
+\begin{quote}\begin{description}
+\item[{Parameters}] \leavevmode\begin{itemize}
+\item {} 
+\sphinxstyleliteralstrong{\sphinxupquote{mle\_params}} \textendash{} mle parameter estimates,  recieved from fitting
+
+\item {} 
+\sphinxstyleliteralstrong{\sphinxupquote{loglik\_func}} \textendash{} casadi logliklihood function for the given dataset
+
+\item {} 
+\sphinxstyleliteralstrong{\sphinxupquote{figure}} \textendash{} the figure object on which plotting occurs
+
+\item {} 
+\sphinxstyleliteralstrong{\sphinxupquote{options}} \textendash{} an options dictionary for passing user options
+
+\end{itemize}
+
+\end{description}\end{quote}
+
+\end{fulllineitems}
+
+\index{\_\_contourtrace() (nloed.model.Model method)@\spxentry{\_\_contourtrace()}\spxextra{nloed.model.Model method}}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{nloed:nloed.model.Model.__contourtrace}}\pysiglinewithargsret{\sphinxbfcode{\sphinxupquote{\_\_contourtrace}}}{\emph{\DUrole{n}{mle\_params}}, \emph{\DUrole{n}{loglik\_func}}, \emph{\DUrole{n}{coordinates}}, \emph{\DUrole{n}{options}}}{}
+This function plots the projections of the confidence volume in a 2d plane for each pair of parameters
+this creates marginal confidence contours for each pair of parameters
+\begin{quote}\begin{description}
+\item[{Parameters}] \leavevmode\begin{itemize}
+\item {} 
+\sphinxstyleliteralstrong{\sphinxupquote{mle\_params}} \textendash{} mle parameter estimates,  recieved from fitting
+
+\item {} 
+\sphinxstyleliteralstrong{\sphinxupquote{loglik\_func}} \textendash{} casadi logliklihood function for the given dataset
+
+\item {} 
+\sphinxstyleliteralstrong{\sphinxupquote{coordinates}} \textendash{} a pair of parameter coordinates specifying the 2d contour to be computed in parameter space
+
+\item {} 
+\sphinxstyleliteralstrong{\sphinxupquote{options}} \textendash{} an options dictionary for passing user options
+
+\end{itemize}
+
+\item[{Returns}] \leavevmode
+x, y\sphinxhyphen{}values in parameter space specified by coordinates tracing the projected profile confidence contour outline
+
+\item[{Return type}] \leavevmode
+{[}x\_fit, y\_fit{]}
+
+\end{description}\end{quote}
+
+\end{fulllineitems}
+
+\index{\_\_creategrid() (nloed.model.Model method)@\spxentry{\_\_creategrid()}\spxextra{nloed.model.Model method}}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{nloed:nloed.model.Model.__creategrid}}\pysiglinewithargsret{\sphinxbfcode{\sphinxupquote{\_\_creategrid}}}{\emph{\DUrole{n}{input\_candidate\_list}}}{}
+\end{fulllineitems}
+
+\index{\_\_logliksearch() (nloed.model.Model method)@\spxentry{\_\_logliksearch()}\spxextra{nloed.model.Model method}}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{nloed:nloed.model.Model.__logliksearch}}\pysiglinewithargsret{\sphinxbfcode{\sphinxupquote{\_\_logliksearch}}}{\emph{\DUrole{n}{profile\_loglik\_solver}}, \emph{\DUrole{n}{marginal\_param}}, \emph{\DUrole{n}{options}}, \emph{\DUrole{n}{forward}\DUrole{o}{=}\DUrole{default_value}{True}}}{}
+This function performs a root finding algorithm using solver\_list objects
+It uses halley’s method (currently bisection as of summer 2020) to find the radius value (relative to the mle) where the loglik ratio equals the chi\sphinxhyphen{}squared level
+This radius runs along the direction specified in the solver\_list when they are created
+Halley’s method is a higher order extension of newton’s method for finding roots
+\begin{quote}\begin{description}
+\item[{Parameters}] \leavevmode\begin{itemize}
+\item {} 
+\sphinxstyleliteralstrong{\sphinxupquote{solver\_list}} \textendash{} solver/casadi functions for finding the loglikelihood ratio gap at a given radius from mle,  and its 1st/2nd derivatives
+
+\item {} 
+\sphinxstyleliteralstrong{\sphinxupquote{marginal\_param}} \textendash{} starting values (usually the mle) for the marginal parameters
+
+\item {} 
+\sphinxstyleliteralstrong{\sphinxupquote{options}} \textendash{} an options dictionary for passing user options
+
+\item {} 
+\sphinxstyleliteralstrong{\sphinxupquote{forward}} \textendash{} boolean,  if true search is done in the forward (positive) radius direction (relative to direction specidied in solver list),  if false perform search starting with a negative radius
+
+\end{itemize}
+
+\item[{Returns}] \leavevmode
+returns the radius corresponding to the chi\sphinxhyphen{}squared boundary of the loglikelihood region
+marginal\_param: returns the optimal setting of the marginal parameters at the boundary
+ratio\_gap: returns the residual loglikelihood ratio gap at the boundary (it should be small,  within tolerance)
+
+\item[{Return type}] \leavevmode
+radius
+
+\end{description}\end{quote}
+
+\end{fulllineitems}
+
+\index{\_\_profileplot() (nloed.model.Model method)@\spxentry{\_\_profileplot()}\spxextra{nloed.model.Model method}}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{nloed:nloed.model.Model.__profileplot}}\pysiglinewithargsret{\sphinxbfcode{\sphinxupquote{\_\_profileplot}}}{\emph{\DUrole{n}{mle\_params}}, \emph{\DUrole{n}{loglik\_func}}, \emph{\DUrole{n}{figure}}, \emph{\DUrole{n}{options}}}{}
+This function plots profile parameter traces for each parameter value
+\begin{quote}\begin{description}
+\item[{Parameters}] \leavevmode\begin{itemize}
+\item {} 
+\sphinxstyleliteralstrong{\sphinxupquote{mle\_params}} \textendash{} mle parameter estimates,  recieved from fitting
+
+\item {} 
+\sphinxstyleliteralstrong{\sphinxupquote{loglik\_func}} \textendash{} casadi logliklihood function for the given dataset
+
+\item {} 
+\sphinxstyleliteralstrong{\sphinxupquote{figure}} \textendash{} the figure object on which plotting occurs
+
+\item {} 
+\sphinxstyleliteralstrong{\sphinxupquote{options}} \textendash{} an options dictionary for passing user options
+
+\end{itemize}
+
+\item[{Returns}] \leavevmode
+list of lists of upper and lower bounds for each parameter
+trace\_list: list of list of lists of parameter vector values along profile trace for each parameter
+profile\_list: List of lists of logliklihood ratio values for each parameter along the profile trace
+
+\item[{Return type}] \leavevmode
+interval\_list
+
+\end{description}\end{quote}
+
+\end{fulllineitems}
+
+\index{\_\_profilesetup() (nloed.model.Model method)@\spxentry{\_\_profilesetup()}\spxextra{nloed.model.Model method}}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{nloed:nloed.model.Model.__profilesetup}}\pysiglinewithargsret{\sphinxbfcode{\sphinxupquote{\_\_profilesetup}}}{\emph{\DUrole{n}{mle\_params}}, \emph{\DUrole{n}{loglik\_func}}, \emph{\DUrole{n}{fixedparams}}, \emph{\DUrole{n}{direction}}, \emph{\DUrole{n}{options}}}{}
+This function creates function/solver objects for performing a profile likelihood search for the condifence boundary
+in the specified direction,  the function/solver objects compute the logliklihood ratio gap
+at a given radius (along the specified direction),  along with the LLR gaps 1st and 2nd derivative with respect to the radius.
+marginal (free) parameters (if they exist) are optimized conditional on the fixed parameters specified by the radius and direction
+the likelihood ratio gap is the negative difference between the chi\sphinxhyphen{}squared boundary and the loglik ratio at the current radius
+\begin{quote}\begin{description}
+\item[{Parameters}] \leavevmode\begin{itemize}
+\item {} 
+\sphinxstyleliteralstrong{\sphinxupquote{mle\_params}} \textendash{} mle parameter estimates,  recieved from fitting
+
+\item {} 
+\sphinxstyleliteralstrong{\sphinxupquote{loglik\_func}} \textendash{} casadi logliklihood function for the given dataset
+
+\item {} 
+\sphinxstyleliteralstrong{\sphinxupquote{fixedparams}} \textendash{} a boolean vector,  same length as the parameters,  true means cooresponding parameters fixed by direction and radius,  false values are marginal and optimized (if they exist)
+
+\item {} 
+\sphinxstyleliteralstrong{\sphinxupquote{direction}} \textendash{} a direction in parameter space,  coordinate specified as true in fixedparams are used as the search direction
+
+\item {} 
+\sphinxstyleliteralstrong{\sphinxupquote{options}} \textendash{} an options dictionary for passing user options
+
+\end{itemize}
+
+\item[{Returns}] \leavevmode
+casadi function/ipopt solver that returns the loglik ratio gap for a given radius,  after optimizing free/marginal parameters if they exist
+profile\_loglik\_jacobian\_solver: casadi function/ipopt derived derivative function that returns the derivative of the loglik ratio gap with respect to the radius (jacobian is 1x1)
+profile\_loglik\_hessian\_solver: casadi function/ipopt derived 2nd derivative function that returns the 2nd derivative of the loglik ratio gap with respect to the radius (hessian is 1x1)
+
+\item[{Return type}] \leavevmode
+profile\_loglik\_solver
+
+\end{description}\end{quote}
+
+\end{fulllineitems}
+
+\index{\_\_profiletrace() (nloed.model.Model method)@\spxentry{\_\_profiletrace()}\spxextra{nloed.model.Model method}}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{nloed:nloed.model.Model.__profiletrace}}\pysiglinewithargsret{\sphinxbfcode{\sphinxupquote{\_\_profiletrace}}}{\emph{\DUrole{n}{mle\_params}}, \emph{\DUrole{n}{loglik\_func}}, \emph{\DUrole{n}{options}}}{}
+This function compute the profile logliklihood parameter trace for each parameter in the model
+\begin{quote}\begin{description}
+\item[{Parameters}] \leavevmode\begin{itemize}
+\item {} 
+\sphinxstyleliteralstrong{\sphinxupquote{mle\_params}} \textendash{} mle parameter estimates,  recieved from fitting
+
+\item {} 
+\sphinxstyleliteralstrong{\sphinxupquote{loglik\_func}} \textendash{} casadi logliklihood function for the given dataset
+
+\item {} 
+\sphinxstyleliteralstrong{\sphinxupquote{options}} \textendash{} an options dictionary for passing user options
+
+\end{itemize}
+
+\item[{Returns}] \leavevmode
+list of lists of upper and lower bounds for each parameter
+trace\_list: list of list of lists of parameter vector values along profile trace for each parameter
+profile\_list: List of lists of logliklihood ratio values for each parameter along the profile trace
+
+\item[{Return type}] \leavevmode
+interval\_list
+
+\end{description}\end{quote}
+
+\end{fulllineitems}
+
+\index{\_get\_distribution\_functions() (nloed.model.Model method)@\spxentry{\_get\_distribution\_functions()}\spxextra{nloed.model.Model method}}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{nloed:nloed.model.Model._get_distribution_functions}}\pysiglinewithargsret{\sphinxbfcode{\sphinxupquote{\_get\_distribution\_functions}}}{\emph{\DUrole{n}{observ\_model}}, \emph{\DUrole{n}{observ\_distribution}}}{}
+This function accepts the observation name, distribution type
+and observation model and constructs casadi functions to compute
+the logliklihood, fisher information, prediction mean/sensitivity/variance
+and also a numpy/casadi function to return random samples from the the model
+\begin{quote}\begin{description}
+\item[{Parameters}] \leavevmode\begin{itemize}
+\item {} 
+\sphinxstyleliteralstrong{\sphinxupquote{observ\_name}} \textendash{} a string specifying the observation variable name
+
+\item {} 
+\sphinxstyleliteralstrong{\sphinxupquote{observ\_distribution}} \textendash{} a string specifying the observation distribution type (i.e ‘Normal’)
+
+\item {} 
+\sphinxstyleliteralstrong{\sphinxupquote{observ\_model}} \textendash{} a casadi function mapping input and parameter vectors to sampling distribution statistics
+
+\end{itemize}
+
+\item[{Returns}] \leavevmode
+\begin{description}
+\item[{list of casadi/numpy functions in the following order;}] \leavevmode
+loglik, fisher info, prediction mean , prediction mean sensitivity,
+prediction variance, observation sampler
+
+\end{description}
+
+
+\item[{Return type}] \leavevmode
+function\_list
+
+\end{description}\end{quote}
+
+\end{fulllineitems}
+
+\index{\_progress\_bar() (nloed.model.Model method)@\spxentry{\_progress\_bar()}\spxextra{nloed.model.Model method}}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{nloed:nloed.model.Model._progress_bar}}\pysiglinewithargsret{\sphinxbfcode{\sphinxupquote{\_progress\_bar}}}{\emph{\DUrole{n}{iteration}}, \emph{\DUrole{n}{total}}, \emph{\DUrole{n}{prefix}\DUrole{o}{=}\DUrole{default_value}{\textquotesingle{}\textquotesingle{}}}}{}
+Helper function to print progress bar in a looped process
+\begin{quote}\begin{description}
+\item[{Parameters}] \leavevmode\begin{itemize}
+\item {} 
+\sphinxstyleliteralstrong{\sphinxupquote{iteration}} \textendash{} current iteration in the process
+
+\item {} 
+\sphinxstyleliteralstrong{\sphinxupquote{total}} \textendash{} total iterations in the process
+
+\item {} 
+\sphinxstyleliteralstrong{\sphinxupquote{prefix}} \textendash{} prefix string to name process
+
+\end{itemize}
+
+\end{description}\end{quote}
+
 \end{fulllineitems}
 
 \index{evaluate() (nloed.model.Model method)@\spxentry{evaluate()}\spxextra{nloed.model.Model method}}
@@ -209,13 +491,16 @@ design\_datasets
 
 \end{fulllineitems}
 
+\index{distribution\_dict (nloed.model.Model attribute)@\spxentry{distribution\_dict}\spxextra{nloed.model.Model attribute}}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{nloed:nloed.model.Model.distribution_dict}}\pysigline{\sphinxbfcode{\sphinxupquote{distribution\_dict}}\sphinxbfcode{\sphinxupquote{ = \{\textquotesingle{}Bernoulli\textquotesingle{}: {[}\textquotesingle{}Probability\textquotesingle{}{]}, \textquotesingle{}Binomial\textquotesingle{}: {[}\textquotesingle{}Probability\textquotesingle{}{]}, \textquotesingle{}Exponential\textquotesingle{}: {[}\textquotesingle{}Rate\textquotesingle{}{]}, \textquotesingle{}Gamma\textquotesingle{}: {[}\textquotesingle{}Shape\textquotesingle{}, \textquotesingle{}Scale\textquotesingle{}{]}, \textquotesingle{}Lognormal\textquotesingle{}: {[}\textquotesingle{}GeoMean\textquotesingle{}, \textquotesingle{}GeoVariance\textquotesingle{}{]}, \textquotesingle{}Normal\textquotesingle{}: {[}\textquotesingle{}Mean\textquotesingle{}, \textquotesingle{}Variance\textquotesingle{}{]}, \textquotesingle{}Poisson\textquotesingle{}: {[}\textquotesingle{}Rate\textquotesingle{}{]}\}}}}
+\end{fulllineitems}
+
 
 \end{fulllineitems}
 
 
-
-\subsection{NLoed’s Model Class Private Functions}
-\label{\detokenize{nloed:nloed-s-model-class-private-functions}}
 
 \subsection{NLoed’s Design Class}
 \label{\detokenize{nloed:module-nloed.design}}\label{\detokenize{nloed:nloed-s-design-class}}\index{module@\spxentry{module}!nloed.design@\spxentry{nloed.design}}\index{nloed.design@\spxentry{nloed.design}!module@\spxentry{module}}\index{Design (class in nloed.design)@\spxentry{Design}\spxextra{class in nloed.design}}
