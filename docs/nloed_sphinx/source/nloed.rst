@@ -10,6 +10,13 @@ NLoed's Model Class
 .. automodule:: nloed.model
    :members: Model
    :undoc-members:
+   :show-inheritance:
+
+NLoed's Model Class Private Functions
+-------------------------------------
+
+.. automodule:: nloed.model
+   :noindex:
    :private-members:
    :show-inheritance:
 
