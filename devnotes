@@ -1,3 +1,12 @@
+TODO
+-move this to docs, do it in markdown for github, link in readme near install
+-add package install with requirments.txt
+-add packaging outline
+-add pytest and tox outline
+-add sphinx guidline
+-add notebook stuff (if needed)
+
+
 To duplicated dev environment exactly (on Mac):
 
 Install xcode (might come with git, if not get git via homebrew)
