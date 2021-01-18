@@ -129,8 +129,7 @@ class Model:
             self.observation_percentile[observ_name] = obs_percent
             
     def _get_distribution_functions(self, observ_model, observ_distribution ):
-        """
-        This function accepts the observation name, distribution type
+        """This function accepts the observation name, distribution type
         and observation model and constructs casadi functions to compute
         the logliklihood, fisher information, prediction mean/sensitivity/variance
         and also a numpy/casadi function to return random samples from the the model
@@ -140,7 +139,7 @@ class Model:
             observ_distribution: a string specifying the observation distribution type (i.e 'Normal')
             observ_model: a casadi function mapping input and parameter vectors to sampling distribution statistics
 
-        Return:
+        Returns:
             function_list: list of casadi/numpy functions in the following order;
                             loglik, fisher info, prediction mean , prediction mean sensitivity,
                             prediction variance, observation sampler
@@ -492,15 +491,15 @@ class Model:
         return param_data
 
     def sample(self, designs, param, design_replicates=1,options={}):
-        """
-        This function generates datasets for a given design or list of designs,  with a given set of parameters,  with an optional number of replicates
+        """This function generates datasets for a given design or list of designs,
+        with a given set of parameters,  with an optional number of replicates
 
         Args:
             designs: either; a single design dictionary,  OR,  a list of design dictionaries
             parameters: the parameter values at which to generate the data
             replicates: optional,  an integer indicating the number of datasets to generate for each design,  default is 1
 
-        Return:
+        Returns:
             design_datasets: either; a singel dataset for the given design,  OR,  a list of dataset replicates for the given design,  OR,  a list of list of dataset replicates for each design
         """
         #NOTE: needs checks on inputs

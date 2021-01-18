@@ -7,7 +7,7 @@ import pandas as pd
 
 class Design:
     """ 
-    A class for statisical models in the NLoed package
+    A class for experimental designs in the NLoed package
     """
 
     def __init__(self, models, parameters, objective, discrete_inputs=None, continuous_inputs=None, observ_groups=None, fixed_design=None, options={}):
