@@ -91,6 +91,240 @@
 
 
 
+\chapter{nloed}
+\label{\detokenize{modules:nloed}}\label{\detokenize{modules::doc}}
+
+\section{nloed package}
+\label{\detokenize{nloed:nloed-package}}\label{\detokenize{nloed::doc}}
+
+\subsection{Submodules}
+\label{\detokenize{nloed:submodules}}
+
+\subsection{nloed.design module}
+\label{\detokenize{nloed:module-nloed.design}}\label{\detokenize{nloed:nloed-design-module}}\index{module@\spxentry{module}!nloed.design@\spxentry{nloed.design}}\index{nloed.design@\spxentry{nloed.design}!module@\spxentry{module}}\index{Design (class in nloed.design)@\spxentry{Design}\spxextra{class in nloed.design}}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{nloed:nloed.design.Design}}\pysiglinewithargsret{\sphinxbfcode{\sphinxupquote{class }}\sphinxcode{\sphinxupquote{nloed.design.}}\sphinxbfcode{\sphinxupquote{Design}}}{\emph{\DUrole{n}{models}}, \emph{\DUrole{n}{parameters}}, \emph{\DUrole{n}{objective}}, \emph{\DUrole{n}{discrete\_inputs}\DUrole{o}{=}\DUrole{default_value}{None}}, \emph{\DUrole{n}{continuous\_inputs}\DUrole{o}{=}\DUrole{default_value}{None}}, \emph{\DUrole{n}{observ\_groups}\DUrole{o}{=}\DUrole{default_value}{None}}, \emph{\DUrole{n}{fixed\_design}\DUrole{o}{=}\DUrole{default_value}{None}}, \emph{\DUrole{n}{options}\DUrole{o}{=}\DUrole{default_value}{\{\}}}}{}
+Bases: \sphinxcode{\sphinxupquote{object}}
+
+A class for experimental designs in the NLoed package
+\index{power() (nloed.design.Design method)@\spxentry{power()}\spxextra{nloed.design.Design method}}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{nloed:nloed.design.Design.power}}\pysiglinewithargsret{\sphinxbfcode{\sphinxupquote{power}}}{\emph{\DUrole{n}{sample\_size}}, \emph{\DUrole{n}{options}\DUrole{o}{=}\DUrole{default_value}{\{\}}}}{}
+This function
+Args:
+Return:
+
+\end{fulllineitems}
+
+\index{relaxed() (nloed.design.Design method)@\spxentry{relaxed()}\spxextra{nloed.design.Design method}}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{nloed:nloed.design.Design.relaxed}}\pysiglinewithargsret{\sphinxbfcode{\sphinxupquote{relaxed}}}{\emph{\DUrole{n}{options}\DUrole{o}{=}\DUrole{default_value}{\{\}}}}{}
+This function
+Args:
+Return:
+
+\end{fulllineitems}
+
+\index{round() (nloed.design.Design method)@\spxentry{round()}\spxextra{nloed.design.Design method}}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{nloed:nloed.design.Design.round}}\pysiglinewithargsret{\sphinxbfcode{\sphinxupquote{round}}}{\emph{\DUrole{n}{sample\_size}}, \emph{\DUrole{n}{options}\DUrole{o}{=}\DUrole{default_value}{\{\}}}}{}
+This function
+Args:
+Return:
+
+\end{fulllineitems}
+
+
+\end{fulllineitems}
+
+
+
+\subsection{nloed.model module}
+\label{\detokenize{nloed:module-nloed.model}}\label{\detokenize{nloed:nloed-model-module}}\index{module@\spxentry{module}!nloed.model@\spxentry{nloed.model}}\index{nloed.model@\spxentry{nloed.model}!module@\spxentry{module}}\index{Model (class in nloed.model)@\spxentry{Model}\spxextra{class in nloed.model}}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{nloed:nloed.model.Model}}\pysiglinewithargsret{\sphinxbfcode{\sphinxupquote{class }}\sphinxcode{\sphinxupquote{nloed.model.}}\sphinxbfcode{\sphinxupquote{Model}}}{\emph{\DUrole{n}{observ\_struct}}, \emph{\DUrole{n}{input\_names}}, \emph{\DUrole{n}{param\_names}}, \emph{\DUrole{n}{options}\DUrole{o}{=}\DUrole{default_value}{\{\}}}}{}
+Bases: \sphinxcode{\sphinxupquote{object}}
+
+A class for statisical models in the NLoed package
+\index{distribution\_dict (nloed.model.Model attribute)@\spxentry{distribution\_dict}\spxextra{nloed.model.Model attribute}}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{nloed:nloed.model.Model.distribution_dict}}\pysigline{\sphinxbfcode{\sphinxupquote{distribution\_dict}}\sphinxbfcode{\sphinxupquote{ = \{\textquotesingle{}Bernoulli\textquotesingle{}: {[}\textquotesingle{}Probability\textquotesingle{}{]}, \textquotesingle{}Binomial\textquotesingle{}: {[}\textquotesingle{}Probability\textquotesingle{}{]}, \textquotesingle{}Exponential\textquotesingle{}: {[}\textquotesingle{}Rate\textquotesingle{}{]}, \textquotesingle{}Gamma\textquotesingle{}: {[}\textquotesingle{}Shape\textquotesingle{}, \textquotesingle{}Scale\textquotesingle{}{]}, \textquotesingle{}Lognormal\textquotesingle{}: {[}\textquotesingle{}GeoMean\textquotesingle{}, \textquotesingle{}GeoVariance\textquotesingle{}{]}, \textquotesingle{}Normal\textquotesingle{}: {[}\textquotesingle{}Mean\textquotesingle{}, \textquotesingle{}Variance\textquotesingle{}{]}, \textquotesingle{}Poisson\textquotesingle{}: {[}\textquotesingle{}Rate\textquotesingle{}{]}\}}}}
+\end{fulllineitems}
+
+\index{evaluate() (nloed.model.Model method)@\spxentry{evaluate()}\spxextra{nloed.model.Model method}}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{nloed:nloed.model.Model.evaluate}}\pysiglinewithargsret{\sphinxbfcode{\sphinxupquote{evaluate}}}{\emph{\DUrole{n}{designs}}, \emph{\DUrole{n}{param}}, \emph{\DUrole{n}{options}\DUrole{o}{=}\DUrole{default_value}{\{\}}}}{}
+This function
+
+Args:
+
+Return:
+
+\end{fulllineitems}
+
+\index{fit() (nloed.model.Model method)@\spxentry{fit()}\spxextra{nloed.model.Model method}}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{nloed:nloed.model.Model.fit}}\pysiglinewithargsret{\sphinxbfcode{\sphinxupquote{fit}}}{\emph{\DUrole{n}{datasets}}, \emph{\DUrole{n}{start\_param}\DUrole{o}{=}\DUrole{default_value}{None}}, \emph{\DUrole{n}{options}\DUrole{o}{=}\DUrole{default_value}{\{\}}}}{}
+This function fits the model to a dataset using maximum likelihood
+it also provides optional marginal confidence intervals
+and plots of logliklihood profiles/traces and marginal projected confidence contours
+\begin{quote}\begin{description}
+\item[{Parameters}] \leavevmode\begin{itemize}
+\item {} 
+\sphinxstyleliteralstrong{\sphinxupquote{datasets}} \textendash{} either; a dictionary for one dataset OR a list of dictionaries,  each design replicates OR a list of lists of dict’s where each index in the outer lists has a unique design
+
+\item {} 
+\sphinxstyleliteralstrong{\sphinxupquote{options}} \textendash{} optional,  a dictionary of user defined options
+
+\end{itemize}
+
+\item[{Returns}] \leavevmode
+either; a list of lists structure with parameter fit lists,  has the same shape/order as the input,  OR,  the same strcture but with fits and intervals as the leaf object
+
+\item[{Return type}] \leavevmode
+ParameterFitStruct
+
+\end{description}\end{quote}
+
+\end{fulllineitems}
+
+\index{predict() (nloed.model.Model method)@\spxentry{predict()}\spxextra{nloed.model.Model method}}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{nloed:nloed.model.Model.predict}}\pysiglinewithargsret{\sphinxbfcode{\sphinxupquote{predict}}}{\emph{\DUrole{n}{input\_struct}}, \emph{\DUrole{n}{param}}, \emph{\DUrole{n}{covariance\_matrix}\DUrole{o}{=}\DUrole{default_value}{None}}, \emph{\DUrole{n}{options}\DUrole{o}{=}\DUrole{default_value}{\{\}}}}{}
+This function
+\begin{quote}\begin{description}
+\item[{Parameters}] \leavevmode\begin{itemize}
+\item {} 
+\sphinxstyleliteralstrong{\sphinxupquote{input\_struct}} \textendash{} 
+
+\item {} 
+\sphinxstyleliteralstrong{\sphinxupquote{param}} \textendash{} 
+
+\item {} 
+\sphinxstyleliteralstrong{\sphinxupquote{covariance\_matrix}} \textendash{} 
+
+\item {} 
+\sphinxstyleliteralstrong{\sphinxupquote{options}} \textendash{} optional,  a dictionary of user defined options
+
+\end{itemize}
+
+\end{description}\end{quote}
+
+Return:
+
+\end{fulllineitems}
+
+\index{sample() (nloed.model.Model method)@\spxentry{sample()}\spxextra{nloed.model.Model method}}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{nloed:nloed.model.Model.sample}}\pysiglinewithargsret{\sphinxbfcode{\sphinxupquote{sample}}}{\emph{\DUrole{n}{designs}}, \emph{\DUrole{n}{param}}, \emph{\DUrole{n}{design\_replicates}\DUrole{o}{=}\DUrole{default_value}{1}}, \emph{\DUrole{n}{options}\DUrole{o}{=}\DUrole{default_value}{\{\}}}}{}
+This function generates datasets for a given design or list of designs,
+with a given set of parameters,  with an optional number of replicates
+\begin{quote}\begin{description}
+\item[{Parameters}] \leavevmode\begin{itemize}
+\item {} 
+\sphinxstyleliteralstrong{\sphinxupquote{designs}} \textendash{} either; a single design dictionary,  OR,  a list of design dictionaries
+
+\item {} 
+\sphinxstyleliteralstrong{\sphinxupquote{parameters}} \textendash{} the parameter values at which to generate the data
+
+\item {} 
+\sphinxstyleliteralstrong{\sphinxupquote{replicates}} \textendash{} optional,  an integer indicating the number of datasets to generate for each design,  default is 1
+
+\end{itemize}
+
+\item[{Returns}] \leavevmode
+either; a singel dataset for the given design,  OR,  a list of dataset replicates for the given design,  OR,  a list of list of dataset replicates for each design
+
+\item[{Return type}] \leavevmode
+design\_datasets
+
+\end{description}\end{quote}
+
+\end{fulllineitems}
+
+
+\end{fulllineitems}
+
+\index{factorial (class in nloed.model)@\spxentry{factorial}\spxextra{class in nloed.model}}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{nloed:nloed.model.factorial}}\pysiglinewithargsret{\sphinxbfcode{\sphinxupquote{class }}\sphinxcode{\sphinxupquote{nloed.model.}}\sphinxbfcode{\sphinxupquote{factorial}}}{\emph{\DUrole{n}{name}}, \emph{\DUrole{n}{options}\DUrole{o}{=}\DUrole{default_value}{\{\}}}}{}
+Bases: \sphinxcode{\sphinxupquote{casadi.casadi.Callback}}
+\index{eval() (nloed.model.factorial method)@\spxentry{eval()}\spxextra{nloed.model.factorial method}}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{nloed:nloed.model.factorial.eval}}\pysiglinewithargsret{\sphinxbfcode{\sphinxupquote{eval}}}{\emph{\DUrole{n}{arg}}}{}
+Evaluate numerically, using temporary matrices and work vectors.
+\begin{quote}
+
+eval(self, {[}DM{]} arg) \sphinxhyphen{}\textgreater{} {[}DM{]}
+\end{quote}
+
+This signature is not thread\sphinxhyphen{}safe. For guaranteed thread\sphinxhyphen{}safety, use
+eval\_buffer
+
+\end{fulllineitems}
+
+\index{get\_n\_in() (nloed.model.factorial method)@\spxentry{get\_n\_in()}\spxextra{nloed.model.factorial method}}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{nloed:nloed.model.factorial.get_n_in}}\pysiglinewithargsret{\sphinxbfcode{\sphinxupquote{get\_n\_in}}}{}{}
+Get the number of inputs This function is called during construction.
+
+get\_n\_in(self) \sphinxhyphen{}\textgreater{} int
+
+\end{fulllineitems}
+
+\index{get\_n\_out() (nloed.model.factorial method)@\spxentry{get\_n\_out()}\spxextra{nloed.model.factorial method}}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{nloed:nloed.model.factorial.get_n_out}}\pysiglinewithargsret{\sphinxbfcode{\sphinxupquote{get\_n\_out}}}{}{}
+Get the number of outputs This function is called during construction.
+
+get\_n\_out(self) \sphinxhyphen{}\textgreater{} int
+
+\end{fulllineitems}
+
+\index{init() (nloed.model.factorial method)@\spxentry{init()}\spxextra{nloed.model.factorial method}}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{nloed:nloed.model.factorial.init}}\pysiglinewithargsret{\sphinxbfcode{\sphinxupquote{init}}}{}{}
+Initialize the object This function is called after the object construction
+\begin{quote}
+
+init(self)
+\end{quote}
+
+(for the whole class hierarchy) is complete, but before the finalization
+step. It is called recursively for the whole class hierarchy, starting with
+the lowest level.
+
+\end{fulllineitems}
+
+
+\end{fulllineitems}
+
+\index{silence\_stdout() (in module nloed.model)@\spxentry{silence\_stdout()}\spxextra{in module nloed.model}}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{nloed:nloed.model.silence_stdout}}\pysiglinewithargsret{\sphinxcode{\sphinxupquote{nloed.model.}}\sphinxbfcode{\sphinxupquote{silence\_stdout}}}{}{}
+\end{fulllineitems}
+
+
+
+\subsection{Module contents}
+\label{\detokenize{nloed:module-nloed}}\label{\detokenize{nloed:module-contents}}\index{module@\spxentry{module}!nloed@\spxentry{nloed}}\index{nloed@\spxentry{nloed}!module@\spxentry{module}}
+
 \chapter{Introduction}
 \label{\detokenize{index:introduction}}
 Intro blah blah
@@ -99,10 +333,6 @@ Intro blah blah
 \section{Motivation}
 \label{\detokenize{index:motivation}}
 Motivation blah blah
-\begin{quote}
-
-nloed
-\end{quote}
 
 
 \chapter{Indices and tables}
@@ -119,6 +349,14 @@ nloed
 \end{itemize}
 
 
+\renewcommand{\indexname}{Python Module Index}
+\begin{sphinxtheindex}
+\let\bigletter\sphinxstyleindexlettergroup
+\bigletter{n}
+\item\relax\sphinxstyleindexentry{nloed}\sphinxstyleindexpageref{nloed:\detokenize{module-nloed}}
+\item\relax\sphinxstyleindexentry{nloed.design}\sphinxstyleindexpageref{nloed:\detokenize{module-nloed.design}}
+\item\relax\sphinxstyleindexentry{nloed.model}\sphinxstyleindexpageref{nloed:\detokenize{module-nloed.model}}
+\end{sphinxtheindex}
 
 \renewcommand{\indexname}{Index}
 \printindex

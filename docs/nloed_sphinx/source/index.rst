@@ -9,6 +9,8 @@ Welcome to NLoed's documentation!
 .. toctree::
    :maxdepth: 2
    :caption: Contents:
+   
+   modules
 
 Introduction
 ============
@@ -20,7 +22,6 @@ Motivation
 
 Motivation blah blah
 
-   nloed
 
 
 Indices and tables
