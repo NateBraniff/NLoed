@@ -58,4 +58,9 @@ html_theme = 'alabaster'
 html_static_path = ['_static']
 
 
-autodoc_member_order = 'groupwise'
+autodoc_member_order = 'bysource'
+
+
+latex_elements = {
+  'extraclassoptions': 'openany,oneside'
+}
