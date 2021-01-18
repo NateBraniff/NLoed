@@ -4,20 +4,22 @@ nloed package
 Submodules
 ----------
 
-nloed.design module
+NLoed's Model Class
 -------------------
 
-.. automodule:: nloed.design
-   :members:
+.. automodule:: nloed.model
+   :members: Model
    :undoc-members:
+   :private-members:
    :show-inheritance:
 
-nloed.model module
-------------------
+NLoed's Design Class
+--------------------
 
-.. automodule:: nloed.model
-   :members:
+.. automodule:: nloed.design
+   :members: Design
    :undoc-members:
+   :private-members:
    :show-inheritance:
 
 Module contents
