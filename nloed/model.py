@@ -482,7 +482,8 @@ class Model:
         return param_data
 
     def sample(self, designs, param, design_replicates=1,options={}):
-        """A function for generating simulated data from the NLoed model for a given design passed as a dataframe.
+        """A function for generating simulated data from the NLoed model for a given design passed 
+        as a dataframe.
         
         This function generates datasets using the NLoed model and a provided design (or a list of 
         designs) via simulation and Numpy/Scipy's random number generation. This simulation is done
@@ -505,12 +506,13 @@ class Model:
                 Possible Values: True or False
 
         Returns:
-            dataframe OR list of dataframes: A dataframe containg a simulation of the design is returned by default
-                OR, if design_replicates was set >1, a list of dataframes containg simulated 
-                replicates is returned for the given design
-                OR,  if a list of dataframes with corresponding to multiple designs was passed
-                a list of lists of dataframes is returned, the outer index corresponds to the design
-                list, and the inner index corresponds to the number of replicates requested.
+            dataframe OR list of dataframes:
+            A dataframe containg a simulation of the design is returned by default
+            OR, if design_replicates was set to >1, a list of dataframes containg simulated 
+            replicates is returned for the given design
+            OR,  if a list of dataframes containing a set of design was passed,
+            a list of lists of dataframes is returned, the outer index corresponds to the design
+            list, and the inner index corresponds to the number of replicates requested.
         """
         #NOTE: needs checks on inputs
         #NOTE: should make the returned dataframe a multicolumn index to be consistent
@@ -568,16 +570,74 @@ class Model:
         user-provided input conditions and paramater values. Prediction information includes the
         predicted mean response of the model, confidence intervals for the mean response under 
         parameter uncertainty, confidence intervals for the observation distribution, and sensitivity
-        analysis. The returned intervals can be computed in a number of ways; exactly, with a normal
-        (local and deterministic) approximation, or using Monte Carlo simulation. 
+        analysis of the mean response. The returned intervals can be computed in a number of ways; 
+        exactly, with a normal (local and deterministic) approximation, or using Monte Carlo simulation. 
 
         Args:
-            input_struct:
-            param:
-            covariance_matrix:
-            options: optional,  a dictionary of user defined options
+            input_struct (dataframe): A dataframe specifying the combination of inputs values and 
+                observations at which predictions are desired.
+            param (array-like): The parameter vector values at which the predictions are to be made.
+            covariance_matrix (array-like, optional: A symetric matrix specifying the parameter's 
+                normal covariance matrix, required if parameter uncertainty is to be included. The
+                prior mean set by the values passed via the param argument.
+            options (dictionary, optional): A dictionary of user-defined options, possible key-value
+                pairs include:
 
-        Return:
+                "Method" --
+                Purpose: Selects the method used to compute the mean and prediction and observation 
+                intervals.
+                Type: string
+                Default Value: "Delta"
+                Possible Values: "Exact"=Compute predictions and intervals exactly; this
+                option is only available if no parameter uncertainty information is NOT provided .
+                "Delta"=Use a normal, local apporximation to compute the prediction and
+                intervals, "MonteCarlo"=Use Monte Carlo simulation of the model to compute the 
+                prediction and intervals under any parameter or observation uncertainty.
+
+                "PredictionInterval" --
+                Purpose: A boolean to indicat if prediction intervals are to be returned, true if yes.
+                Type: bool
+                Default Value: False
+                Possible Values: True or False
+
+                "ObservationInterval" --
+                Purpose: A boolean to indicat if observation intervals are to be returned, true if yes.
+                Type: bool
+                Default Value: False
+                Possible Values: True or False
+
+                "Sensitivity" --
+                Purpose: A boolean to indicat if observation intervals are to be returned, true if yes.
+                Type: bool
+                Default Value: False
+                Possible Values: True or False
+
+                "PredictionSampleNumber" --
+                Purpose: An integer indicating the number of parameter vectors to be sampled from
+                the prior in order to compute the prediction (and observation0 intervals using Monte
+                Carlo simulation.
+                Type: integer
+                Default Value: 10000
+                Possible Values:
+
+                "ObservationSampleNumber" --
+                Purpose: An integer indicating the number of observation values to be sampled from
+                the observation distribution in order to compute the observation interval using 
+                Monte Carlo simulation.
+                Type: integer
+                Default Value: 10
+                Possible Values:
+
+                "ConfidenceLevel" --
+                Purpose: A float specifying the confidence level desired for any intervals computed.
+                Type: float
+                Default Value: 0.95
+                Possible Values: <1, >0
+
+
+        Returns:
+            dataframe: A dataframe containing the requested prediction quntities computed at the
+                input and parameter settings passed.
 
         """
         #NOTE: evaluate model to predict mean and prediction interval for y
@@ -701,7 +761,8 @@ class Model:
 
     #NOTE: should maybe rename this
     def evaluate(self, designs, param, options={}):
-        """
+        """ A function for evaluating the peformance metrics of a passed design with the NLoed Model.
+
         This function 
 
         Args:

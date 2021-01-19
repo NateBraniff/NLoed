@@ -456,7 +456,8 @@ dataframe OR list of dataframes
 
 \begin{fulllineitems}
 \phantomsection\label{\detokenize{nloed:nloed.model.Model.sample}}\pysiglinewithargsret{\sphinxbfcode{\sphinxupquote{sample}}}{\emph{\DUrole{n}{designs}}, \emph{\DUrole{n}{param}}, \emph{\DUrole{n}{design\_replicates}\DUrole{o}{=}\DUrole{default_value}{1}}, \emph{\DUrole{n}{options}\DUrole{o}{=}\DUrole{default_value}{\{\}}}}{}
-A function for generating simulated data from the NLoed model for a given design passed as a dataframe.
+A function for generating simulated data from the NLoed model for a given design passed
+as a dataframe.
 
 This function generates datasets using the NLoed model and a provided design (or a list of
 designs) via simulation and Numpy/Scipy’s random number generation. This simulation is done
@@ -490,16 +491,12 @@ Possible Values: True or False
 \end{itemize}
 
 \item[{Returns}] \leavevmode
-\begin{description}
-\item[{A dataframe containg a simulation of the design is returned by default}] \leavevmode
-OR, if design\_replicates was set \textgreater{}1, a list of dataframes containg simulated
+A dataframe containg a simulation of the design is returned by default
+OR, if design\_replicates was set to \textgreater{}1, a list of dataframes containg simulated
 replicates is returned for the given design
-OR,  if a list of dataframes with corresponding to multiple designs was passed
+OR,  if a list of dataframes containing a set of design was passed,
 a list of lists of dataframes is returned, the outer index corresponds to the design
 list, and the inner index corresponds to the number of replicates requested.
-
-\end{description}
-
 
 \item[{Return type}] \leavevmode
 dataframe OR list of dataframes
@@ -518,27 +515,98 @@ This function can be used to compute predictions from an NLoed model instance gi
 user\sphinxhyphen{}provided input conditions and paramater values. Prediction information includes the
 predicted mean response of the model, confidence intervals for the mean response under
 parameter uncertainty, confidence intervals for the observation distribution, and sensitivity
-analysis. The returned intervals can be computed in a number of ways; exactly, with a normal
-(local and deterministic) approximation, or using Monte Carlo simulation.
+analysis of the mean response. The returned intervals can be computed in a number of ways;
+exactly, with a normal (local and deterministic) approximation, or using Monte Carlo simulation.
 \begin{quote}\begin{description}
 \item[{Parameters}] \leavevmode\begin{itemize}
 \item {} 
-\sphinxstyleliteralstrong{\sphinxupquote{input\_struct}} \textendash{} 
+\sphinxstyleliteralstrong{\sphinxupquote{input\_struct}} (\sphinxstyleliteralemphasis{\sphinxupquote{dataframe}}) \textendash{} A dataframe specifying the combination of inputs values and
+observations at which predictions are desired.
 
 \item {} 
-\sphinxstyleliteralstrong{\sphinxupquote{param}} \textendash{} 
+\sphinxstyleliteralstrong{\sphinxupquote{param}} (\sphinxstyleliteralemphasis{\sphinxupquote{array\sphinxhyphen{}like}}) \textendash{} The parameter vector values at which the predictions are to be made.
 
 \item {} 
-\sphinxstyleliteralstrong{\sphinxupquote{covariance\_matrix}} \textendash{} 
+\sphinxstyleliteralstrong{\sphinxupquote{(}}\sphinxstyleliteralstrong{\sphinxupquote{array\sphinxhyphen{}like}} (\sphinxstyleliteralemphasis{\sphinxupquote{covariance\_matrix}}) \textendash{} A symetric matrix specifying the parameter’s
+normal covariance matrix, required if parameter uncertainty is to be included. The
+prior mean set by the values passed via the param argument.
 
 \item {} 
-\sphinxstyleliteralstrong{\sphinxupquote{options}} \textendash{} optional,  a dictionary of user defined options
+\sphinxstyleliteralstrong{\sphinxupquote{optional}} \textendash{} A symetric matrix specifying the parameter’s
+normal covariance matrix, required if parameter uncertainty is to be included. The
+prior mean set by the values passed via the param argument.
+
+\item {} 
+\sphinxstyleliteralstrong{\sphinxupquote{options}} (\sphinxstyleliteralemphasis{\sphinxupquote{dictionary}}\sphinxstyleliteralemphasis{\sphinxupquote{, }}\sphinxstyleliteralemphasis{\sphinxupquote{optional}}) \textendash{} 
+A dictionary of user\sphinxhyphen{}defined options, possible key\sphinxhyphen{}value
+pairs include:
+
+”Method” \textendash{}
+Purpose: Selects the method used to compute the mean and prediction and observation
+intervals.
+Type: string
+Default Value: “Delta”
+Possible Values: “Exact”=Compute predictions and intervals exactly; this
+option is only available if no parameter uncertainty information is NOT provided .
+“Delta”=Use a normal, local apporximation to compute the prediction and
+intervals, “MonteCarlo”=Use Monte Carlo simulation of the model to compute the
+prediction and intervals under any parameter or observation uncertainty.
+
+”PredictionInterval” \textendash{}
+Purpose: A boolean to indicat if prediction intervals are to be returned, true if yes.
+Type: bool
+Default Value: False
+Possible Values: True or False
+
+”ObservationInterval” \textendash{}
+Purpose: A boolean to indicat if observation intervals are to be returned, true if yes.
+Type: bool
+Default Value: False
+Possible Values: True or False
+
+”Sensitivity” \textendash{}
+Purpose: A boolean to indicat if observation intervals are to be returned, true if yes.
+Type: bool
+Default Value: False
+Possible Values: True or False
+
+”PredictionSampleNumber” \textendash{}
+Purpose: An integer indicating the number of parameter vectors to be sampled from
+the prior in order to compute the prediction (and observation0 intervals using Monte
+Carlo simulation.
+Type: integer
+Default Value: 10000
+Possible Values:
+
+”ObservationSampleNumber” \textendash{}
+Purpose: An integer indicating the number of observation values to be sampled from
+the observation distribution in order to compute the observation interval using
+Monte Carlo simulation.
+Type: integer
+Default Value: 10
+Possible Values:
+
+”ConfidenceLevel” \textendash{}
+Purpose: A float specifying the confidence level desired for any intervals computed.
+Type: float
+Default Value: 0.95
+Possible Values: \textless{}1, \textgreater{}0
+
 
 \end{itemize}
 
-\end{description}\end{quote}
+\item[{Returns}] \leavevmode
+\begin{description}
+\item[{A dataframe containing the requested prediction quntities computed at the}] \leavevmode
+input and parameter settings passed.
 
-Return:
+\end{description}
+
+
+\item[{Return type}] \leavevmode
+dataframe
+
+\end{description}\end{quote}
 
 \end{fulllineitems}
 
@@ -546,6 +614,8 @@ Return:
 
 \begin{fulllineitems}
 \phantomsection\label{\detokenize{nloed:nloed.model.Model.evaluate}}\pysiglinewithargsret{\sphinxbfcode{\sphinxupquote{evaluate}}}{\emph{\DUrole{n}{designs}}, \emph{\DUrole{n}{param}}, \emph{\DUrole{n}{options}\DUrole{o}{=}\DUrole{default_value}{\{\}}}}{}
+A function for evaluating the peformance metrics of a passed design with the NLoed Model.
+
 This function
 
 Args:
@@ -948,6 +1018,14 @@ Return:
 
 \chapter{Index}
 \label{\detokenize{nloed:index}}\begin{itemize}
+\item {} 
+\DUrole{xref,std,std-ref}{genindex}
+
+\end{itemize}
+
+
+\chapter{Index}
+\label{\detokenize{index:index}}\begin{itemize}
 \item {} 
 \DUrole{xref,std,std-ref}{genindex}
 

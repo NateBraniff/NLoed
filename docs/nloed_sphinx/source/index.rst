@@ -12,3 +12,7 @@ Welcome to NLoed's documentation!
    
    nloed
 
+Index
+=====
+
+* :ref:`genindex`
