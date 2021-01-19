@@ -74,7 +74,7 @@
 
 
 \title{NLoed}
-\date{Jan 18, 2021}
+\date{Jan 19, 2021}
 \release{0.0.1}
 \author{Nathan Braniff}
 \newcommand{\sphinxlogo}{\vbox{}}
@@ -111,65 +111,54 @@ A class for statisical models in the NLoed package
 \phantomsection\label{\detokenize{nloed:nloed.model.Model.distribution_dict}}\pysigline{\sphinxbfcode{\sphinxupquote{distribution\_dict}}\sphinxbfcode{\sphinxupquote{ = \{\textquotesingle{}Bernoulli\textquotesingle{}: {[}\textquotesingle{}Probability\textquotesingle{}{]}, \textquotesingle{}Binomial\textquotesingle{}: {[}\textquotesingle{}Probability\textquotesingle{}{]}, \textquotesingle{}Exponential\textquotesingle{}: {[}\textquotesingle{}Rate\textquotesingle{}{]}, \textquotesingle{}Gamma\textquotesingle{}: {[}\textquotesingle{}Shape\textquotesingle{}, \textquotesingle{}Scale\textquotesingle{}{]}, \textquotesingle{}Lognormal\textquotesingle{}: {[}\textquotesingle{}GeoMean\textquotesingle{}, \textquotesingle{}GeoVariance\textquotesingle{}{]}, \textquotesingle{}Normal\textquotesingle{}: {[}\textquotesingle{}Mean\textquotesingle{}, \textquotesingle{}Variance\textquotesingle{}{]}, \textquotesingle{}Poisson\textquotesingle{}: {[}\textquotesingle{}Rate\textquotesingle{}{]}\}}}}
 \end{fulllineitems}
 
-\index{\_get\_distribution\_functions() (nloed.model.Model method)@\spxentry{\_get\_distribution\_functions()}\spxextra{nloed.model.Model method}}
+\index{fit() (nloed.model.Model method)@\spxentry{fit()}\spxextra{nloed.model.Model method}}
 
 \begin{fulllineitems}
-\phantomsection\label{\detokenize{nloed:nloed.model.Model._get_distribution_functions}}\pysiglinewithargsret{\sphinxbfcode{\sphinxupquote{\_get\_distribution\_functions}}}{\emph{\DUrole{n}{observ\_model}}, \emph{\DUrole{n}{observ\_distribution}}}{}
-This function accepts the observation name, distribution type
-and observation model and constructs casadi functions to compute
-the logliklihood, fisher information, prediction mean/sensitivity/variance
-and also a numpy/casadi function to return random samples from the the model
+\phantomsection\label{\detokenize{nloed:nloed.model.Model.fit}}\pysiglinewithargsret{\sphinxbfcode{\sphinxupquote{fit}}}{\emph{\DUrole{n}{datasets}}, \emph{\DUrole{n}{start\_param}\DUrole{o}{=}\DUrole{default_value}{None}}, \emph{\DUrole{n}{options}\DUrole{o}{=}\DUrole{default_value}{\{\}}}}{}
+A function for fitting the NLoed model to a dataset contained in a dataframe.
+
+This function fits the model to a dataset using maximum likelihood. This function can also
+return marginal confidence intervals as well as plots of liklihood profiles and projections
+of profiles traces and confidence contours.
 \begin{quote}\begin{description}
 \item[{Parameters}] \leavevmode\begin{itemize}
 \item {} 
-\sphinxstyleliteralstrong{\sphinxupquote{observ\_name}} \textendash{} a string specifying the observation variable name
+\sphinxstyleliteralstrong{\sphinxupquote{datasets}} (\sphinxstyleliteralemphasis{\sphinxupquote{dataframe}}\sphinxstyleliteralemphasis{\sphinxupquote{, }}\sphinxstyleliteralemphasis{\sphinxupquote{list}}) \textendash{} A dictionary containing the dataset to be fit.
+OR a list of dictionaries, each containing a dataset replicate of a given design
+OR a list of lists of dictionaries, where each index in the outer lists corresponds
+to a unique design and each inner index coresponds to a replicate of the given design
 
 \item {} 
-\sphinxstyleliteralstrong{\sphinxupquote{observ\_distribution}} \textendash{} a string specifying the observation distribution type (i.e ‘Normal’)
+\sphinxstyleliteralstrong{\sphinxupquote{start\_param}} (\sphinxstyleliteralemphasis{\sphinxupquote{array\sphinxhyphen{}like}}\sphinxstyleliteralemphasis{\sphinxupquote{, }}\sphinxstyleliteralemphasis{\sphinxupquote{optional}}) \textendash{} An array of starting parameter values where the
+local fitting optimization should be started
 
 \item {} 
-\sphinxstyleliteralstrong{\sphinxupquote{observ\_model}} \textendash{} a casadi function mapping input and parameter vectors to sampling distribution statistics
+\sphinxstyleliteralstrong{\sphinxupquote{options}} (\sphinxstyleliteralemphasis{\sphinxupquote{dict}}\sphinxstyleliteralemphasis{\sphinxupquote{, }}\sphinxstyleliteralemphasis{\sphinxupquote{optional}}) \textendash{} 
+a dictionary of user defined options
+
+Confidence \sphinxhyphen{} Default “None”; Values: ‘None” = No intervals generated, “Intervals” \sphinxhyphen{}
+Marginal intervals generated, “Profiles” = Marginal intervals generated and liklehood
+profiles and trace projections are plotted using Matplotlib, “Contours” = Marginal
+intervals generate, likelihood profiles and trace and confidence contour projections
+are plotted.
+
 
 \end{itemize}
 
 \item[{Returns}] \leavevmode
 \begin{description}
-\item[{list of casadi/numpy functions in the following order;}] \leavevmode
-loglik, fisher info, prediction mean , prediction mean sensitivity,
-prediction variance, observation sampler
+\item[{A dataframe with a column for each fit parameter, and if}] \leavevmode
+requested, columns for the lower and upper limit of the marginal confidence region
+of each. If a list of datasets was provided, fits (and intervals) for each are given
+in individual rows. If a list of lists of datasets was provided (designs X replicates),
+a list of dataframes will be returned with the same length as the outer index of the
+passed list of lists.
 
 \end{description}
 
 
 \item[{Return type}] \leavevmode
-function\_list
-
-\end{description}\end{quote}
-
-\end{fulllineitems}
-
-\index{fit() (nloed.model.Model method)@\spxentry{fit()}\spxextra{nloed.model.Model method}}
-
-\begin{fulllineitems}
-\phantomsection\label{\detokenize{nloed:nloed.model.Model.fit}}\pysiglinewithargsret{\sphinxbfcode{\sphinxupquote{fit}}}{\emph{\DUrole{n}{datasets}}, \emph{\DUrole{n}{start\_param}\DUrole{o}{=}\DUrole{default_value}{None}}, \emph{\DUrole{n}{options}\DUrole{o}{=}\DUrole{default_value}{\{\}}}}{}
-This function fits the model to a dataset using maximum likelihood
-it also provides optional marginal confidence intervals
-and plots of logliklihood profiles/traces and marginal projected confidence contours
-\begin{quote}\begin{description}
-\item[{Parameters}] \leavevmode\begin{itemize}
-\item {} 
-\sphinxstyleliteralstrong{\sphinxupquote{datasets}} \textendash{} either; a dictionary for one dataset OR a list of dictionaries,  each design replicates OR a list of lists of dict’s where each index in the outer lists has a unique design
-
-\item {} 
-\sphinxstyleliteralstrong{\sphinxupquote{options}} \textendash{} optional,  a dictionary of user defined options
-
-\end{itemize}
-
-\item[{Returns}] \leavevmode
-either; a list of lists structure with parameter fit lists,  has the same shape/order as the input,  OR,  the same strcture but with fits and intervals as the leaf object
-
-\item[{Return type}] \leavevmode
-ParameterFitStruct
+param\_data (dataframe, list)
 
 \end{description}\end{quote}
 
@@ -179,18 +168,25 @@ ParameterFitStruct
 
 \begin{fulllineitems}
 \phantomsection\label{\detokenize{nloed:nloed.model.Model.sample}}\pysiglinewithargsret{\sphinxbfcode{\sphinxupquote{sample}}}{\emph{\DUrole{n}{designs}}, \emph{\DUrole{n}{param}}, \emph{\DUrole{n}{design\_replicates}\DUrole{o}{=}\DUrole{default_value}{1}}, \emph{\DUrole{n}{options}\DUrole{o}{=}\DUrole{default_value}{\{\}}}}{}
-This function generates datasets for a given design or list of designs,
-with a given set of parameters,  with an optional number of replicates
+A function for generating simulated data from the NLoed model for a given design contained in a dataframe.
+
+This function generates datasets using the NLoed model and a provided design (or a list of
+designs) via simulation and Numpy/Scipy’s random number generation. This simulation is done
+at a user\sphinxhyphen{}provided set of parameter values. The number of replicates of the design that are
+simulated is optional but defaults to one.
 \begin{quote}\begin{description}
 \item[{Parameters}] \leavevmode\begin{itemize}
 \item {} 
-\sphinxstyleliteralstrong{\sphinxupquote{designs}} \textendash{} either; a single design dictionary,  OR,  a list of design dictionaries
+\sphinxstyleliteralstrong{\sphinxupquote{designs}} \textendash{} either; a single design dictionary, OR, a list of design dictionaries
 
 \item {} 
-\sphinxstyleliteralstrong{\sphinxupquote{parameters}} \textendash{} the parameter values at which to generate the data
+\sphinxstyleliteralstrong{\sphinxupquote{param}} \textendash{} the parameter values at which to generate the data
 
 \item {} 
-\sphinxstyleliteralstrong{\sphinxupquote{replicates}} \textendash{} optional,  an integer indicating the number of datasets to generate for each design,  default is 1
+\sphinxstyleliteralstrong{\sphinxupquote{design\_replicates}} \textendash{} optional,  an integer indicating the number of datasets to generate for each design,  default is 1
+
+\item {} 
+\sphinxstyleliteralstrong{\sphinxupquote{options}} \textendash{} 
 
 \end{itemize}
 
@@ -240,6 +236,43 @@ This function
 Args:
 
 Return:
+
+\end{fulllineitems}
+
+\index{\_get\_distribution\_functions() (nloed.model.Model method)@\spxentry{\_get\_distribution\_functions()}\spxextra{nloed.model.Model method}}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{nloed:nloed.model.Model._get_distribution_functions}}\pysiglinewithargsret{\sphinxbfcode{\sphinxupquote{\_get\_distribution\_functions}}}{\emph{\DUrole{n}{observ\_model}}, \emph{\DUrole{n}{observ\_distribution}}}{}
+This function accepts the observation name, distribution type
+and observation model and constructs casadi functions to compute
+the logliklihood, fisher information, prediction mean/sensitivity/variance
+and also a numpy/casadi function to return random samples from the the model
+\begin{quote}\begin{description}
+\item[{Parameters}] \leavevmode\begin{itemize}
+\item {} 
+\sphinxstyleliteralstrong{\sphinxupquote{observ\_name}} \textendash{} a string specifying the observation variable name
+
+\item {} 
+\sphinxstyleliteralstrong{\sphinxupquote{observ\_distribution}} \textendash{} a string specifying the observation distribution type (i.e ‘Normal’)
+
+\item {} 
+\sphinxstyleliteralstrong{\sphinxupquote{observ\_model}} \textendash{} a casadi function mapping input and parameter vectors to sampling distribution statistics
+
+\end{itemize}
+
+\item[{Returns}] \leavevmode
+\begin{description}
+\item[{list of casadi/numpy functions in the following order;}] \leavevmode
+loglik, fisher info, prediction mean , prediction mean sensitivity,
+prediction variance, observation sampler
+
+\end{description}
+
+
+\item[{Return type}] \leavevmode
+function\_list
+
+\end{description}\end{quote}
 
 \end{fulllineitems}
 

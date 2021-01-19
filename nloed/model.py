@@ -33,7 +33,6 @@ class Model:
     #NOTE: should rename inputs to cavariates or controls or smthg
 
     # COMMENTS AND VAR NAMING AND FUNCTION DOCSTRINGS
-
     # DOCUMENTATION
 
     distribution_dict={ 'Normal':       ['Mean','Variance'],
@@ -128,183 +127,37 @@ class Model:
             self.observation_sampler[observ_name] = obs_sampler
             self.observation_percentile[observ_name] = obs_percent
             
-    def _get_distribution_functions(self, observ_model, observ_distribution ):
-        """This function accepts the observation name, distribution type
-        and observation model and constructs casadi functions to compute
-        the logliklihood, fisher information, prediction mean/sensitivity/variance
-        and also a numpy/casadi function to return random samples from the the model
-
-        Args:
-            observ_name: a string specifying the observation variable name
-            observ_distribution: a string specifying the observation distribution type (i.e 'Normal')
-            observ_model: a casadi function mapping input and parameter vectors to sampling distribution statistics
-
-        Returns:
-            function_list: list of casadi/numpy functions in the following order;
-                            loglik, fisher info, prediction mean , prediction mean sensitivity,
-                            prediction variance, observation sampler
-        """
-        #get the observation name
-        observ_name = observ_model.name()
-        #create symbols for parameters and inputs,  and observation variable
-        if self.symbolics_boolean:
-            param_symbols = cs.SX.sym('param_symbols', self.num_param)
-            input_symbols = cs.SX.sym('input_symbols', self.num_input)
-            observ_symbol = cs.SX.sym(observ_name+'_symbol', 1)
-        else:
-            param_symbols = cs.MX.sym('param_symbols', self.num_param)
-            input_symbols = cs.MX.sym('input_symbols', self.num_input)
-            observ_symbol = cs.MX.sym(observ_name+'_symbol', 1)
-        #generate the distribution statistics symbols, and prediction sensitivity symbol
-        stats = observ_model(input_symbols, param_symbols)
-        stats_sensitivity = cs.jacobian(stats, param_symbols)
-
-        if observ_distribution  == 'Normal':
-            if not stats.shape == (2,1):
-                raise Exception('The Normal distribution accepts only 2 distributional parameters, but dimension '+str(stats)+' provided!')
-            #create LogLikelihood symbolics and function 
-            loglik_symbol = -0.5*cs.log(cs.sqrt(stats[1])) - (observ_symbol - stats[0])**2/(2*stats[1])
-            #create FIM symbolics and function
-            if self.symbolics_boolean:
-                elemental_fim = cs.vertcat(cs.horzcat(1/stats[1], cs.SX(0)),cs.horzcat(cs.SX(0), 1/(2*stats[1]**2)))
-            else:
-                elemental_fim = cs.vertcat(cs.horzcat(1/stats[1], cs.MX(0)),cs.horzcat(cs.MX(0), 1/(2*stats[1]**2)))
-            #create prediction functions for the mean, sensitivity and variance
-            model_mean_symbol = stats[0]
-            model_sensitivity_symbol = stats_sensitivity[0,:]
-            model_variance_symbol = stats[1]
-            #create random sampling function
-            var_to_stdev = lambda s: [s[0].full().item(), np.sqrt(s[1]).full().item()]
-            observ_sampler_func = lambda inpt,par,n=1: np.random.normal(*var_to_stdev(observ_model(inpt,par)),size=n)
-            observation_percentile_func = lambda perc,inpt,par: st.norm.ppf(perc,*var_to_stdev(observ_model(inpt,par)))
-        elif observ_distribution == 'Poisson':
-            if not stats.shape == (1,1):
-                raise Exception('The Poisson distribution accepts only 1 distributional parameters, but dimension '+str(stats)+' provided!')
-            #create a custom casadi function for doing factorials, store the function in the class so it doesn't go out of scope
-            # self.__factorialFunc = casadi_factorial
-            # casadi_factorial = factorial('fact')
-            #create LogLikelihood symbolics and function 
-            #loglik_symbol = observ_symbol*cs.log(stats[0]) + casadi_factorial(observ_symbol) - stats[0]
-            loglik_symbol = observ_symbol*cs.log(stats[0]) - stats[0]
-            #create FIM symbolics and function
-            elemental_fim = 1/stats[0]
-            #create prediction functions for the mean, sensitivity and variance
-            model_mean_symbol = stats[0]
-            model_sensitivity_symbol = stats_sensitivity[0,:]
-            model_variance_symbol = stats[0]
-            #create random sampling function
-            observ_sampler_func = lambda inpt,par,n=1: np.random.poisson(observ_model(inpt,par).full().item(),size=n)
-            observation_percentile_func = lambda inpt,par,perc: st.poisson.ppf(perc,*observ_model(inpt,par).full().item())
-        elif observ_distribution == 'Lognormal': 
-            if not stats.shape == (2,1):
-                raise Exception('The Lognormal distribution accepts only 2 distributional parameters, but dimension '+str(stats)+' provided!')
-            #create LogLikelihood symbolics and function 
-            #loglik_symbol = -cs.log(observ_symbol) - 0.5*cs.log(2*cs.pi*stats[1])\
-            #     - (cs.log(observ_symbol) - stats[0])**2/(2*stats[1])
-            loglik_symbol = - 0.5*cs.log(2*cs.pi*stats[1]) - (cs.log(observ_symbol) - stats[0])**2/(2*stats[1])
-            #create FIM symbolics and function
-            if self.symbolics_boolean:
-                elemental_fim = cs.vertcat(cs.horzcat(1/stats[1], cs.SX(0)),cs.horzcat(cs.SX(0), 1/(2*stats[1]**2)))
-            else:
-                elemental_fim = cs.vertcat(cs.horzcat(1/stats[1], cs.MX(0)),cs.horzcat(cs.MX(0), 1/(2*stats[1]**2)))
-            #create prediction functions for the mean, sensitivity and variance
-            model_mean_symbol = cs.exp(stats[0] + stats[1]/2)
-            model_sensitivity_symbol = cs.jacobian(model_mean_symbol,param_symbols)
-            model_variance_symbol = (cs.exp(stats[1])-1) * cs.exp(2*stats[0] + stats[1])
-            #create random sampling function
-            var_to_stdev = lambda s: [s[0].full().item(), np.sqrt(s[1].full().item())]
-            observ_sampler_func = lambda inpt,par,n=1: np.random.lognormal(*var_to_stdev(observ_model(inpt,par)),size=n)
-            to_shape_scale = lambda s: [np.sqrt(s[1].full().item()), 0, np.exp(s[0].full().item())]
-            observation_percentile_func = lambda perc,inpt,par: st.lognorm.ppf(perc,*to_shape_scale(observ_model(inpt,par)))
-        elif observ_distribution == 'Binomial': 
-            if not stats.shape == (2,1):
-                raise Exception('The Binomial distribution accepts only 2 distributional parameters, but dimension '+str(stats)+' provided!')
-            if not np.mod(cs.DM(stats[1]).full().item(),1)==0 :
-                raise Exception('The second distributional parameter for Binomial must be a whole number positive integer!')
-            #create LogLikelihood symbolics and function 
-            loglik_symbol = observ_symbol*cs.log(stats[0]) + (stats[1]-observ_symbol)*cs.log(1-stats[0])
-            #create FIM symbolics and function
-            if self.symbolics_boolean:
-                elemental_fim = cs.vertcat(cs.horzcat(stats[1]/(stats[0]*(1-stats[0])), cs.SX(0)),cs.horzcat(cs.SX(0), cs.SX(0)))
-            else:
-                elemental_fim = cs.vertcat(cs.horzcat(stats[1]/(stats[0]*(1-stats[0])), cs.MX(0)),cs.horzcat(cs.MX(0), cs.MX(0)))
-            #create prediction functions for the mean, sensitivity and variance
-            model_mean_symbol = stats[0]*stats[1]
-            model_sensitivity_symbol = cs.jacobian(model_mean_symbol,param_symbols)
-            model_variance_symbol = stats[1]*stats[0]*(1-stats[0])
-            #create random sampling function
-            float_to_int = lambda s: [int(s[1].full().item()), s[0].full().item()]
-            observ_sampler_func = lambda inpt,par,n=1: np.random.binomial(*float_to_int(observ_model(inpt,par)),size=n)
-            observation_percentile_func = lambda perc,inpt,par: st.binom.ppf(perc,*float_to_int(observ_model(inpt,par)))
-        elif observ_distribution == 'Bernoulli':
-            if not stats.shape == (1,1):
-                raise Exception('The Bernoulli distribution accepts only 1 distributional parameters, but dimension '+str(stats)+' provided!')
-            #create LogLikelihood symbolics and function 
-            loglik_symbol = observ_symbol*cs.log(stats[0]) + (1-observ_symbol)*cs.log(1-stats[0])
-            #create FIM symbolics and function
-            elemental_fim = 1/(stats[0]*(1-stats[0]))
-            #create prediction functions for the mean, sensitivity and variance
-            model_mean_symbol = stats[0]
-            model_sensitivity_symbol = cs.jacobian(model_mean_symbol,param_symbols)
-            model_variance_symbol = stats[0]*(1-stats[0])
-            #create random sampling function
-            observ_sampler_func = lambda inpt,par,n=1: np.random.binomial(1,observ_model(inpt,par).full().item(),size=n)
-            observation_percentile_func = lambda perc,inpt,par: st.bernoulli.ppf(perc,observ_model(inpt,par).full().item())
-        elif observ_distribution == 'Exponential': 
-            if not stats.shape == (1,1):
-                raise Exception('The Exponential distribution accepts only 1 distributional parameters, but dimension '+str(stats)+' provided!')
-            #create LogLikelihood symbolics and function 
-            loglik_symbol = cs.log(stats[0]) - observ_symbol*stats[0]
-            #create FIM symbolics and function
-            elemental_fim = 1/(cs.power(stats[0],2))
-            #create prediction functions for the mean, sensitivity and variance
-            model_mean_symbol = 1/stats[0]
-            model_sensitivity_symbol = cs.jacobian(model_mean_symbol,param_symbols)
-            model_variance_symbol = 1/(cs.power(stats[0],2))
-            #create random sampling function
-            observ_sampler_func = lambda inpt,par,n=1: np.random.exponential(1/observ_model(inpt,par).full().item(),size=n)
-            observation_percentile_func = lambda perc,inpt,par: st.expon.ppf(perc,1/observ_model(inpt,par).full().item())
-        elif observ_distribution == 'Gamma': 
-            print('Not Implemeneted')
-        else:
-            raise Exception('Unknown Distribution: '+observ_distribution)
-
-        loglik_func = cs.Function('loglik_'+observ_name, [observ_symbol, input_symbols, param_symbols], [loglik_symbol])
-        fisher_info_symbol = stats_sensitivity.T @ elemental_fim @ stats_sensitivity
-        fisher_info_func = cs.Function('fim_'+observ_name, [input_symbols, param_symbols], [fisher_info_symbol])
-
-        mean_casadi_func = cs.Function('pred_mean_'+observ_name,
-                                        [input_symbols, param_symbols],
-                                        [model_mean_symbol])
-        model_mean_func = lambda inpt,par: mean_casadi_func(inpt,par).full().item()
-        sensitivity_casadi_func = cs.Function('pred_sens_'+observ_name,
-                                                [input_symbols, param_symbols],
-                                                [model_sensitivity_symbol])
-        model_sensitivity_func = lambda inpt,par: sensitivity_casadi_func(inpt,par).full().flatten()
-        variance_casadi_func = cs.Function('pred_var'+observ_name,
-                                            [input_symbols, param_symbols],
-                                            [model_variance_symbol])
-        model_variance_func = lambda inpt,par: variance_casadi_func(inpt,par).full().item()
-
-        function_list = [loglik_func, fisher_info_func,
-                         model_mean_func, model_sensitivity_func,model_variance_func,
-                         observ_sampler_func, observation_percentile_func]
-
-        return function_list
-
+# --------------- Public functions -----------------------------------------------------------------
 
     def fit(self, datasets, start_param=None, options={}):
-        """
-        This function fits the model to a dataset using maximum likelihood
-        it also provides optional marginal confidence intervals
-        and plots of logliklihood profiles/traces and marginal projected confidence contours
+        """ A function for fitting the NLoed model to a dataset contained in a dataframe.
+
+        This function fits the model to a dataset using maximum likelihood. This function can also 
+        return marginal confidence intervals as well as plots of liklihood profiles and projections 
+        of profiles traces and confidence contours.
 
         Args:
-            datasets: either; a dictionary for one dataset OR a list of dictionaries,  each design replicates OR a list of lists of dict's where each index in the outer lists has a unique design
-            options: optional,  a dictionary of user defined options
+            datasets (dataframe, list): A dictionary containing the dataset to be fit.
+                OR a list of dictionaries, each containing a dataset replicate of a given design
+                OR a list of lists of dictionaries, where each index in the outer lists corresponds
+                to a unique design and each inner index coresponds to a replicate of the given design
+            start_param (array-like, optional): An array of starting parameter values where the 
+                local fitting optimization should be started
+            options (dict, optional): a dictionary of user defined options
+
+                Confidence - Default "None"; Values: 'None" = No intervals generated, "Intervals" - 
+                Marginal intervals generated, "Profiles" = Marginal intervals generated and liklehood
+                profiles and trace projections are plotted using Matplotlib, "Contours" = Marginal 
+                intervals generate, likelihood profiles and trace and confidence contour projections
+                are plotted.
 
         Return:
-            ParameterFitStruct: either; a list of lists structure with parameter fit lists,  has the same shape/order as the input,  OR,  the same strcture but with fits and intervals as the leaf object
+            param_data (dataframe, list): A dataframe with a column for each fit parameter, and if 
+                requested, columns for the lower and upper limit of the marginal confidence region 
+                of each. If a list of datasets was provided, fits (and intervals) for each are given 
+                in individual rows. If a list of lists of datasets was provided (designs X replicates),
+                a list of dataframes will be returned with the same length as the outer index of the
+                passed list of lists.
         """
         #NOTE: needs checks on inputs, var names, designs must be exact reps
         #NOTE: NEED testing for multiple observation input structures,  multiple dimensions of parameters ideally,  1, 2, 3 and 7+
@@ -491,13 +344,18 @@ class Model:
         return param_data
 
     def sample(self, designs, param, design_replicates=1,options={}):
-        """This function generates datasets for a given design or list of designs,
-        with a given set of parameters,  with an optional number of replicates
+        """A function for generating simulated data from the NLoed model for a given design contained in a dataframe.
+        
+        This function generates datasets using the NLoed model and a provided design (or a list of 
+        designs) via simulation and Numpy/Scipy's random number generation. This simulation is done
+        at a user-provided set of parameter values. The number of replicates of the design that are
+        simulated is optional but defaults to one.
 
         Args:
-            designs: either; a single design dictionary,  OR,  a list of design dictionaries
-            parameters: the parameter values at which to generate the data
-            replicates: optional,  an integer indicating the number of datasets to generate for each design,  default is 1
+            designs: either; a single design dictionary, OR, a list of design dictionaries
+            param: the parameter values at which to generate the data
+            design_replicates: optional,  an integer indicating the number of datasets to generate for each design,  default is 1
+            options:
 
         Returns:
             design_datasets: either; a singel dataset for the given design,  OR,  a list of dataset replicates for the given design,  OR,  a list of list of dataset replicates for each design
@@ -820,7 +678,173 @@ class Model:
     #     print('Not Implemeneted')
     #     #NOTE: maybe add a basic residual computation method for goodness of fit assesment?? Or maybe better show how in tutorial but not here
 
-# --------------- Private functions and subclasses ---------------------------------------------
+# --------------- Private functions (for constructor -----------------------------------------------
+
+    def _get_distribution_functions(self, observ_model, observ_distribution ):
+        """This function accepts the observation name, distribution type
+        and observation model and constructs casadi functions to compute
+        the logliklihood, fisher information, prediction mean/sensitivity/variance
+        and also a numpy/casadi function to return random samples from the the model
+
+        Args:
+            observ_name: a string specifying the observation variable name
+            observ_distribution: a string specifying the observation distribution type (i.e 'Normal')
+            observ_model: a casadi function mapping input and parameter vectors to sampling distribution statistics
+
+        Returns:
+            function_list: list of casadi/numpy functions in the following order;
+                            loglik, fisher info, prediction mean , prediction mean sensitivity,
+                            prediction variance, observation sampler
+        """
+        #get the observation name
+        observ_name = observ_model.name()
+        #create symbols for parameters and inputs,  and observation variable
+        if self.symbolics_boolean:
+            param_symbols = cs.SX.sym('param_symbols', self.num_param)
+            input_symbols = cs.SX.sym('input_symbols', self.num_input)
+            observ_symbol = cs.SX.sym(observ_name+'_symbol', 1)
+        else:
+            param_symbols = cs.MX.sym('param_symbols', self.num_param)
+            input_symbols = cs.MX.sym('input_symbols', self.num_input)
+            observ_symbol = cs.MX.sym(observ_name+'_symbol', 1)
+        #generate the distribution statistics symbols, and prediction sensitivity symbol
+        stats = observ_model(input_symbols, param_symbols)
+        stats_sensitivity = cs.jacobian(stats, param_symbols)
+
+        if observ_distribution  == 'Normal':
+            if not stats.shape == (2,1):
+                raise Exception('The Normal distribution accepts only 2 distributional parameters, but dimension '+str(stats)+' provided!')
+            #create LogLikelihood symbolics and function 
+            loglik_symbol = -0.5*cs.log(cs.sqrt(stats[1])) - (observ_symbol - stats[0])**2/(2*stats[1])
+            #create FIM symbolics and function
+            if self.symbolics_boolean:
+                elemental_fim = cs.vertcat(cs.horzcat(1/stats[1], cs.SX(0)),cs.horzcat(cs.SX(0), 1/(2*stats[1]**2)))
+            else:
+                elemental_fim = cs.vertcat(cs.horzcat(1/stats[1], cs.MX(0)),cs.horzcat(cs.MX(0), 1/(2*stats[1]**2)))
+            #create prediction functions for the mean, sensitivity and variance
+            model_mean_symbol = stats[0]
+            model_sensitivity_symbol = stats_sensitivity[0,:]
+            model_variance_symbol = stats[1]
+            #create random sampling function
+            var_to_stdev = lambda s: [s[0].full().item(), np.sqrt(s[1]).full().item()]
+            observ_sampler_func = lambda inpt,par,n=1: np.random.normal(*var_to_stdev(observ_model(inpt,par)),size=n)
+            observation_percentile_func = lambda perc,inpt,par: st.norm.ppf(perc,*var_to_stdev(observ_model(inpt,par)))
+        elif observ_distribution == 'Poisson':
+            if not stats.shape == (1,1):
+                raise Exception('The Poisson distribution accepts only 1 distributional parameters, but dimension '+str(stats)+' provided!')
+            #create a custom casadi function for doing factorials, store the function in the class so it doesn't go out of scope
+            # self.__factorialFunc = casadi_factorial
+            # casadi_factorial = factorial('fact')
+            #create LogLikelihood symbolics and function 
+            #loglik_symbol = observ_symbol*cs.log(stats[0]) + casadi_factorial(observ_symbol) - stats[0]
+            loglik_symbol = observ_symbol*cs.log(stats[0]) - stats[0]
+            #create FIM symbolics and function
+            elemental_fim = 1/stats[0]
+            #create prediction functions for the mean, sensitivity and variance
+            model_mean_symbol = stats[0]
+            model_sensitivity_symbol = stats_sensitivity[0,:]
+            model_variance_symbol = stats[0]
+            #create random sampling function
+            observ_sampler_func = lambda inpt,par,n=1: np.random.poisson(observ_model(inpt,par).full().item(),size=n)
+            observation_percentile_func = lambda inpt,par,perc: st.poisson.ppf(perc,*observ_model(inpt,par).full().item())
+        elif observ_distribution == 'Lognormal': 
+            if not stats.shape == (2,1):
+                raise Exception('The Lognormal distribution accepts only 2 distributional parameters, but dimension '+str(stats)+' provided!')
+            #create LogLikelihood symbolics and function 
+            #loglik_symbol = -cs.log(observ_symbol) - 0.5*cs.log(2*cs.pi*stats[1])\
+            #     - (cs.log(observ_symbol) - stats[0])**2/(2*stats[1])
+            loglik_symbol = - 0.5*cs.log(2*cs.pi*stats[1]) - (cs.log(observ_symbol) - stats[0])**2/(2*stats[1])
+            #create FIM symbolics and function
+            if self.symbolics_boolean:
+                elemental_fim = cs.vertcat(cs.horzcat(1/stats[1], cs.SX(0)),cs.horzcat(cs.SX(0), 1/(2*stats[1]**2)))
+            else:
+                elemental_fim = cs.vertcat(cs.horzcat(1/stats[1], cs.MX(0)),cs.horzcat(cs.MX(0), 1/(2*stats[1]**2)))
+            #create prediction functions for the mean, sensitivity and variance
+            model_mean_symbol = cs.exp(stats[0] + stats[1]/2)
+            model_sensitivity_symbol = cs.jacobian(model_mean_symbol,param_symbols)
+            model_variance_symbol = (cs.exp(stats[1])-1) * cs.exp(2*stats[0] + stats[1])
+            #create random sampling function
+            var_to_stdev = lambda s: [s[0].full().item(), np.sqrt(s[1].full().item())]
+            observ_sampler_func = lambda inpt,par,n=1: np.random.lognormal(*var_to_stdev(observ_model(inpt,par)),size=n)
+            to_shape_scale = lambda s: [np.sqrt(s[1].full().item()), 0, np.exp(s[0].full().item())]
+            observation_percentile_func = lambda perc,inpt,par: st.lognorm.ppf(perc,*to_shape_scale(observ_model(inpt,par)))
+        elif observ_distribution == 'Binomial': 
+            if not stats.shape == (2,1):
+                raise Exception('The Binomial distribution accepts only 2 distributional parameters, but dimension '+str(stats)+' provided!')
+            if not np.mod(cs.DM(stats[1]).full().item(),1)==0 :
+                raise Exception('The second distributional parameter for Binomial must be a whole number positive integer!')
+            #create LogLikelihood symbolics and function 
+            loglik_symbol = observ_symbol*cs.log(stats[0]) + (stats[1]-observ_symbol)*cs.log(1-stats[0])
+            #create FIM symbolics and function
+            if self.symbolics_boolean:
+                elemental_fim = cs.vertcat(cs.horzcat(stats[1]/(stats[0]*(1-stats[0])), cs.SX(0)),cs.horzcat(cs.SX(0), cs.SX(0)))
+            else:
+                elemental_fim = cs.vertcat(cs.horzcat(stats[1]/(stats[0]*(1-stats[0])), cs.MX(0)),cs.horzcat(cs.MX(0), cs.MX(0)))
+            #create prediction functions for the mean, sensitivity and variance
+            model_mean_symbol = stats[0]*stats[1]
+            model_sensitivity_symbol = cs.jacobian(model_mean_symbol,param_symbols)
+            model_variance_symbol = stats[1]*stats[0]*(1-stats[0])
+            #create random sampling function
+            float_to_int = lambda s: [int(s[1].full().item()), s[0].full().item()]
+            observ_sampler_func = lambda inpt,par,n=1: np.random.binomial(*float_to_int(observ_model(inpt,par)),size=n)
+            observation_percentile_func = lambda perc,inpt,par: st.binom.ppf(perc,*float_to_int(observ_model(inpt,par)))
+        elif observ_distribution == 'Bernoulli':
+            if not stats.shape == (1,1):
+                raise Exception('The Bernoulli distribution accepts only 1 distributional parameters, but dimension '+str(stats)+' provided!')
+            #create LogLikelihood symbolics and function 
+            loglik_symbol = observ_symbol*cs.log(stats[0]) + (1-observ_symbol)*cs.log(1-stats[0])
+            #create FIM symbolics and function
+            elemental_fim = 1/(stats[0]*(1-stats[0]))
+            #create prediction functions for the mean, sensitivity and variance
+            model_mean_symbol = stats[0]
+            model_sensitivity_symbol = cs.jacobian(model_mean_symbol,param_symbols)
+            model_variance_symbol = stats[0]*(1-stats[0])
+            #create random sampling function
+            observ_sampler_func = lambda inpt,par,n=1: np.random.binomial(1,observ_model(inpt,par).full().item(),size=n)
+            observation_percentile_func = lambda perc,inpt,par: st.bernoulli.ppf(perc,observ_model(inpt,par).full().item())
+        elif observ_distribution == 'Exponential': 
+            if not stats.shape == (1,1):
+                raise Exception('The Exponential distribution accepts only 1 distributional parameters, but dimension '+str(stats)+' provided!')
+            #create LogLikelihood symbolics and function 
+            loglik_symbol = cs.log(stats[0]) - observ_symbol*stats[0]
+            #create FIM symbolics and function
+            elemental_fim = 1/(cs.power(stats[0],2))
+            #create prediction functions for the mean, sensitivity and variance
+            model_mean_symbol = 1/stats[0]
+            model_sensitivity_symbol = cs.jacobian(model_mean_symbol,param_symbols)
+            model_variance_symbol = 1/(cs.power(stats[0],2))
+            #create random sampling function
+            observ_sampler_func = lambda inpt,par,n=1: np.random.exponential(1/observ_model(inpt,par).full().item(),size=n)
+            observation_percentile_func = lambda perc,inpt,par: st.expon.ppf(perc,1/observ_model(inpt,par).full().item())
+        elif observ_distribution == 'Gamma': 
+            print('Not Implemeneted')
+        else:
+            raise Exception('Unknown Distribution: '+observ_distribution)
+
+        loglik_func = cs.Function('loglik_'+observ_name, [observ_symbol, input_symbols, param_symbols], [loglik_symbol])
+        fisher_info_symbol = stats_sensitivity.T @ elemental_fim @ stats_sensitivity
+        fisher_info_func = cs.Function('fim_'+observ_name, [input_symbols, param_symbols], [fisher_info_symbol])
+
+        mean_casadi_func = cs.Function('pred_mean_'+observ_name,
+                                        [input_symbols, param_symbols],
+                                        [model_mean_symbol])
+        model_mean_func = lambda inpt,par: mean_casadi_func(inpt,par).full().item()
+        sensitivity_casadi_func = cs.Function('pred_sens_'+observ_name,
+                                                [input_symbols, param_symbols],
+                                                [model_sensitivity_symbol])
+        model_sensitivity_func = lambda inpt,par: sensitivity_casadi_func(inpt,par).full().flatten()
+        variance_casadi_func = cs.Function('pred_var'+observ_name,
+                                            [input_symbols, param_symbols],
+                                            [model_variance_symbol])
+        model_variance_func = lambda inpt,par: variance_casadi_func(inpt,par).full().item()
+
+        function_list = [loglik_func, fisher_info_func,
+                         model_mean_func, model_sensitivity_func,model_variance_func,
+                         observ_sampler_func, observation_percentile_func]
+
+        return function_list
+
+# --------------- Private functions (for public functions) -----------------------------------------
 
     def __confidence_intervals(self, mle_params, loglik_func, options):
         """ 
