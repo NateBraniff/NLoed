@@ -1,6 +1,3 @@
-NLoed Package
-=============
-
 NLoed's Model Class
 -------------------
 
