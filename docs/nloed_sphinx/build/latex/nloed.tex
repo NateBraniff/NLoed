@@ -134,21 +134,26 @@ local fitting optimization should be started
 
 \item {} 
 \sphinxstyleliteralstrong{\sphinxupquote{options}} (\sphinxstyleliteralemphasis{\sphinxupquote{dict}}\sphinxstyleliteralemphasis{\sphinxupquote{, }}\sphinxstyleliteralemphasis{\sphinxupquote{optional}}) \textendash{} 
-a dictionary of user defined options
+A dictionary of user\sphinxhyphen{}defined options, possible key\sphinxhyphen{}value pairs
+include:
 
-Confidence \sphinxhyphen{} Default “None”; Values: ‘None” = No intervals generated, “Intervals” \sphinxhyphen{}
-Marginal intervals generated, “Profiles” = Marginal intervals generated and liklehood
-profiles and trace projections are plotted using Matplotlib, “Contours” = Marginal
-intervals generate, likelihood profiles and trace and confidence contour projections
-are plotted.
+”Confidence”
+
+Default: “None”
+
+Values:
+‘None” = No intervals returned,
+“Intervals” = Marginal intervals returned,
+“Profiles” = Same as “Intervals” but trace projections are plotted using Matplotlib,
+“Contours” = Same as  “Profiles” but confidence contour projections are also plotted
 
 
 \end{itemize}
 
 \item[{Returns}] \leavevmode
 \begin{description}
-\item[{A dataframe with a column for each fit parameter, and if}] \leavevmode
-requested, columns for the lower and upper limit of the marginal confidence region
+\item[{Returns a dataframe with a column for each fit parameter,}] \leavevmode
+and if requested, columns for the lower and upper limit of the marginal confidence region
 of each. If a list of datasets was provided, fits (and intervals) for each are given
 in individual rows. If a list of lists of datasets was provided (designs X replicates),
 a list of dataframes will be returned with the same length as the outer index of the
@@ -158,7 +163,7 @@ passed list of lists.
 
 
 \item[{Return type}] \leavevmode
-param\_data (dataframe, list)
+dataframe OR list of dataframes
 
 \end{description}\end{quote}
 

@@ -143,17 +143,22 @@ class Model:
                 to a unique design and each inner index coresponds to a replicate of the given design
             start_param (array-like, optional): An array of starting parameter values where the 
                 local fitting optimization should be started
-            options (dict, optional): a dictionary of user defined options
+            options (dict, optional): A dictionary of user-defined options, possible key-value pairs
+                include:
 
-                Confidence - Default "None"; Values: 'None" = No intervals generated, "Intervals" - 
-                Marginal intervals generated, "Profiles" = Marginal intervals generated and liklehood
-                profiles and trace projections are plotted using Matplotlib, "Contours" = Marginal 
-                intervals generate, likelihood profiles and trace and confidence contour projections
-                are plotted.
+                "Confidence"
+
+                Default: "None"
+
+                Values:
+                'None" = No intervals returned,
+                "Intervals" = Marginal intervals returned, 
+                "Profiles" = Same as "Intervals" but trace projections are plotted using Matplotlib,
+                "Contours" = Same as  "Profiles" but confidence contour projections are also plotted
 
         Return:
-            param_data (dataframe, list): A dataframe with a column for each fit parameter, and if 
-                requested, columns for the lower and upper limit of the marginal confidence region 
+            dataframe OR list of dataframes: Returns a dataframe with a column for each fit parameter, 
+                and if requested, columns for the lower and upper limit of the marginal confidence region 
                 of each. If a list of datasets was provided, fits (and intervals) for each are given 
                 in individual rows. If a list of lists of datasets was provided (designs X replicates),
                 a list of dataframes will be returned with the same length as the outer index of the
