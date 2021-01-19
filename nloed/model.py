@@ -15,8 +15,75 @@ from scipy.interpolate import splev,  splrep
 
 
 class Model:
-    """ 
-    A class for statisical models in the NLoed package
+    """ The NLoed Model class implements a mathematical model and provides useful functions for model building.
+
+    This class encodes casadi symbolic structures connecting model inputs and parameters to the
+    observation variables. The class also encodes the assumed distirbution for each model observation
+    variable.
+    
+    Upon construction, the class populates a series of casadi function attributes for
+    computing various model predictions (i.e. mean, variance, sensitivity), logliklhoods, data
+    sampling, and the fisher information. These function attributes are used to implement the class's
+    public user-callable functions; fit(), predict(), evaluate() and sample(). The function attributes
+    are also used by NLoed's Design class when a Model instance is passsed for experimental design.
+
+    Attributes:
+        symbolics_boolean (bool): A boolean indicating if Casadi SX (True) or MX (false) symbolics
+            should be used.
+        num_observ (integer): An integer indicating the number of observation variables in the model.
+        num_input (integer): An integer indicating the number of input variables accepted by the model.
+        num_param (integer): An integer indicating the number of parameters accepted by the model.
+        input_name_list (list of strings): A list of the input variable names, in the order passed 
+            to the model constructor.
+        param_name_list (list of strings): A list of the parameter names, in the order passed 
+            to the model constructor.
+        observ_name_list (list of strings): A list of the observation variable names, in the order
+            passed to the model constructor.
+        loglik (dictionary of functions): This function attribute consists of a dictionary in which 
+            the keys are the model's observation variable names and the values are casadi functions
+            computing the loglikelihood of a single observation of the variable at the passed
+            observation value with the passed input and parameter settings.
+
+            Call Structure: Model.loglik[obs_name](obs_value, inputs, parameters)
+        fisher_info_matrix (dictionary of functions): This function attribute consists of a 
+            dictionary in which the keys are the model's observation variable names and the values 
+            are casadi functions computing the fisher information matrix for a single observation of
+            the specified observation variable at the passed input and parameter settings.
+            Model.model_mean(inputs, parameters)
+
+            Call Structure: Model.fisher_info_matrix[obs_name](inputs, parameters)
+        model_mean (dictionary of functions): This function attribute consists of a 
+            dictionary in which the keys are the model's observation variable names and the values 
+            are casadi functions computing the expected mean observation value at the passed input
+            and parameter settings.
+
+            Call Structure: Model.model_mean[obs_name](inputs, parameters)
+        model_variance (dictionary of functions): This function attribute consists of a 
+            dictionary in which the keys are the model's observation variable names and the values 
+            are casadi functions computing the expected variance of the observation variable at the
+            passed input and parameter settings.
+
+            Call Structure: Model.model_variance[obs_name](inputs, parameters)
+        model_sensitivity (dictionary of functions): This function attribute consists of a 
+            dictionary in which the keys are the model's observation variable names and the values 
+            are casadi functions computing the parameteric sensitivity of the expected mean 
+            observation of the specified variable at the passed input and parameter settings.
+
+            Call Structure: Model.model_variance[obs_name](inputs, parameters)
+        observation_sampler (dictionary of functions): This function attribute consists of a 
+            dictionary in which the keys are the model's observation variable names and the values 
+            are casadi-based functions generating random realizations of the observation variable value
+            from its expected distribution, conditioned on the passed input and parameter settings.
+
+            Call Structure: Model.model_variance[obs_name](inputs, parameters)
+        observation_percentile (dictionary of functions): This function attribute consists of a 
+            dictionary in which the keys are the model's observation variable names and the values 
+            are casadi-based functions computing the requested percentile of the observation variable's
+            distribution conditioned on the passed input and parameter settings.
+
+            Call Structure: Model.model_variance[obs_name](percentile, inputs, parameters)
+
+    
     """
 
     # FEATURES TO ADD & TESTING
@@ -35,6 +102,9 @@ class Model:
     # COMMENTS AND VAR NAMING AND FUNCTION DOCSTRINGS
     # DOCUMENTATION
 
+    #add format for dataframes to docstrings
+    #add error classes and document them in docstrings??
+
     distribution_dict={ 'Normal':       ['Mean','Variance'],
                         'Poisson':      ['Rate'],
                         'Lognormal':    ['GeoMean','GeoVariance'],
@@ -43,7 +113,7 @@ class Model:
                         'Exponential':  ['Rate'],
                         'Gamma':        ['Shape','Scale']}
 
-    def __init__(self, observ_struct, input_names, param_names,options={}):
+    def __init__(self, observ_struct, input_names, param_names, options={}):
         
         default_options = \
           { 'ScalarSymbolics':       [True,       lambda x: isinstance(x,bool) ]}
@@ -89,19 +159,21 @@ class Model:
         self.param_name_list= param_names
         self.observ_name_list = [] 
         #create dicts for input/param names,  can be used to look up indices with names
-        self.input_name_dict, self.param_name_dict = {}, {}
-        #self.observ_name_dict ={}
-        #populate the input name dict
-        for i in range(self.num_input):
-            self.input_name_dict[input_names[i]] = i
-        #populate the param name dict
-        for i in range(self.num_param):
-            self.param_name_dict[param_names[i]] = i
+        # self.input_name_dict, self.param_name_dict = {}, {}
+        # #self.observ_name_dict ={}
+        # #populate the input name dict
+        # for i in range(self.num_input):
+        #     self.input_name_dict[input_names[i]] = i
+        # #populate the param name dict
+        # for i in range(self.num_param):
+        #     self.param_name_dict[param_names[i]] = i
         #create a list to store the observation variable distribution type and
         #   functions for computing observation sampling statistics, loglikelihood, and fisher info. matrix
-        self.distribution, self.model, self.loglik, self.fisher_info_matrix = {},{},{},{}
+        #self.distribution, 
+        #self.model,
+        self.loglik, self.fisher_info_matrix = {},{},{},{}
         #create a list to store casadi functions for the predicted mean, mean parameteric sensitivity, prediction variance 
-        self.model_mean , self.model_variance, self.model_sensitivity = {},{},{}
+        self.model_mean, self.model_variance, self.model_sensitivity = {},{},{}
         self.observation_sampler, self.observation_percentile ={}, {}
         #loop over the observation variables
         for i in range(self.num_observ):
@@ -115,8 +187,8 @@ class Model:
                 self.observ_name_list.append(observ_name)
             else:
                 raise Exception('Observation names must be unique!')
-            self.distribution[observ_name] = observ_distribution
-            self.model[observ_name] = observ_model
+            #self.distribution[observ_name] = observ_distribution
+            #self.model[observ_name] = observ_model
             [loglik, fish_info, model_mean, model_sens, model_var, obs_sampler, obs_percent] = \
                 self._get_distribution_functions(observ_model, observ_distribution)
             self.loglik[observ_name] = loglik
@@ -410,7 +482,7 @@ class Model:
         return param_data
 
     def sample(self, designs, param, design_replicates=1,options={}):
-        """A function for generating simulated data from the NLoed model for a given design contained in a dataframe.
+        """A function for generating simulated data from the NLoed model for a given design passed as a dataframe.
         
         This function generates datasets using the NLoed model and a provided design (or a list of 
         designs) via simulation and Numpy/Scipy's random number generation. This simulation is done
@@ -418,13 +490,27 @@ class Model:
         simulated is optional but defaults to one.
 
         Args:
-            designs: either; a single design dictionary, OR, a list of design dictionaries
-            param: the parameter values at which to generate the data
-            design_replicates: optional,  an integer indicating the number of datasets to generate for each design,  default is 1
-            options:
+            designs (dataframe OR list of dataframes): A dataframe containing the design to be simulated,
+                OR a list of dataframes containing multiple designs to be simulated
+            param (array-like): The parameter values used to generate the data
+            design_replicates (integer, optional): An integer indicating the number of dataset 
+                replicates to be generated for each design. The default is 1 per design passed.
+            options (dict, optional): A dictionary of user-defined options, possible key-value pairs
+                include:
+
+                "Verbose" --
+                Purpose: Determines the amount of print feedback provided while the function executes
+                Type: bool,
+                Default Value: True,
+                Possible Values: True or False
 
         Returns:
-            design_datasets: either; a singel dataset for the given design,  OR,  a list of dataset replicates for the given design,  OR,  a list of list of dataset replicates for each design
+            dataframe OR list of dataframes: A dataframe containg a simulation of the design is returned by default
+                OR, if design_replicates was set >1, a list of dataframes containg simulated 
+                replicates is returned for the given design
+                OR,  if a list of dataframes with corresponding to multiple designs was passed
+                a list of lists of dataframes is returned, the outer index corresponds to the design
+                list, and the inner index corresponds to the number of replicates requested.
         """
         #NOTE: needs checks on inputs
         #NOTE: should make the returned dataframe a multicolumn index to be consistent
@@ -476,8 +562,14 @@ class Model:
             return replicat_datasets
         
     def predict(self, input_struct, param, covariance_matrix=None, options={}):
-        """
-        This function 
+        """ A function for generating prediction information from the NLoed model.
+        
+        This function can be used to compute predictions from an NLoed model instance given the
+        user-provided input conditions and paramater values. Prediction information includes the
+        predicted mean response of the model, confidence intervals for the mean response under 
+        parameter uncertainty, confidence intervals for the observation distribution, and sensitivity
+        analysis. The returned intervals can be computed in a number of ways; exactly, with a normal
+        (local and deterministic) approximation, or using Monte Carlo simulation. 
 
         Args:
             input_struct:
@@ -744,10 +836,15 @@ class Model:
     #     print('Not Implemeneted')
     #     #NOTE: maybe add a basic residual computation method for goodness of fit assesment?? Or maybe better show how in tutorial but not here
 
-# --------------- Private functions (for constructor -----------------------------------------------
+# --------------- Private functions (for constructor) ----------------------------------------------
 
     def _get_distribution_functions(self, observ_model, observ_distribution ):
-        """This function accepts the observation name, distribution type
+        """ A private function that automatically generates function attributes for the given 
+        observation variable information.
+        
+        This private function is used during the NLoed model class construction.
+
+        This function accepts the observation name, distribution type
         and observation model and constructs casadi functions to compute
         the logliklihood, fisher information, prediction mean/sensitivity/variance
         and also a numpy/casadi function to return random samples from the the model
@@ -758,9 +855,9 @@ class Model:
             observ_model: a casadi function mapping input and parameter vectors to sampling distribution statistics
 
         Returns:
-            function_list: list of casadi/numpy functions in the following order;
-                            loglik, fisher info, prediction mean , prediction mean sensitivity,
-                            prediction variance, observation sampler
+            list: A list of casadi/numpy functions in the following order;
+                    loglik, fisher info, prediction mean , prediction mean sensitivity,
+                    prediction variance, observation sampler
         """
         #get the observation name
         observ_name = observ_model.name()

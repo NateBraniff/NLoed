@@ -98,7 +98,239 @@
 \phantomsection\label{\detokenize{nloed:nloed.model.Model}}\pysiglinewithargsret{\sphinxbfcode{\sphinxupquote{class }}\sphinxcode{\sphinxupquote{nloed.model.}}\sphinxbfcode{\sphinxupquote{Model}}}{\emph{\DUrole{n}{observ\_struct}}, \emph{\DUrole{n}{input\_names}}, \emph{\DUrole{n}{param\_names}}, \emph{\DUrole{n}{options}\DUrole{o}{=}\DUrole{default_value}{\{\}}}}{}
 Bases: \sphinxcode{\sphinxupquote{object}}
 
-A class for statisical models in the NLoed package
+The NLoed Model class implements a mathematical model and provides useful functions for model building.
+
+This class encodes casadi symbolic structures connecting model inputs and parameters to the
+observation variables. The class also encodes the assumed distirbution for each model observation
+variable.
+
+Upon construction, the class populates a series of casadi function attributes for
+computing various model predictions (i.e. mean, variance, sensitivity), logliklhoods, data
+sampling, and the fisher information. These function attributes are used to implement the class’s
+public user\sphinxhyphen{}callable functions; fit(), predict(), evaluate() and sample(). The function attributes
+are also used by NLoed’s Design class when a Model instance is passsed for experimental design.
+\index{symbolics\_boolean (nloed.model.Model attribute)@\spxentry{symbolics\_boolean}\spxextra{nloed.model.Model attribute}}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{nloed:nloed.model.Model.symbolics_boolean}}\pysigline{\sphinxbfcode{\sphinxupquote{symbolics\_boolean}}}
+A boolean indicating if Casadi SX (True) or MX (false) symbolics
+should be used.
+\begin{quote}\begin{description}
+\item[{Type}] \leavevmode
+bool
+
+\end{description}\end{quote}
+
+\end{fulllineitems}
+
+\index{num\_observ (nloed.model.Model attribute)@\spxentry{num\_observ}\spxextra{nloed.model.Model attribute}}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{nloed:nloed.model.Model.num_observ}}\pysigline{\sphinxbfcode{\sphinxupquote{num\_observ}}}
+An integer indicating the number of observation variables in the model.
+\begin{quote}\begin{description}
+\item[{Type}] \leavevmode
+integer
+
+\end{description}\end{quote}
+
+\end{fulllineitems}
+
+\index{num\_input (nloed.model.Model attribute)@\spxentry{num\_input}\spxextra{nloed.model.Model attribute}}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{nloed:nloed.model.Model.num_input}}\pysigline{\sphinxbfcode{\sphinxupquote{num\_input}}}
+An integer indicating the number of input variables accepted by the model.
+\begin{quote}\begin{description}
+\item[{Type}] \leavevmode
+integer
+
+\end{description}\end{quote}
+
+\end{fulllineitems}
+
+\index{num\_param (nloed.model.Model attribute)@\spxentry{num\_param}\spxextra{nloed.model.Model attribute}}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{nloed:nloed.model.Model.num_param}}\pysigline{\sphinxbfcode{\sphinxupquote{num\_param}}}
+An integer indicating the number of parameters accepted by the model.
+\begin{quote}\begin{description}
+\item[{Type}] \leavevmode
+integer
+
+\end{description}\end{quote}
+
+\end{fulllineitems}
+
+\index{input\_name\_list (nloed.model.Model attribute)@\spxentry{input\_name\_list}\spxextra{nloed.model.Model attribute}}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{nloed:nloed.model.Model.input_name_list}}\pysigline{\sphinxbfcode{\sphinxupquote{input\_name\_list}}}
+A list of the input variable names, in the order passed
+to the model constructor.
+\begin{quote}\begin{description}
+\item[{Type}] \leavevmode
+list of strings
+
+\end{description}\end{quote}
+
+\end{fulllineitems}
+
+\index{param\_name\_list (nloed.model.Model attribute)@\spxentry{param\_name\_list}\spxextra{nloed.model.Model attribute}}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{nloed:nloed.model.Model.param_name_list}}\pysigline{\sphinxbfcode{\sphinxupquote{param\_name\_list}}}
+A list of the parameter names, in the order passed
+to the model constructor.
+\begin{quote}\begin{description}
+\item[{Type}] \leavevmode
+list of strings
+
+\end{description}\end{quote}
+
+\end{fulllineitems}
+
+\index{observ\_name\_list (nloed.model.Model attribute)@\spxentry{observ\_name\_list}\spxextra{nloed.model.Model attribute}}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{nloed:nloed.model.Model.observ_name_list}}\pysigline{\sphinxbfcode{\sphinxupquote{observ\_name\_list}}}
+A list of the observation variable names, in the order
+passed to the model constructor.
+\begin{quote}\begin{description}
+\item[{Type}] \leavevmode
+list of strings
+
+\end{description}\end{quote}
+
+\end{fulllineitems}
+
+\index{loglik (nloed.model.Model attribute)@\spxentry{loglik}\spxextra{nloed.model.Model attribute}}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{nloed:nloed.model.Model.loglik}}\pysigline{\sphinxbfcode{\sphinxupquote{loglik}}}
+This function attribute consists of a dictionary in which
+the keys are the model’s observation variable names and the values are casadi functions
+computing the loglikelihood of a single observation of the variable at the passed
+observation value with the passed input and parameter settings.
+
+Call Structure: Model.loglik{[}obs\_name{]}(obs\_value, inputs, parameters)
+\begin{quote}\begin{description}
+\item[{Type}] \leavevmode
+dictionary of functions
+
+\end{description}\end{quote}
+
+\end{fulllineitems}
+
+\index{fisher\_info\_matrix (nloed.model.Model attribute)@\spxentry{fisher\_info\_matrix}\spxextra{nloed.model.Model attribute}}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{nloed:nloed.model.Model.fisher_info_matrix}}\pysigline{\sphinxbfcode{\sphinxupquote{fisher\_info\_matrix}}}
+This function attribute consists of a
+dictionary in which the keys are the model’s observation variable names and the values
+are casadi functions computing the fisher information matrix for a single observation of
+the specified observation variable at the passed input and parameter settings.
+Model.model\_mean(inputs, parameters)
+
+Call Structure: Model.fisher\_info\_matrix{[}obs\_name{]}(inputs, parameters)
+\begin{quote}\begin{description}
+\item[{Type}] \leavevmode
+dictionary of functions
+
+\end{description}\end{quote}
+
+\end{fulllineitems}
+
+\index{model\_mean (nloed.model.Model attribute)@\spxentry{model\_mean}\spxextra{nloed.model.Model attribute}}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{nloed:nloed.model.Model.model_mean}}\pysigline{\sphinxbfcode{\sphinxupquote{model\_mean}}}
+This function attribute consists of a
+dictionary in which the keys are the model’s observation variable names and the values
+are casadi functions computing the expected mean observation value at the passed input
+and parameter settings.
+
+Call Structure: Model.model\_mean{[}obs\_name{]}(inputs, parameters)
+\begin{quote}\begin{description}
+\item[{Type}] \leavevmode
+dictionary of functions
+
+\end{description}\end{quote}
+
+\end{fulllineitems}
+
+\index{model\_variance (nloed.model.Model attribute)@\spxentry{model\_variance}\spxextra{nloed.model.Model attribute}}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{nloed:nloed.model.Model.model_variance}}\pysigline{\sphinxbfcode{\sphinxupquote{model\_variance}}}
+This function attribute consists of a
+dictionary in which the keys are the model’s observation variable names and the values
+are casadi functions computing the expected variance of the observation variable at the
+passed input and parameter settings.
+
+Call Structure: Model.model\_variance{[}obs\_name{]}(inputs, parameters)
+\begin{quote}\begin{description}
+\item[{Type}] \leavevmode
+dictionary of functions
+
+\end{description}\end{quote}
+
+\end{fulllineitems}
+
+\index{model\_sensitivity (nloed.model.Model attribute)@\spxentry{model\_sensitivity}\spxextra{nloed.model.Model attribute}}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{nloed:nloed.model.Model.model_sensitivity}}\pysigline{\sphinxbfcode{\sphinxupquote{model\_sensitivity}}}
+This function attribute consists of a
+dictionary in which the keys are the model’s observation variable names and the values
+are casadi functions computing the parameteric sensitivity of the expected mean
+observation of the specified variable at the passed input and parameter settings.
+
+Call Structure: Model.model\_variance{[}obs\_name{]}(inputs, parameters)
+\begin{quote}\begin{description}
+\item[{Type}] \leavevmode
+dictionary of functions
+
+\end{description}\end{quote}
+
+\end{fulllineitems}
+
+\index{observation\_sampler (nloed.model.Model attribute)@\spxentry{observation\_sampler}\spxextra{nloed.model.Model attribute}}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{nloed:nloed.model.Model.observation_sampler}}\pysigline{\sphinxbfcode{\sphinxupquote{observation\_sampler}}}
+This function attribute consists of a
+dictionary in which the keys are the model’s observation variable names and the values
+are casadi\sphinxhyphen{}based functions generating random realizations of the observation variable value
+from its expected distribution, conditioned on the passed input and parameter settings.
+
+Call Structure: Model.model\_variance{[}obs\_name{]}(inputs, parameters)
+\begin{quote}\begin{description}
+\item[{Type}] \leavevmode
+dictionary of functions
+
+\end{description}\end{quote}
+
+\end{fulllineitems}
+
+\index{observation\_percentile (nloed.model.Model attribute)@\spxentry{observation\_percentile}\spxextra{nloed.model.Model attribute}}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{nloed:nloed.model.Model.observation_percentile}}\pysigline{\sphinxbfcode{\sphinxupquote{observation\_percentile}}}
+This function attribute consists of a
+dictionary in which the keys are the model’s observation variable names and the values
+are casadi\sphinxhyphen{}based functions computing the requested percentile of the observation variable’s
+distribution conditioned on the passed input and parameter settings.
+
+Call Structure: Model.model\_variance{[}obs\_name{]}(percentile, inputs, parameters)
+\begin{quote}\begin{description}
+\item[{Type}] \leavevmode
+dictionary of functions
+
+\end{description}\end{quote}
+
+\end{fulllineitems}
+
 \index{distribution\_dict (nloed.model.Model attribute)@\spxentry{distribution\_dict}\spxextra{nloed.model.Model attribute}}
 
 \begin{fulllineitems}
@@ -224,7 +456,7 @@ dataframe OR list of dataframes
 
 \begin{fulllineitems}
 \phantomsection\label{\detokenize{nloed:nloed.model.Model.sample}}\pysiglinewithargsret{\sphinxbfcode{\sphinxupquote{sample}}}{\emph{\DUrole{n}{designs}}, \emph{\DUrole{n}{param}}, \emph{\DUrole{n}{design\_replicates}\DUrole{o}{=}\DUrole{default_value}{1}}, \emph{\DUrole{n}{options}\DUrole{o}{=}\DUrole{default_value}{\{\}}}}{}
-A function for generating simulated data from the NLoed model for a given design contained in a dataframe.
+A function for generating simulated data from the NLoed model for a given design passed as a dataframe.
 
 This function generates datasets using the NLoed model and a provided design (or a list of
 designs) via simulation and Numpy/Scipy’s random number generation. This simulation is done
@@ -233,24 +465,44 @@ simulated is optional but defaults to one.
 \begin{quote}\begin{description}
 \item[{Parameters}] \leavevmode\begin{itemize}
 \item {} 
-\sphinxstyleliteralstrong{\sphinxupquote{designs}} \textendash{} either; a single design dictionary, OR, a list of design dictionaries
+\sphinxstyleliteralstrong{\sphinxupquote{designs}} (\sphinxstyleliteralemphasis{\sphinxupquote{dataframe OR list of dataframes}}) \textendash{} A dataframe containing the design to be simulated,
+OR a list of dataframes containing multiple designs to be simulated
 
 \item {} 
-\sphinxstyleliteralstrong{\sphinxupquote{param}} \textendash{} the parameter values at which to generate the data
+\sphinxstyleliteralstrong{\sphinxupquote{param}} (\sphinxstyleliteralemphasis{\sphinxupquote{array\sphinxhyphen{}like}}) \textendash{} The parameter values used to generate the data
 
 \item {} 
-\sphinxstyleliteralstrong{\sphinxupquote{design\_replicates}} \textendash{} optional,  an integer indicating the number of datasets to generate for each design,  default is 1
+\sphinxstyleliteralstrong{\sphinxupquote{design\_replicates}} (\sphinxstyleliteralemphasis{\sphinxupquote{integer}}\sphinxstyleliteralemphasis{\sphinxupquote{, }}\sphinxstyleliteralemphasis{\sphinxupquote{optional}}) \textendash{} An integer indicating the number of dataset
+replicates to be generated for each design. The default is 1 per design passed.
 
 \item {} 
-\sphinxstyleliteralstrong{\sphinxupquote{options}} \textendash{} 
+\sphinxstyleliteralstrong{\sphinxupquote{options}} (\sphinxstyleliteralemphasis{\sphinxupquote{dict}}\sphinxstyleliteralemphasis{\sphinxupquote{, }}\sphinxstyleliteralemphasis{\sphinxupquote{optional}}) \textendash{} 
+A dictionary of user\sphinxhyphen{}defined options, possible key\sphinxhyphen{}value pairs
+include:
+
+”Verbose” \textendash{}
+Purpose: Determines the amount of print feedback provided while the function executes
+Type: bool,
+Default Value: True,
+Possible Values: True or False
+
 
 \end{itemize}
 
 \item[{Returns}] \leavevmode
-either; a singel dataset for the given design,  OR,  a list of dataset replicates for the given design,  OR,  a list of list of dataset replicates for each design
+\begin{description}
+\item[{A dataframe containg a simulation of the design is returned by default}] \leavevmode
+OR, if design\_replicates was set \textgreater{}1, a list of dataframes containg simulated
+replicates is returned for the given design
+OR,  if a list of dataframes with corresponding to multiple designs was passed
+a list of lists of dataframes is returned, the outer index corresponds to the design
+list, and the inner index corresponds to the number of replicates requested.
+
+\end{description}
+
 
 \item[{Return type}] \leavevmode
-design\_datasets
+dataframe OR list of dataframes
 
 \end{description}\end{quote}
 
@@ -260,7 +512,14 @@ design\_datasets
 
 \begin{fulllineitems}
 \phantomsection\label{\detokenize{nloed:nloed.model.Model.predict}}\pysiglinewithargsret{\sphinxbfcode{\sphinxupquote{predict}}}{\emph{\DUrole{n}{input\_struct}}, \emph{\DUrole{n}{param}}, \emph{\DUrole{n}{covariance\_matrix}\DUrole{o}{=}\DUrole{default_value}{None}}, \emph{\DUrole{n}{options}\DUrole{o}{=}\DUrole{default_value}{\{\}}}}{}
-This function
+A function for generating prediction information from the NLoed model.
+
+This function can be used to compute predictions from an NLoed model instance given the
+user\sphinxhyphen{}provided input conditions and paramater values. Prediction information includes the
+predicted mean response of the model, confidence intervals for the mean response under
+parameter uncertainty, confidence intervals for the observation distribution, and sensitivity
+analysis. The returned intervals can be computed in a number of ways; exactly, with a normal
+(local and deterministic) approximation, or using Monte Carlo simulation.
 \begin{quote}\begin{description}
 \item[{Parameters}] \leavevmode\begin{itemize}
 \item {} 
@@ -299,6 +558,11 @@ Return:
 
 \begin{fulllineitems}
 \phantomsection\label{\detokenize{nloed:nloed.model.Model._get_distribution_functions}}\pysiglinewithargsret{\sphinxbfcode{\sphinxupquote{\_get\_distribution\_functions}}}{\emph{\DUrole{n}{observ\_model}}, \emph{\DUrole{n}{observ\_distribution}}}{}
+A private function that automatically generates function attributes for the given
+observation variable information.
+
+This private function is used during the NLoed model class construction.
+
 This function accepts the observation name, distribution type
 and observation model and constructs casadi functions to compute
 the logliklihood, fisher information, prediction mean/sensitivity/variance
@@ -318,7 +582,7 @@ and also a numpy/casadi function to return random samples from the the model
 
 \item[{Returns}] \leavevmode
 \begin{description}
-\item[{list of casadi/numpy functions in the following order;}] \leavevmode
+\item[{A list of casadi/numpy functions in the following order;}] \leavevmode
 loglik, fisher info, prediction mean , prediction mean sensitivity,
 prediction variance, observation sampler
 
@@ -326,7 +590,7 @@ prediction variance, observation sampler
 
 
 \item[{Return type}] \leavevmode
-function\_list
+list
 
 \end{description}\end{quote}
 
