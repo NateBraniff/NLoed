@@ -1,9 +1,6 @@
 NLoed's Model Class
 ====================
 
-Model
------
-
 .. automodule:: nloed.model
    :members: Model
    :undoc-members:
@@ -12,9 +9,6 @@ Model
 
 NLoed's Design Class
 ====================
-
-Design
-------
 
 .. automodule:: nloed.design
    :members: Design
