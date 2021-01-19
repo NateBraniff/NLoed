@@ -146,33 +146,76 @@ class Model:
             options (dict, optional): A dictionary of user-defined options, possible key-value pairs
                 include:
 
-                "Confidence";
-                {\em Purpose}: Determines confidnece diagnostics to be returned or plotted,
-                {\em Type}: string,
-                {\em Default Value}: "None",
-                {\em Possible Values}:
+                "Confidence" --
+                Purpose: Determines confidnece diagnostics to be returned or plotted,
+                Type: string,
+                Default Value: "None",
+                Possible Values:
                 "None" = No intervals returned,
                 "Intervals" = Marginal intervals returned,
                 "Profiles" = Same as "Intervals" but trace projections are plotted using Matplotlib,
                 "Contours" = Same as  "Profiles" but confidence contour projections are also plotted.
 
-                "ConfidenceLevel";
+                "ConfidenceLevel" --
                 Purpose: Sets the confidence level for the marginal intervals, traces, profiles and contours,
                 Type: float,
                 Default Value: 0.95,
                 Possible Values: 0<1.
 
-                'RadialNumber';
+                'RadialNumber' --
                 Purpose: Determines the number of radial searches performed out from the fit 
-                parameter value used to find the confidence contour projections.
+                parameter value used to find the confidence contour projections,
                 Type: integer
-                Default value: 30
-                Possible values: >1, but sufficient density is needed for good interpolation.
+                Default Value: 30
+                Possible Values: >1, but sufficient density is needed for good interpolation
 
-                "SampleNumber";
+                "SampleNumber" --
                 Purpose: 
+                Type: integer
+                Default Value: 10
+                Possible Values: >1
 
+                "Tolerance" --
+                Purpose: 
+                Type: float
+                Default Value: 0.001
+                Possible Values: >0
 
+                "InitialStep" --
+                Purpose: 
+                Type: float
+                Default Value: 0.01
+                Possible Values: >0
+
+                "MaxSteps" --
+                Purpose: 
+                Type: integer
+                Default Value: 2000
+                Possible Values: >1
+
+                "SearchFactor" --
+                Purpose: 
+                Type: float
+                Default Value: 5.0
+                Possible Values: >0
+
+                "InitParamBounds" --
+                Purpose: 
+                Type: array-like
+                Default Value: False
+                Possible Values:
+
+                "InitSearchNumber" --
+                Purpose: 
+                Type: integer
+                Default Value: 3
+                Possible Values: >0
+
+                "Verbose" --
+                Purpose: 
+                Type: boolean
+                Default Value: True
+                Possible Values: True or False
 
         Return:
             dataframe OR list of dataframes: Returns a dataframe with a column for each fit parameter, 
@@ -182,15 +225,6 @@ class Model:
                 a list of dataframes will be returned with the same length as the outer index of the
                 passed list of lists.
         """
-
-                #         "Tolerance":        [0.001,                 lambda x: isinstance(x,float) and 0<x],
-                # "InitialStep":      [.01,                   lambda x: isinstance(x,float) and 0<x],
-                # "MaxSteps":         [2000,                  lambda x: isinstance(x,int) and 1<x],
-                # "SearchFactor":     [5,                     lambda x: isinstance(x,float) and 0<x],
-                # "SearchBound":      [3.0,                   lambda x: isinstance(x,float) and 0<x],
-                # "InitParamBounds":  [False,                 lambda x: isinstance(x,list) or isinstance(x,np.ndarray)],
-                # "InitSearchNumber": [3,                     lambda x: isinstance(x,int) and 0<x],
-                # "Verbose":          [True,                  lambda x: isinstance(x,bool)]}
         #NOTE: needs checks on inputs, var names, designs must be exact reps
         #NOTE: NEED testing for multiple observation input structures,  multiple dimensions of parameters ideally,  1, 2, 3 and 7+
         #NOTE: add some print statments to provide user with progress status

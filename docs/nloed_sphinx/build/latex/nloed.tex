@@ -137,31 +137,76 @@ local fitting optimization should be started
 A dictionary of user\sphinxhyphen{}defined options, possible key\sphinxhyphen{}value pairs
 include:
 
-”Confidence”;
-\{em Purpose\}: Determines confidnece diagnostics to be returned or plotted,
-\{em Type\}: string,
-\{em Default Value\}: “None”,
-\{em Possible Values\}:
+”Confidence” \textendash{}
+Purpose: Determines confidnece diagnostics to be returned or plotted,
+Type: string,
+Default Value: “None”,
+Possible Values:
 “None” = No intervals returned,
 “Intervals” = Marginal intervals returned,
 “Profiles” = Same as “Intervals” but trace projections are plotted using Matplotlib,
 “Contours” = Same as  “Profiles” but confidence contour projections are also plotted.
 
-”ConfidenceLevel”;
+”ConfidenceLevel” \textendash{}
 Purpose: Sets the confidence level for the marginal intervals, traces, profiles and contours,
 Type: float,
 Default Value: 0.95,
 Possible Values: 0\textless{}1.
 
-’RadialNumber’;
+’RadialNumber’ \textendash{}
 Purpose: Determines the number of radial searches performed out from the fit
-parameter value used to find the confidence contour projections.
+parameter value used to find the confidence contour projections,
 Type: integer
-Default value: 30
-Possible values: \textgreater{}1, but sufficient density is needed for good interpolation.
+Default Value: 30
+Possible Values: \textgreater{}1, but sufficient density is needed for good interpolation
 
-”SampleNumber”;
+”SampleNumber” \textendash{}
 Purpose:
+Type: integer
+Default Value: 10
+Possible Values: \textgreater{}1
+
+”Tolerance” \textendash{}
+Purpose:
+Type: float
+Default Value: 0.001
+Possible Values: \textgreater{}0
+
+”InitialStep” \textendash{}
+Purpose:
+Type: float
+Default Value: 0.01
+Possible Values: \textgreater{}0
+
+”MaxSteps” \textendash{}
+Purpose:
+Type: integer
+Default Value: 2000
+Possible Values: \textgreater{}1
+
+”SearchFactor” \textendash{}
+Purpose:
+Type: float
+Default Value: 5.0
+Possible Values: \textgreater{}0
+
+”InitParamBounds” \textendash{}
+Purpose:
+Type: array\sphinxhyphen{}like
+Default Value: False
+Possible Values:
+
+”InitSearchNumber” \textendash{}
+Purpose:
+Type: integer
+Default Value: 3
+Possible Values: \textgreater{}0
+
+”Verbose” \textendash{}
+Purpose:
+Type: boolean
+Default Value: True
+Possible Values: True or False
 
 
 \end{itemize}
