@@ -146,15 +146,33 @@ class Model:
             options (dict, optional): A dictionary of user-defined options, possible key-value pairs
                 include:
 
-                "Confidence"
+                "Confidence";
+                Purpose: Determines confidnece diagnostics to be returned or plotted,
+                Type: String,
+                Default value: "None",
+                Possible values:
+                "None" = No intervals returned,
+                "Intervals" = Marginal intervals returned,
+                "Profiles" = Same as "Intervals" but trace projections are plotted using Matplotlib,
+                "Contours" = Same as  "Profiles" but confidence contour projections are also plotted.
 
-                Default: "None"
+                "ConfidenceLevel";
+                Purpose: Sets the confidence level for the marginal intervals, traces, profiles and contours,
+                Type: Float,
+                Default value: 0.95,
+                Possible values: 0<1.
 
-                Values:
-                'None" = No intervals returned,\n
-                "Intervals" = Marginal intervals returned,\n
-                "Profiles" = Same as "Intervals" but trace projections are plotted using Matplotlib,\n
-                "Contours" = Same as  "Profiles" but confidence contour projections are also plotted
+                'RadialNumber';
+                Purpose: Determines the number of radial searches performed out from the fit 
+                parameter value used to find the confidence contour projections.
+                Type: Integer
+                Default value: 30
+                Possible values: >1, but sufficient density is needed for good interpolation
+
+                "SampleNumber";
+                Purpose: 
+
+
 
         Return:
             dataframe OR list of dataframes: Returns a dataframe with a column for each fit parameter, 
@@ -164,6 +182,15 @@ class Model:
                 a list of dataframes will be returned with the same length as the outer index of the
                 passed list of lists.
         """
+
+                #         "Tolerance":        [0.001,                 lambda x: isinstance(x,float) and 0<x],
+                # "InitialStep":      [.01,                   lambda x: isinstance(x,float) and 0<x],
+                # "MaxSteps":         [2000,                  lambda x: isinstance(x,int) and 1<x],
+                # "SearchFactor":     [5,                     lambda x: isinstance(x,float) and 0<x],
+                # "SearchBound":      [3.0,                   lambda x: isinstance(x,float) and 0<x],
+                # "InitParamBounds":  [False,                 lambda x: isinstance(x,list) or isinstance(x,np.ndarray)],
+                # "InitSearchNumber": [3,                     lambda x: isinstance(x,int) and 0<x],
+                # "Verbose":          [True,                  lambda x: isinstance(x,bool)]}
         #NOTE: needs checks on inputs, var names, designs must be exact reps
         #NOTE: NEED testing for multiple observation input structures,  multiple dimensions of parameters ideally,  1, 2, 3 and 7+
         #NOTE: add some print statments to provide user with progress status

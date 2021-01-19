@@ -137,18 +137,31 @@ local fitting optimization should be started
 A dictionary of user\sphinxhyphen{}defined options, possible key\sphinxhyphen{}value pairs
 include:
 
-”Confidence”
+”Confidence”;
+Purpose: Determines confidnece diagnostics to be returned or plotted,
+Type: String,
+Default value: “None”,
+Possible values:
+“None” = No intervals returned,
+“Intervals” = Marginal intervals returned,
+“Profiles” = Same as “Intervals” but trace projections are plotted using Matplotlib,
+“Contours” = Same as  “Profiles” but confidence contour projections are also plotted.
 
-Default: “None”
+”ConfidenceLevel”;
+Purpose: Sets the confidence level for the marginal intervals, traces, profiles and contours,
+Type: Float,
+Default value: 0.95,
+Possible values: 0\textless{}1.
 
-Values:
-‘None” = No intervals returned,
+’RadialNumber’;
+Purpose: Determines the number of radial searches performed out from the fit
+parameter value used to find the confidence contour projections.
+Type: Integer
+Default value: 30
+Possible values: \textgreater{}1, but sufficient density is needed for good interpolation
 
-”Intervals” = Marginal intervals returned,
-
-”Profiles” = Same as “Intervals” but trace projections are plotted using Matplotlib,
-
-”Contours” = Same as  “Profiles” but confidence contour projections are also plotted
+”SampleNumber”;
+Purpose:
 
 
 \end{itemize}
