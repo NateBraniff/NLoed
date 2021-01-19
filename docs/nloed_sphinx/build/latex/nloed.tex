@@ -91,13 +91,10 @@
 
 
 
-\chapter{nloed}
-\label{\detokenize{modules:nloed}}\label{\detokenize{modules::doc}}
-
-\section{NLoed Package}
+\chapter{NLoed Package}
 \label{\detokenize{nloed:nloed-package}}\label{\detokenize{nloed::doc}}
 
-\subsection{NLoed’s Model Class}
+\section{NLoed’s Model Class}
 \label{\detokenize{nloed:module-nloed.model}}\label{\detokenize{nloed:nloed-s-model-class}}\index{module@\spxentry{module}!nloed.model@\spxentry{nloed.model}}\index{nloed.model@\spxentry{nloed.model}!module@\spxentry{module}}\index{Model (class in nloed.model)@\spxentry{Model}\spxextra{class in nloed.model}}
 
 \begin{fulllineitems}
@@ -123,9 +120,9 @@ of profiles traces and confidence contours.
 \begin{quote}\begin{description}
 \item[{Parameters}] \leavevmode\begin{itemize}
 \item {} 
-\sphinxstyleliteralstrong{\sphinxupquote{datasets}} (\sphinxstyleliteralemphasis{\sphinxupquote{dataframe}}\sphinxstyleliteralemphasis{\sphinxupquote{, }}\sphinxstyleliteralemphasis{\sphinxupquote{list}}) \textendash{} A dictionary containing the dataset to be fit.
-OR a list of dictionaries, each containing a dataset replicate of a given design
-OR a list of lists of dictionaries, where each index in the outer lists corresponds
+\sphinxstyleliteralstrong{\sphinxupquote{datasets}} (\sphinxstyleliteralemphasis{\sphinxupquote{dataframe OR list of dataframes}}) \textendash{} A dataframe containing the dataset to be fit.
+OR a list of dataframes, each containing a dataset replicate of a given design
+OR a list of lists of dataframes, where each index in the outer list corresponds
 to a unique design and each inner index coresponds to a replicate of the given design
 
 \item {} 
@@ -212,16 +209,12 @@ Possible Values: True or False
 \end{itemize}
 
 \item[{Returns}] \leavevmode
-\begin{description}
-\item[{Returns a dataframe with a column for each fit parameter,}] \leavevmode
-and if requested, columns for the lower and upper limit of the marginal confidence region
-of each. If a list of datasets was provided, fits (and intervals) for each are given
-in individual rows. If a list of lists of datasets was provided (designs X replicates),
+A dataframe containing the fit parameters,
+and if requested, confidence interval information. If a list of datasets was provided,
+each row of the dataframe corresponds to the dataset index in the passed list.
+If a list of lists of dataframes was provided (designs by replicates),
 a list of dataframes will be returned with the same length as the outer index of the
 passed list of lists.
-
-\end{description}
-
 
 \item[{Return type}] \leavevmode
 dataframe OR list of dataframes
@@ -601,7 +594,7 @@ Helper function to print progress bar in a looped process
 
 
 
-\subsection{NLoed’s Design Class}
+\section{NLoed’s Design Class}
 \label{\detokenize{nloed:module-nloed.design}}\label{\detokenize{nloed:nloed-s-design-class}}\index{module@\spxentry{module}!nloed.design@\spxentry{nloed.design}}\index{nloed.design@\spxentry{nloed.design}!module@\spxentry{module}}\index{Design (class in nloed.design)@\spxentry{Design}\spxextra{class in nloed.design}}
 
 \begin{fulllineitems}
@@ -692,32 +685,8 @@ Return:
 
 
 
-\subsection{Module contents}
+\section{Module contents}
 \label{\detokenize{nloed:module-nloed}}\label{\detokenize{nloed:module-contents}}\index{module@\spxentry{module}!nloed@\spxentry{nloed}}\index{nloed@\spxentry{nloed}!module@\spxentry{module}}
-
-\chapter{Introduction}
-\label{\detokenize{index:introduction}}
-Intro blah blah
-
-
-\section{Motivation}
-\label{\detokenize{index:motivation}}
-Motivation blah blah
-
-
-\chapter{Indices and tables}
-\label{\detokenize{index:indices-and-tables}}\begin{itemize}
-\item {} 
-\DUrole{xref,std,std-ref}{genindex}
-
-\item {} 
-\DUrole{xref,std,std-ref}{modindex}
-
-\item {} 
-\DUrole{xref,std,std-ref}{search}
-
-\end{itemize}
-
 
 \renewcommand{\indexname}{Python Module Index}
 \begin{sphinxtheindex}

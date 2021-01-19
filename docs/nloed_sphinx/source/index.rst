@@ -10,23 +10,5 @@ Welcome to NLoed's documentation!
    :maxdepth: 2
    :caption: Contents:
    
-   modules
+   nloed
 
-Introduction
-============
-
-Intro blah blah
-
-Motivation
-**********
-
-Motivation blah blah
-
-
-
-Indices and tables
-==================
-
-* :ref:`genindex`
-* :ref:`modindex`
-* :ref:`search`
