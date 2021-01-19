@@ -1,5 +1,8 @@
 NLoed's Model Class
--------------------
+====================
+
+Model
+-----
 
 .. automodule:: nloed.model
    :members: Model
@@ -8,7 +11,10 @@ NLoed's Model Class
    :show-inheritance:
 
 NLoed's Design Class
---------------------
+====================
+
+Design
+------
 
 .. automodule:: nloed.design
    :members: Design
@@ -16,10 +22,3 @@ NLoed's Design Class
    :private-members:
    :show-inheritance:
 
-Module contents
----------------
-
-.. automodule:: nloed
-   :members:
-   :undoc-members:
-   :show-inheritance:
