@@ -147,10 +147,10 @@ class Model:
                 include:
 
                 "Confidence";
-                Purpose: Determines confidnece diagnostics to be returned or plotted,
-                Type: String,
-                Default value: "None",
-                Possible values:
+                {\em Purpose}: Determines confidnece diagnostics to be returned or plotted,
+                {\em Type}: string,
+                {\em Default Value}: "None",
+                {\em Possible Values}:
                 "None" = No intervals returned,
                 "Intervals" = Marginal intervals returned,
                 "Profiles" = Same as "Intervals" but trace projections are plotted using Matplotlib,
@@ -158,16 +158,16 @@ class Model:
 
                 "ConfidenceLevel";
                 Purpose: Sets the confidence level for the marginal intervals, traces, profiles and contours,
-                Type: Float,
-                Default value: 0.95,
-                Possible values: 0<1.
+                Type: float,
+                Default Value: 0.95,
+                Possible Values: 0<1.
 
                 'RadialNumber';
                 Purpose: Determines the number of radial searches performed out from the fit 
                 parameter value used to find the confidence contour projections.
-                Type: Integer
+                Type: integer
                 Default value: 30
-                Possible values: >1, but sufficient density is needed for good interpolation
+                Possible values: >1, but sufficient density is needed for good interpolation.
 
                 "SampleNumber";
                 Purpose: 
