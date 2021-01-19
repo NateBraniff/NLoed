@@ -577,7 +577,7 @@ class Model:
             input_struct (dataframe): A dataframe specifying the combination of inputs values and 
                 observations at which predictions are desired.
             param (array-like): The parameter vector values at which the predictions are to be made.
-            covariance_matrix (array-like, optional: A symetric matrix specifying the parameter's 
+            covariance_matrix (array-like, optional): A symetric matrix specifying the parameter's 
                 normal covariance matrix, required if parameter uncertainty is to be included. The
                 prior mean set by the values passed via the param argument.
             options (dictionary, optional): A dictionary of user-defined options, possible key-value

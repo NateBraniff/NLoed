@@ -15,8 +15,3 @@ NLoed's Design Class
    :undoc-members:
    :private-members:
    :show-inheritance:
-
-Index
-=====
-
-* :ref:`genindex`
