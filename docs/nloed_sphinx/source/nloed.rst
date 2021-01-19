@@ -16,9 +16,7 @@ NLoed's Design Class
    :private-members:
    :show-inheritance:
 
-Indices and tables
-==================
+Index
+=====
 
 * :ref:`genindex`
-* :ref:`modindex`
-* :ref:`search`
