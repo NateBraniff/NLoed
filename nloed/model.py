@@ -151,9 +151,9 @@ class Model:
                 Default: "None"
 
                 Values:
-                'None" = No intervals returned,
-                "Intervals" = Marginal intervals returned, 
-                "Profiles" = Same as "Intervals" but trace projections are plotted using Matplotlib,
+                'None" = No intervals returned,\n
+                "Intervals" = Marginal intervals returned,\n
+                "Profiles" = Same as "Intervals" but trace projections are plotted using Matplotlib,\n
                 "Contours" = Same as  "Profiles" but confidence contour projections are also plotted
 
         Return:
