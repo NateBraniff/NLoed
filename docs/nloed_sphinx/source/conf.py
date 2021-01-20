@@ -64,3 +64,6 @@ autodoc_member_order = 'bysource'
 latex_elements = {
   'extraclassoptions': 'openany,oneside'
 }
+
+#Napoleon settings (for Google style docstrings)
+napoleon_include_init_with_doc = True

@@ -1661,7 +1661,7 @@ class Model:
         combined with the direction vector hard-coded in the solver object to specify its magnuted, 
         resulst in a specific set of fixed parmaeter values at which the conditional likelihood 
         optimization is performed. The radius at which a root is found indicates a boundary point in
-        the confidence volume at the confidence level specified by the use in their initating call to
+        the confidence volume at the confidence level specified by the use in their initating call to 
         Model.fit().
 
         Note a passed version used Halley's method; a higher order extension of Newton's method for

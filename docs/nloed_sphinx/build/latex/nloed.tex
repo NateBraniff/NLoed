@@ -337,6 +337,58 @@ dictionary of functions
 \phantomsection\label{\detokenize{nloed:nloed.model.Model.distribution_dict}}\pysigline{\sphinxbfcode{\sphinxupquote{distribution\_dict}}\sphinxbfcode{\sphinxupquote{ = \{\textquotesingle{}Bernoulli\textquotesingle{}: {[}\textquotesingle{}Probability\textquotesingle{}{]}, \textquotesingle{}Binomial\textquotesingle{}: {[}\textquotesingle{}Probability\textquotesingle{}{]}, \textquotesingle{}Exponential\textquotesingle{}: {[}\textquotesingle{}Rate\textquotesingle{}{]}, \textquotesingle{}Gamma\textquotesingle{}: {[}\textquotesingle{}Shape\textquotesingle{}, \textquotesingle{}Scale\textquotesingle{}{]}, \textquotesingle{}Lognormal\textquotesingle{}: {[}\textquotesingle{}GeoMean\textquotesingle{}, \textquotesingle{}GeoVariance\textquotesingle{}{]}, \textquotesingle{}Normal\textquotesingle{}: {[}\textquotesingle{}Mean\textquotesingle{}, \textquotesingle{}Variance\textquotesingle{}{]}, \textquotesingle{}Poisson\textquotesingle{}: {[}\textquotesingle{}Rate\textquotesingle{}{]}\}}}}
 \end{fulllineitems}
 
+\index{\_\_init\_\_() (nloed.model.Model method)@\spxentry{\_\_init\_\_()}\spxextra{nloed.model.Model method}}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{nloed:nloed.model.Model.__init__}}\pysiglinewithargsret{\sphinxbfcode{\sphinxupquote{\_\_init\_\_}}}{\emph{\DUrole{n}{observ\_struct}}, \emph{\DUrole{n}{input\_names}}, \emph{\DUrole{n}{param\_names}}, \emph{\DUrole{n}{options}\DUrole{o}{=}\DUrole{default_value}{\{\}}}}{}
+The class constructor for NLoed’s Model class.
+
+This function accepts the users Casadi functions, distribution lables, and input and
+parmeter names, and generate an NLoed model object for the specified model. During instantiation
+the Casadi functions are used to generate a variety of function attributes for each model
+observation variable; including functions for computing model predictions, loglikelihood,
+fisher information and data sampling. These function attributes are used both by the NLoed
+Model instance’s public function and if/when the Model instance is passed to the NLoed Design
+class for optimizing an experimental design.
+\begin{quote}\begin{description}
+\item[{Parameters}] \leavevmode\begin{itemize}
+\item {} 
+\sphinxstyleliteralstrong{\sphinxupquote{observ\_struct}} (\sphinxstyleliteralemphasis{\sphinxupquote{list of tuples}}) \textendash{} A list of tuples, one tuple for each of the models
+observation variables. The first element of the tuple is a Casadi function mapping
+the model inputs and parameters to the given observation’s sampling statistics. The
+second element of each tuple is a string indicating the type of parameteric distribution
+assigned to that observation variable. Observation names are extracted from the string
+label of the Casadi function for each obervation variable.
+
+\item {} 
+\sphinxstyleliteralstrong{\sphinxupquote{input\_names}} (\sphinxstyleliteralemphasis{\sphinxupquote{list of strings}}) \textendash{} A list of strings specifying the names of the model inputs
+in the same order that the inputs are expected by the Casadi functions also passed by
+the user.
+
+\item {} 
+\sphinxstyleliteralstrong{\sphinxupquote{param\_names}} (\sphinxstyleliteralemphasis{\sphinxupquote{list of strings}}) \textendash{} A list of strings specifying the names of the model parameters
+in the same order that the parameters are expected by the Casadi functions also passed by
+the user.
+
+\item {} 
+\sphinxstyleliteralstrong{\sphinxupquote{options}} (\sphinxstyleliteralemphasis{\sphinxupquote{dict}}\sphinxstyleliteralemphasis{\sphinxupquote{, }}\sphinxstyleliteralemphasis{\sphinxupquote{optional}}) \textendash{} 
+A dictionary of user\sphinxhyphen{}defined options, possible key\sphinxhyphen{}value pairs
+include:
+
+”ScalarSymbolics” \textendash{}
+Purpose: Determines whether SX or MX Casadi symbolics are used within the NLoed Model
+class, True implies scalar symbolics via SX.,
+Type: boolean,
+Default Value: True,
+Possible Values: True or False
+
+
+\end{itemize}
+
+\end{description}\end{quote}
+
+\end{fulllineitems}
+
 \index{fit() (nloed.model.Model method)@\spxentry{fit()}\spxextra{nloed.model.Model method}}
 
 \begin{fulllineitems}
@@ -1076,10 +1128,10 @@ casadi solver
 
 \end{fulllineitems}
 
-\index{\_\_logliksearch() (nloed.model.Model method)@\spxentry{\_\_logliksearch()}\spxextra{nloed.model.Model method}}
+\index{\_\_loglik\_search() (nloed.model.Model method)@\spxentry{\_\_loglik\_search()}\spxextra{nloed.model.Model method}}
 
 \begin{fulllineitems}
-\phantomsection\label{\detokenize{nloed:nloed.model.Model.__logliksearch}}\pysiglinewithargsret{\sphinxbfcode{\sphinxupquote{\_\_logliksearch}}}{\emph{\DUrole{n}{profile\_loglik\_solver}}, \emph{\DUrole{n}{marginal\_param}}, \emph{\DUrole{n}{options}}, \emph{\DUrole{n}{forward}\DUrole{o}{=}\DUrole{default_value}{True}}}{}
+\phantomsection\label{\detokenize{nloed:nloed.model.Model.__loglik_search}}\pysiglinewithargsret{\sphinxbfcode{\sphinxupquote{\_\_loglik\_search}}}{\emph{\DUrole{n}{profile\_loglik\_solver}}, \emph{\DUrole{n}{marginal\_param}}, \emph{\DUrole{n}{options}}, \emph{\DUrole{n}{forward}\DUrole{o}{=}\DUrole{default_value}{True}}}{}
 A private helper function for performing a bisection search for profile likelihood
 boundary points.
 
@@ -1095,10 +1147,7 @@ combined with the direction vector hard\sphinxhyphen{}coded in the solver object
 resulst in a specific set of fixed parmaeter values at which the conditional likelihood
 optimization is performed. The radius at which a root is found indicates a boundary point in
 the confidence volume at the confidence level specified by the use in their initating call to
-\begin{quote}
-
 Model.fit().
-\end{quote}
 
 Note a passed version used Halley’s method; a higher order extension of Newton’s method for
 finding roots. This was possible using Casadi’s ability to differentiate optimization solutions
@@ -1180,6 +1229,14 @@ Helper function to print progress bar in a looped process
 Bases: \sphinxcode{\sphinxupquote{object}}
 
 A class for experimental designs in the NLoed package
+\index{\_\_init\_\_() (nloed.design.Design method)@\spxentry{\_\_init\_\_()}\spxextra{nloed.design.Design method}}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{nloed:nloed.design.Design.__init__}}\pysiglinewithargsret{\sphinxbfcode{\sphinxupquote{\_\_init\_\_}}}{\emph{\DUrole{n}{models}}, \emph{\DUrole{n}{parameters}}, \emph{\DUrole{n}{objective}}, \emph{\DUrole{n}{discrete\_inputs}\DUrole{o}{=}\DUrole{default_value}{None}}, \emph{\DUrole{n}{continuous\_inputs}\DUrole{o}{=}\DUrole{default_value}{None}}, \emph{\DUrole{n}{observ\_groups}\DUrole{o}{=}\DUrole{default_value}{None}}, \emph{\DUrole{n}{fixed\_design}\DUrole{o}{=}\DUrole{default_value}{None}}, \emph{\DUrole{n}{options}\DUrole{o}{=}\DUrole{default_value}{\{\}}}}{}
+Design constructor docstring
+
+\end{fulllineitems}
+
 \index{round() (nloed.design.Design method)@\spxentry{round()}\spxextra{nloed.design.Design method}}
 
 \begin{fulllineitems}
