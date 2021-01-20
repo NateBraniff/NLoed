@@ -11,6 +11,10 @@ class Design:
     """
 
     def __init__(self, models, parameters, objective, discrete_inputs=None, continuous_inputs=None, observ_groups=None, fixed_design=None, options={}):
+        """ 
+          Design constructor docstring
+         """
+
 
         default_options = \
                  { 'LockWeights':         [False,    lambda x: isinstance(x,bool)],

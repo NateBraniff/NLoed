@@ -74,7 +74,7 @@
 
 
 \title{NLoed}
-\date{Jan 19, 2021}
+\date{Jan 20, 2021}
 \release{0.0.1}
 \author{Nathan Braniff}
 \newcommand{\sphinxlogo}{\vbox{}}
@@ -470,7 +470,7 @@ simulated is optional but defaults to one.
 OR a list of dataframes containing multiple designs to be simulated
 
 \item {} 
-\sphinxstyleliteralstrong{\sphinxupquote{param}} (\sphinxstyleliteralemphasis{\sphinxupquote{array\sphinxhyphen{}like}}) \textendash{} The parameter values used to generate the data
+\sphinxstyleliteralstrong{\sphinxupquote{param}} (\sphinxstyleliteralemphasis{\sphinxupquote{array\sphinxhyphen{}like}}\sphinxstyleliteralemphasis{\sphinxupquote{, }}\sphinxstyleliteralemphasis{\sphinxupquote{floats}}) \textendash{} The parameter values used to generate the data
 
 \item {} 
 \sphinxstyleliteralstrong{\sphinxupquote{design\_replicates}} (\sphinxstyleliteralemphasis{\sphinxupquote{integer}}\sphinxstyleliteralemphasis{\sphinxupquote{, }}\sphinxstyleliteralemphasis{\sphinxupquote{optional}}) \textendash{} An integer indicating the number of dataset
@@ -524,10 +524,10 @@ exactly, with a normal (local and deterministic) approximation, or using Monte C
 observations at which predictions are desired.
 
 \item {} 
-\sphinxstyleliteralstrong{\sphinxupquote{param}} (\sphinxstyleliteralemphasis{\sphinxupquote{array\sphinxhyphen{}like}}) \textendash{} The parameter vector values at which the predictions are to be made.
+\sphinxstyleliteralstrong{\sphinxupquote{param}} (\sphinxstyleliteralemphasis{\sphinxupquote{array\sphinxhyphen{}like}}\sphinxstyleliteralemphasis{\sphinxupquote{, }}\sphinxstyleliteralemphasis{\sphinxupquote{floats}}) \textendash{} The parameter vector values at which the predictions are to be made.
 
 \item {} 
-\sphinxstyleliteralstrong{\sphinxupquote{covariance\_matrix}} (\sphinxstyleliteralemphasis{\sphinxupquote{array\sphinxhyphen{}like}}\sphinxstyleliteralemphasis{\sphinxupquote{, }}\sphinxstyleliteralemphasis{\sphinxupquote{optional}}) \textendash{} A symetric matrix specifying the parameter’s
+\sphinxstyleliteralstrong{\sphinxupquote{covariance\_matrix}} (\sphinxstyleliteralemphasis{\sphinxupquote{array\sphinxhyphen{}like}}\sphinxstyleliteralemphasis{\sphinxupquote{, }}\sphinxstyleliteralemphasis{\sphinxupquote{floats}}\sphinxstyleliteralemphasis{\sphinxupquote{, }}\sphinxstyleliteralemphasis{\sphinxupquote{optional}}) \textendash{} A symetric matrix specifying the parameter’s
 normal covariance matrix, required if parameter uncertainty is to be included. The
 prior mean set by the values passed via the param argument.
 
@@ -608,25 +608,108 @@ dataframe
 \index{evaluate() (nloed.model.Model method)@\spxentry{evaluate()}\spxextra{nloed.model.Model method}}
 
 \begin{fulllineitems}
-\phantomsection\label{\detokenize{nloed:nloed.model.Model.evaluate}}\pysiglinewithargsret{\sphinxbfcode{\sphinxupquote{evaluate}}}{\emph{\DUrole{n}{designs}}, \emph{\DUrole{n}{param}}, \emph{\DUrole{n}{options}\DUrole{o}{=}\DUrole{default_value}{\{\}}}}{}
-A function for evaluating the peformance metrics of a passed design with the NLoed Model.
+\phantomsection\label{\detokenize{nloed:nloed.model.Model.evaluate}}\pysiglinewithargsret{\sphinxbfcode{\sphinxupquote{evaluate}}}{\emph{\DUrole{n}{designs}}, \emph{\DUrole{n}{param}}, \emph{\DUrole{n}{options}\DUrole{o}{=}\DUrole{default_value}{\{\}}}}{}~\begin{description}
+\item[{A function for evaluating the peformance metrics of an experimental design applied to}] \leavevmode
+the NLoed Model.
 
-This function
+\end{description}
 
-Args:
+This function can be used to produce evaluation metrics regarding the expected parameter
+fitting accurach a given experimental design will achieve when used with the given NLoed
+Model instance.
 
-Return:
+Evaluation metrics inclide the expected parameter covariance, bias and mean
+squared error as well as the Fisher information matrix. These metrics can be computed either
+asymptoticall (i.e. via the Fisher information matrix; in this case the bias is zero and the
+covariance and MSE are equal) or using Monte Carlo simulation and fitting (in which case the
+bias, covariance and MSE may be unique). By default this function only returns the parameter
+covariance for the design, computed asymptoticall.
+
+All evaluation is performed at the candidate parameter vector passed, and as such these
+metrics are only local appoximations valid near the candidate point.
+\begin{quote}\begin{description}
+\item[{Parameters}] \leavevmode\begin{itemize}
+\item {} 
+\sphinxstyleliteralstrong{\sphinxupquote{designs}} (\sphinxstyleliteralemphasis{\sphinxupquote{dataframe OR list of dataframes}}) \textendash{} A dataframe specifying the experimental design
+to be evaluated,
+OR a list of dataframes describing a set ofexperimental designs to be evaluated.
+
+\item {} 
+\sphinxstyleliteralstrong{\sphinxupquote{param}} (\sphinxstyleliteralemphasis{\sphinxupquote{array\sphinxhyphen{}like}}\sphinxstyleliteralemphasis{\sphinxupquote{, }}\sphinxstyleliteralemphasis{\sphinxupquote{floats}}) \textendash{} The parameter vector values at which the predictions are to be made.
+
+\item {} 
+\sphinxstyleliteralstrong{\sphinxupquote{options}} (\sphinxstyleliteralemphasis{\sphinxupquote{dictionary}}\sphinxstyleliteralemphasis{\sphinxupquote{, }}\sphinxstyleliteralemphasis{\sphinxupquote{optional}}) \textendash{} 
+A dictionary of user\sphinxhyphen{}defined options, possible key\sphinxhyphen{}value
+pairs include:
+
+”Method” \textendash{}
+Purpose: A string indicating which computational method, asymptotic or Monte Carlo,
+is used to compute the evaluation metrics.
+Type: string
+Default Value: “Asymptotic
+Possible Values: “Asymptotic”=Uses a first\sphinxhyphen{}order approximation based onvthe FIM
+matrix to compute the parameter covariance; bias is zero. “MonteCarlo”= Uses
+repeated data simulation and fitting to compute the evaluation metrics.
+
+”Covariance” \textendash{}
+Purpose: A boolean value indicating if the parameter covariance matrix should be
+computed and returned, true implies yes.
+Type: boolean
+Default Value: True
+Possible Values: True or False
+
+”Bias” \textendash{}
+Purpose: A boolean value indicating if the parameter bias vector should be
+computed and returned, true implies yes.
+Type: boolean
+Default Value: False
+Possible Values: True or False
+
+”MSE” \textendash{}
+Purpose: A boolean value indicating if the parameter mean squated error vector
+should be computed and returned, true implies yes.
+Type: boolean
+Default Value: False
+Possible Values: True or False
+
+”FIM” \textendash{}
+Purpose: A boolean value indicating if the Fisher information matrix
+should be computed and returned, true implies yes.
+Type: boolean
+Default Value: False
+Possible Values: True or False
+
+”SampleNumber” \textendash{}
+Purpose: An integer indicating the number of simulations of the experimental design,
+and subsequent fittings, that should be performed if the Monte Carlo method is used
+to compute the evaluation metrics.
+Type: integer
+Default Value: 1000
+Possible Values: \textgreater{}0, must be large enough for a statistically stable estimate
+
+
+\end{itemize}
+
+\item[{Returns}] \leavevmode
+A dataframe containg the design evaluation metrics,
+OR if a list of design dataframes was passed, a list of dataframes is returned
+each containing the design evaluation metrics for its corresponding design.
+
+\item[{Return type}] \leavevmode
+dataframe
+
+\end{description}\end{quote}
 
 \end{fulllineitems}
 
-\index{\_get\_distribution\_functions() (nloed.model.Model method)@\spxentry{\_get\_distribution\_functions()}\spxextra{nloed.model.Model method}}
+\index{\_\_get\_distribution\_functions() (nloed.model.Model method)@\spxentry{\_\_get\_distribution\_functions()}\spxextra{nloed.model.Model method}}
 
 \begin{fulllineitems}
-\phantomsection\label{\detokenize{nloed:nloed.model.Model._get_distribution_functions}}\pysiglinewithargsret{\sphinxbfcode{\sphinxupquote{\_get\_distribution\_functions}}}{\emph{\DUrole{n}{observ\_model}}, \emph{\DUrole{n}{observ\_distribution}}}{}
-A private function that automatically generates function attributes for the given
+\phantomsection\label{\detokenize{nloed:nloed.model.Model.__get_distribution_functions}}\pysiglinewithargsret{\sphinxbfcode{\sphinxupquote{\_\_get\_distribution\_functions}}}{\emph{\DUrole{n}{observ\_model}}, \emph{\DUrole{n}{observ\_distribution}}}{}
+A private function that automatically generates function attributes for the provided
 observation variable information.
 
-This private function is used during the NLoed model class construction.
+This private function is used during the NLoed Model class construction.
 
 This function accepts the observation name, distribution type
 and observation model and constructs casadi functions to compute
@@ -635,27 +718,26 @@ and also a numpy/casadi function to return random samples from the the model
 \begin{quote}\begin{description}
 \item[{Parameters}] \leavevmode\begin{itemize}
 \item {} 
-\sphinxstyleliteralstrong{\sphinxupquote{observ\_name}} \textendash{} a string specifying the observation variable name
+\sphinxstyleliteralstrong{\sphinxupquote{observ\_model}} \textendash{} A symbolic Casadi function mapping the model input and parameter vectors
+to the observation distribution statistics.
 
 \item {} 
-\sphinxstyleliteralstrong{\sphinxupquote{observ\_distribution}} \textendash{} a string specifying the observation distribution type (i.e ‘Normal’)
-
-\item {} 
-\sphinxstyleliteralstrong{\sphinxupquote{observ\_model}} \textendash{} a casadi function mapping input and parameter vectors to sampling distribution statistics
+\sphinxstyleliteralstrong{\sphinxupquote{observ\_distribution}} (\sphinxstyleliteralemphasis{\sphinxupquote{string}}) \textendash{} A string specifying the observation distribution type,
+must be one of the supported distributions.
 
 \end{itemize}
 
 \item[{Returns}] \leavevmode
 \begin{description}
-\item[{A list of casadi/numpy functions in the following order;}] \leavevmode
-loglik, fisher info, prediction mean , prediction mean sensitivity,
-prediction variance, observation sampler
+\item[{A list of Casadi(\sphinxhyphen{}based) functions in the following order;}] \leavevmode
+loglikelihood, fisher information, observation mean , observation variance,
+mean sensitivity, observation sampler, observation percentile
 
 \end{description}
 
 
 \item[{Return type}] \leavevmode
-list
+list of functions
 
 \end{description}\end{quote}
 
@@ -665,113 +747,197 @@ list
 
 \begin{fulllineitems}
 \phantomsection\label{\detokenize{nloed:nloed.model.Model.__confidence_intervals}}\pysiglinewithargsret{\sphinxbfcode{\sphinxupquote{\_\_confidence\_intervals}}}{\emph{\DUrole{n}{mle\_params}}, \emph{\DUrole{n}{loglik\_func}}, \emph{\DUrole{n}{options}}}{}
+A private helper function for computing parameter confidence intervals.
+
+This private function is used in some calls to the public Model.fit() function and is
+triggered by a user call after instantiation.
+
 This function computes marginal parameter confidence intervals for the model
-around the MLE estimate using the profile likelihood
+around the MLE estimate using profile likelihoods.
 \begin{quote}\begin{description}
 \item[{Parameters}] \leavevmode\begin{itemize}
 \item {} 
-\sphinxstyleliteralstrong{\sphinxupquote{mle\_params}} \textendash{} mle parameter estimates,  recieved from fitting
+\sphinxstyleliteralstrong{\sphinxupquote{mle\_params}} (\sphinxstyleliteralemphasis{\sphinxupquote{array\sphinxhyphen{}like}}\sphinxstyleliteralemphasis{\sphinxupquote{, }}\sphinxstyleliteralemphasis{\sphinxupquote{floats}}) \textendash{} A vector specifying the MLE parameter estimates generated and
+passed during a call to Model.fit().
 
 \item {} 
-\sphinxstyleliteralstrong{\sphinxupquote{loglik\_func}} \textendash{} casadi logliklihood function for the given dataset
+\sphinxstyleliteralstrong{\sphinxupquote{loglik\_func}} \textendash{} A Casadi function for computing the total data log\sphinxhyphen{}likelihood for the
+current dataset being handled within the calling Model.fit() call. The only argument
+is a putative parameter vector.
 
 \item {} 
-\sphinxstyleliteralstrong{\sphinxupquote{options}} \textendash{} an options dictionary for passing user options
+\sphinxstyleliteralstrong{\sphinxupquote{options}} (\sphinxstyleliteralemphasis{\sphinxupquote{dictionary}}) \textendash{} A dictionary of user\sphinxhyphen{}defined options encoded as key\sphinxhyphen{}value
+pairs. This dictionary is passed through from a call to Model.fit(), see
+the fit() functions documentation for possible key\sphinxhyphen{}value pairs.
 
 \end{itemize}
 
 \item[{Returns}] \leavevmode
-list of lists of upper and lower bounds for each parameter
+\begin{description}
+\item[{A list of lists, the outer index corresponds to each parameter coordinate,}] \leavevmode
+the innder list contains both the upper and lower bounds for each parameter.
+
+\end{description}
+
 
 \item[{Return type}] \leavevmode
-interval\_list
+list of lists
 
 \end{description}\end{quote}
 
 \end{fulllineitems}
 
-\index{\_\_profileplot() (nloed.model.Model method)@\spxentry{\_\_profileplot()}\spxextra{nloed.model.Model method}}
+\index{\_\_profile\_plot() (nloed.model.Model method)@\spxentry{\_\_profile\_plot()}\spxextra{nloed.model.Model method}}
 
 \begin{fulllineitems}
-\phantomsection\label{\detokenize{nloed:nloed.model.Model.__profileplot}}\pysiglinewithargsret{\sphinxbfcode{\sphinxupquote{\_\_profileplot}}}{\emph{\DUrole{n}{mle\_params}}, \emph{\DUrole{n}{loglik\_func}}, \emph{\DUrole{n}{figure}}, \emph{\DUrole{n}{options}}}{}
-This function plots profile parameter traces for each parameter value
+\phantomsection\label{\detokenize{nloed:nloed.model.Model.__profile_plot}}\pysiglinewithargsret{\sphinxbfcode{\sphinxupquote{\_\_profile\_plot}}}{\emph{\DUrole{n}{mle\_params}}, \emph{\DUrole{n}{loglik\_func}}, \emph{\DUrole{n}{figure}}, \emph{\DUrole{n}{options}}}{}
+A private helper function for plotting both the profile likelihoods and the projections
+of the profiles traces.
+
+This private function is used in some calls to the public Model.fit() function and is
+triggered by a user call after instantiation.
+
+This function generates a square grid of Matplotlib sub\sphinxhyphen{}plots, with a row and column for each
+parameter. The logelikelihood profiles of each parameter are plotted on sub\sphinxhyphen{}plots along the
+diagonal. These diganol plots also include a horizantal reference line indicating
+loglikleihood value at which the perscribed confidence level boundaries occur. Projections
+of the profile likelihood traces for each pair of parameters value are plotted on the lower
+triangular sub\sphinxhyphen{}plots. This function also returns lists containing the computed intervals,
+traces and profiles.
 \begin{quote}\begin{description}
 \item[{Parameters}] \leavevmode\begin{itemize}
 \item {} 
-\sphinxstyleliteralstrong{\sphinxupquote{mle\_params}} \textendash{} mle parameter estimates,  recieved from fitting
+\sphinxstyleliteralstrong{\sphinxupquote{mle\_params}} (\sphinxstyleliteralemphasis{\sphinxupquote{array\sphinxhyphen{}like}}\sphinxstyleliteralemphasis{\sphinxupquote{, }}\sphinxstyleliteralemphasis{\sphinxupquote{floats}}) \textendash{} A vector specifying the MLE parameter estimates generated and
+passed during a call to Model.fit().
 
 \item {} 
-\sphinxstyleliteralstrong{\sphinxupquote{loglik\_func}} \textendash{} casadi logliklihood function for the given dataset
+\sphinxstyleliteralstrong{\sphinxupquote{loglik\_func}} (\sphinxstyleliteralemphasis{\sphinxupquote{function}}) \textendash{} A Casadi function for computing the total data log\sphinxhyphen{}likelihood
+for the current dataset being handled within the calling Model.fit() call. The only
+argument is a putative parameter vector.
 
 \item {} 
-\sphinxstyleliteralstrong{\sphinxupquote{figure}} \textendash{} the figure object on which plotting occurs
+\sphinxstyleliteralstrong{\sphinxupquote{figure}} (\sphinxstyleliteralemphasis{\sphinxupquote{integer}}) \textendash{} The figure object handle on which the plot is generated.
 
 \item {} 
-\sphinxstyleliteralstrong{\sphinxupquote{options}} \textendash{} an options dictionary for passing user options
+\sphinxstyleliteralstrong{\sphinxupquote{options}} (\sphinxstyleliteralemphasis{\sphinxupquote{dictionary}}) \textendash{} A dictionary of user\sphinxhyphen{}defined options encoded as key\sphinxhyphen{}value
+pairs. This dictionary is passed through from a call to Model.fit(), see
+the fit() functions documentation for possible key\sphinxhyphen{}value pairs.
 
 \end{itemize}
 
 \item[{Returns}] \leavevmode
-list of lists of upper and lower bounds for each parameter
-trace\_list: list of list of lists of parameter vector values along profile trace for each parameter
-profile\_list: List of lists of logliklihood ratio values for each parameter along the profile trace
+\begin{description}
+\item[{A multi\sphinxhyphen{}level list of lists is returned, the outer list contains three elements;}] \leavevmode
+1 \sphinxhyphen{} a list of lists where the outer index corresponds to each parameter and the
+inner list contains the upper and lower confidence interval bounds for each parameter,
+2 \sphinxhyphen{} a list of list of lists where the outer index corresponds to each parameter and
+the middle index corresponds to points along each profile trace and the inner list
+contains the value of the parameter vector at that point in the parameter trace.
+3 \sphinxhyphen{} a ;ist of lists where the outer index corresponds to each parameter value and
+the inner index corresponds to logliklihood ratio values for the given parameter
+at points along the likelihood profile. Note this return is passed up from a call
+to \_\_profile\_trace()
+
+\end{description}
+
 
 \item[{Return type}] \leavevmode
-interval\_list
+nested lists
 
 \end{description}\end{quote}
 
 \end{fulllineitems}
 
-\index{\_\_profiletrace() (nloed.model.Model method)@\spxentry{\_\_profiletrace()}\spxextra{nloed.model.Model method}}
+\index{\_\_profile\_trace() (nloed.model.Model method)@\spxentry{\_\_profile\_trace()}\spxextra{nloed.model.Model method}}
 
 \begin{fulllineitems}
-\phantomsection\label{\detokenize{nloed:nloed.model.Model.__profiletrace}}\pysiglinewithargsret{\sphinxbfcode{\sphinxupquote{\_\_profiletrace}}}{\emph{\DUrole{n}{mle\_params}}, \emph{\DUrole{n}{loglik\_func}}, \emph{\DUrole{n}{options}}}{}
-This function compute the profile logliklihood parameter trace for each parameter in the model
+\phantomsection\label{\detokenize{nloed:nloed.model.Model.__profile_trace}}\pysiglinewithargsret{\sphinxbfcode{\sphinxupquote{\_\_profile\_trace}}}{\emph{\DUrole{n}{mle\_params}}, \emph{\DUrole{n}{loglik\_func}}, \emph{\DUrole{n}{options}}}{}
+A private helper function for computing the likelihood profile and trace for each
+parameter.
+
+This private function is used in some calls to the public Model.fit() function and is
+triggered by a user call after instantiation.
+
+This function accepts the MLE parameter estimate and a Casadi function for the total data
+log\sphinxhyphen{}likelihood of the target dataset being processed by the current Model.fit() call
+and uses this to organize computation of a profile likelihood and the corresponding
+parameter vector trace along the computed profile, for each parameter. In the
+course of the this computation, this function also computes the likelihood confidence
+intervals for each parameter as well. This function organizes the profile computation for
+each parameter and in both increasing and decreasing directions, however it relies on lower
+level helper functions (\_\_loglik\_search and \_\_profile\_setup) to do the actual computing.
 \begin{quote}\begin{description}
 \item[{Parameters}] \leavevmode\begin{itemize}
 \item {} 
-\sphinxstyleliteralstrong{\sphinxupquote{mle\_params}} \textendash{} mle parameter estimates,  recieved from fitting
+\sphinxstyleliteralstrong{\sphinxupquote{mle\_params}} (\sphinxstyleliteralemphasis{\sphinxupquote{array\sphinxhyphen{}like}}\sphinxstyleliteralemphasis{\sphinxupquote{, }}\sphinxstyleliteralemphasis{\sphinxupquote{floats}}) \textendash{} A vector specifying the MLE parameter estimates generated and
+passed during a call to Model.fit().
 
 \item {} 
-\sphinxstyleliteralstrong{\sphinxupquote{loglik\_func}} \textendash{} casadi logliklihood function for the given dataset
+\sphinxstyleliteralstrong{\sphinxupquote{loglik\_func}} (\sphinxstyleliteralemphasis{\sphinxupquote{function}}) \textendash{} A Casadi function for computing the total data log\sphinxhyphen{}likelihood
+for the current dataset being handled within the initating Model.fit() call. The only
+argument is a putative parameter vector.
 
 \item {} 
-\sphinxstyleliteralstrong{\sphinxupquote{options}} \textendash{} an options dictionary for passing user options
+\sphinxstyleliteralstrong{\sphinxupquote{options}} (\sphinxstyleliteralemphasis{\sphinxupquote{dictionary}}) \textendash{} A dictionary of user\sphinxhyphen{}defined options encoded as key\sphinxhyphen{}value
+pairs. This dictionary is passed through from a call to Model.fit(), see
+the fit() functions documentation for possible key\sphinxhyphen{}value pairs.
 
 \end{itemize}
 
 \item[{Returns}] \leavevmode
-list of lists of upper and lower bounds for each parameter
-trace\_list: list of list of lists of parameter vector values along profile trace for each parameter
-profile\_list: List of lists of logliklihood ratio values for each parameter along the profile trace
+\begin{description}
+\item[{A multi\sphinxhyphen{}level list of lists is returned, the outer list contains three elements;}] \leavevmode
+1 \sphinxhyphen{} a list of lists where the outer index corresponds to each parameter and the
+inner list contains the upper and lower confidence interval bounds for each parameter,
+2 \sphinxhyphen{} a list of list of lists where the outer index corresponds to each parameter and
+the middle index corresponds to points along each profile trace and the inner list
+contains the value of the parameter vector at that point in the parameter trace.
+3 \sphinxhyphen{} a ;ist of lists where the outer index corresponds to each parameter value and
+the inner index corresponds to logliklihood ratio values for the given parameter
+at points along the likelihood profile.
+
+\end{description}
+
 
 \item[{Return type}] \leavevmode
-interval\_list
+nested lists
 
 \end{description}\end{quote}
 
 \end{fulllineitems}
 
-\index{\_\_contourplot() (nloed.model.Model method)@\spxentry{\_\_contourplot()}\spxextra{nloed.model.Model method}}
+\index{\_\_contour\_plot() (nloed.model.Model method)@\spxentry{\_\_contour\_plot()}\spxextra{nloed.model.Model method}}
 
 \begin{fulllineitems}
-\phantomsection\label{\detokenize{nloed:nloed.model.Model.__contourplot}}\pysiglinewithargsret{\sphinxbfcode{\sphinxupquote{\_\_contourplot}}}{\emph{\DUrole{n}{mle\_params}}, \emph{\DUrole{n}{loglik\_func}}, \emph{\DUrole{n}{figure}}, \emph{\DUrole{n}{options}}}{}
-This function plots the projections of the confidence volume in a 2d plane for each pair of parameters
-this creates marginal confidence contours for each pair of parameters
+\phantomsection\label{\detokenize{nloed:nloed.model.Model.__contour_plot}}\pysiglinewithargsret{\sphinxbfcode{\sphinxupquote{\_\_contour\_plot}}}{\emph{\DUrole{n}{mle\_params}}, \emph{\DUrole{n}{loglik\_func}}, \emph{\DUrole{n}{figure}}, \emph{\DUrole{n}{options}}}{}
+A private helper function for plotting the likelihood confidence contour plots during
+calls to Model.fit()
+
+This private function is used in some calls to the public Model.fit() function and is
+triggered by a user call after instantiation.
+
+This function plots the projections of the profile likelihood\sphinxhyphen{}based confidence volume in a
+2d plane for each pair of parameters using Matplotlib. This creates marginal confidence
+contours for each pair of parameters which are added to the trace projection plots generated
+by \_\_profile\_plot() in the lower\sphinxhyphen{}triangualr sub\sphinxhyphen{}plots of the passed figure.
 \begin{quote}\begin{description}
 \item[{Parameters}] \leavevmode\begin{itemize}
 \item {} 
-\sphinxstyleliteralstrong{\sphinxupquote{mle\_params}} \textendash{} mle parameter estimates,  recieved from fitting
+\sphinxstyleliteralstrong{\sphinxupquote{mle\_params}} (\sphinxstyleliteralemphasis{\sphinxupquote{array\sphinxhyphen{}like}}\sphinxstyleliteralemphasis{\sphinxupquote{, }}\sphinxstyleliteralemphasis{\sphinxupquote{floats}}) \textendash{} A vector specifying the MLE parameter estimates generated and
+passed during a call to Model.fit().
 
 \item {} 
-\sphinxstyleliteralstrong{\sphinxupquote{loglik\_func}} \textendash{} casadi logliklihood function for the given dataset
+\sphinxstyleliteralstrong{\sphinxupquote{loglik\_func}} (\sphinxstyleliteralemphasis{\sphinxupquote{function}}) \textendash{} A Casadi function for computing the total data log\sphinxhyphen{}likelihood
+for the current dataset being handled within the calling Model.fit() call. The only
+argument is a putative parameter vector.
 
 \item {} 
-\sphinxstyleliteralstrong{\sphinxupquote{figure}} \textendash{} the figure object on which plotting occurs
+\sphinxstyleliteralstrong{\sphinxupquote{figure}} (\sphinxstyleliteralemphasis{\sphinxupquote{integer}}) \textendash{} The figure object handle on which the plot is generated.
 
 \item {} 
-\sphinxstyleliteralstrong{\sphinxupquote{options}} \textendash{} an options dictionary for passing user options
+\sphinxstyleliteralstrong{\sphinxupquote{options}} (\sphinxstyleliteralemphasis{\sphinxupquote{dictionary}}) \textendash{} A dictionary of user\sphinxhyphen{}defined options encoded as key\sphinxhyphen{}value
+pairs. This dictionary is passed through from a call to Model.fit(), see
+the fit() functions documentation for possible key\sphinxhyphen{}value pairs.
 
 \end{itemize}
 
@@ -779,73 +945,132 @@ this creates marginal confidence contours for each pair of parameters
 
 \end{fulllineitems}
 
-\index{\_\_contourtrace() (nloed.model.Model method)@\spxentry{\_\_contourtrace()}\spxextra{nloed.model.Model method}}
+\index{\_\_contour\_trace() (nloed.model.Model method)@\spxentry{\_\_contour\_trace()}\spxextra{nloed.model.Model method}}
 
 \begin{fulllineitems}
-\phantomsection\label{\detokenize{nloed:nloed.model.Model.__contourtrace}}\pysiglinewithargsret{\sphinxbfcode{\sphinxupquote{\_\_contourtrace}}}{\emph{\DUrole{n}{mle\_params}}, \emph{\DUrole{n}{loglik\_func}}, \emph{\DUrole{n}{coordinates}}, \emph{\DUrole{n}{options}}}{}
-This function plots the projections of the confidence volume in a 2d plane for each pair of parameters
-this creates marginal confidence contours for each pair of parameters
+\phantomsection\label{\detokenize{nloed:nloed.model.Model.__contour_trace}}\pysiglinewithargsret{\sphinxbfcode{\sphinxupquote{\_\_contour\_trace}}}{\emph{\DUrole{n}{mle\_params}}, \emph{\DUrole{n}{loglik\_func}}, \emph{\DUrole{n}{coordinates}}, \emph{\DUrole{n}{options}}}{}
+A private helper function for computing the profile likelihood confidence contour
+projections for a specified pair of parameters.
+
+This private function is used in some calls to the public Model.fit() function and is
+triggered by a user call after instantiation.
+
+This function computes a projection boundary of the profile likelihood confidence volume in
+a 2D plane for the specified pair of parameters. To do this a series of vectors radiating
+out from the MLE in the target parameter pair plane are searched. Along these vectors the
+marginal (non\sphinxhyphen{}target\sphinxhyphen{}pair) parameters are re\sphinxhyphen{}optimized iteratively. The vectors are extended
+until the conditionally optimized value of the likelihood falls below the selected confidence
+threshold. The 2D coordinates of these boundary points are recorded and their values are used
+to interpolate the projected confidence boundary via a periodic spline. This function
+sets up the radial search and performs the interpolation but relies on lower level helper
+functions (\_\_profile\_setup and \_\_loglik\_search) to compute the boundary points.
 \begin{quote}\begin{description}
 \item[{Parameters}] \leavevmode\begin{itemize}
 \item {} 
-\sphinxstyleliteralstrong{\sphinxupquote{mle\_params}} \textendash{} mle parameter estimates,  recieved from fitting
+\sphinxstyleliteralstrong{\sphinxupquote{mle\_params}} (\sphinxstyleliteralemphasis{\sphinxupquote{array\sphinxhyphen{}like}}\sphinxstyleliteralemphasis{\sphinxupquote{, }}\sphinxstyleliteralemphasis{\sphinxupquote{floats}}) \textendash{} A vector specifying the MLE parameter estimates generated and
+passed during a call to Model.fit().
 
 \item {} 
-\sphinxstyleliteralstrong{\sphinxupquote{loglik\_func}} \textendash{} casadi logliklihood function for the given dataset
+\sphinxstyleliteralstrong{\sphinxupquote{loglik\_func}} (\sphinxstyleliteralemphasis{\sphinxupquote{function}}) \textendash{} A Casadi function for computing the total data log\sphinxhyphen{}likelihood
+for the current dataset being handled within the calling Model.fit() call. The only
+argument is a putative parameter vector.
 
 \item {} 
-\sphinxstyleliteralstrong{\sphinxupquote{coordinates}} \textendash{} a pair of parameter coordinates specifying the 2d contour to be computed in parameter space
+\sphinxstyleliteralstrong{\sphinxupquote{coordinates}} (\sphinxstyleliteralemphasis{\sphinxupquote{array\sphinxhyphen{}like}}\sphinxstyleliteralemphasis{\sphinxupquote{, }}\sphinxstyleliteralemphasis{\sphinxupquote{integers}}) \textendash{} A pair of parameter indices specifying the specific
+parameter pair for which a two 2D contour is to be computed in parameter space.
 
 \item {} 
-\sphinxstyleliteralstrong{\sphinxupquote{options}} \textendash{} an options dictionary for passing user options
+\sphinxstyleliteralstrong{\sphinxupquote{options}} (\sphinxstyleliteralemphasis{\sphinxupquote{dictionary}}) \textendash{} A dictionary of user\sphinxhyphen{}defined options encoded as key\sphinxhyphen{}value
+pairs. This dictionary is passed through from a call to Model.fit(), see
+the fit() functions documentation for possible key\sphinxhyphen{}value pairs.
 
 \end{itemize}
 
 \item[{Returns}] \leavevmode
-x, y\sphinxhyphen{}values in parameter space specified by coordinates tracing the projected profile confidence contour outline
+A list of lists is returned, where the outer list contains two entries;
+a list of x coorindates followed by a list of y coordinates. The coordinates fall on
+the contour projection in the 2D target parameter pair plane. The number of of x and y
+coordinates is equal and is set by the “RadialNumber” key in Model.fit()’s options
+dictionary.
 
 \item[{Return type}] \leavevmode
-{[}x\_fit, y\_fit{]}
+list of lists
 
 \end{description}\end{quote}
 
 \end{fulllineitems}
 
-\index{\_\_profilesetup() (nloed.model.Model method)@\spxentry{\_\_profilesetup()}\spxextra{nloed.model.Model method}}
+\index{\_\_profile\_setup() (nloed.model.Model method)@\spxentry{\_\_profile\_setup()}\spxextra{nloed.model.Model method}}
 
 \begin{fulllineitems}
-\phantomsection\label{\detokenize{nloed:nloed.model.Model.__profilesetup}}\pysiglinewithargsret{\sphinxbfcode{\sphinxupquote{\_\_profilesetup}}}{\emph{\DUrole{n}{mle\_params}}, \emph{\DUrole{n}{loglik\_func}}, \emph{\DUrole{n}{fixedparams}}, \emph{\DUrole{n}{direction}}, \emph{\DUrole{n}{options}}}{}
-This function creates function/solver objects for performing a profile likelihood search for the condifence boundary
-in the specified direction,  the function/solver objects compute the logliklihood ratio gap
-at a given radius (along the specified direction),  along with the LLR gaps 1st and 2nd derivative with respect to the radius.
-marginal (free) parameters (if they exist) are optimized conditional on the fixed parameters specified by the radius and direction
-the likelihood ratio gap is the negative difference between the chi\sphinxhyphen{}squared boundary and the loglik ratio at the current radius
+\phantomsection\label{\detokenize{nloed:nloed.model.Model.__profile_setup}}\pysiglinewithargsret{\sphinxbfcode{\sphinxupquote{\_\_profile\_setup}}}{\emph{\DUrole{n}{mle\_params}}, \emph{\DUrole{n}{loglik\_func}}, \emph{\DUrole{n}{fixed\_params}}, \emph{\DUrole{n}{direction}}, \emph{\DUrole{n}{options}}}{}
+A private helper function for constructing profile likelihood optimization solvers.
+
+This private function is used in some calls to the public Model.fit() function and is
+triggered by a user call after instantiation.
+
+This function creates a Casadi optimization solver object for optimizing the model’s
+likelihood (on the target dataset of the iniating Model.fit() call) w.r.t. the marginal
+parameter values while holding a specific subset of parameters fixed at specified values.
+
+There can be a single fixed parameter (for the common profile likelihood computations), or a set
+(currently we only ever need a pair, used for computing confidence contour projections in 2D).
+The fixed parameter values are specified by a radius and direction vector which makes it
+easy to perform radial searches required for the confidence contour trace (the optimizer is
+iteratively run with different radia values in order to find the boundary points). The
+direction vector is hard\sphinxhyphen{}coded into the resulting solver object after a call to
+\_\_profile\_setup() but the radius can be adjust (hence moving the ‘fixed’ parameters) when
+the solver object is actually run for optimization. This alterable radius value
+enables the actual profile likelihood search.
+
+The solver object actually optimizes the loglikelihood ratio (LLR) gap, the likelihood ratio
+gap is the negative difference between the chi\sphinxhyphen{}squared boundary (specified by the user in
+the initiating call to Model.fit()) and the loglikelihood ratio at the current marginal
+parameter vector being optimized. This is just a rezeroing of the scale and is equivlant to
+optimizing the loglikelihood but makes some of the numerics and output more convenient to
+manage.
+
+Note that limited testing has been done on single parameter models however the resulting
+return object for a 1D model should behave like a regular solver but actually just returns
+the LLR gap value at the radius\sphinxhyphen{}specified fixed values of the lone parameter.
 \begin{quote}\begin{description}
 \item[{Parameters}] \leavevmode\begin{itemize}
 \item {} 
-\sphinxstyleliteralstrong{\sphinxupquote{mle\_params}} \textendash{} mle parameter estimates,  recieved from fitting
+\sphinxstyleliteralstrong{\sphinxupquote{mle\_params}} (\sphinxstyleliteralemphasis{\sphinxupquote{array\sphinxhyphen{}like}}\sphinxstyleliteralemphasis{\sphinxupquote{, }}\sphinxstyleliteralemphasis{\sphinxupquote{floats}}) \textendash{} A vector specifying the MLE parameter estimates generated and
+passed during a call to Model.fit().
 
 \item {} 
-\sphinxstyleliteralstrong{\sphinxupquote{loglik\_func}} \textendash{} casadi logliklihood function for the given dataset
+\sphinxstyleliteralstrong{\sphinxupquote{loglik\_func}} (\sphinxstyleliteralemphasis{\sphinxupquote{function}}) \textendash{} A Casadi function for computing the total data log\sphinxhyphen{}likelihood
+for the current dataset being handled within the calling Model.fit() call. The only
+argument is a putative parameter vector.
 
 \item {} 
-\sphinxstyleliteralstrong{\sphinxupquote{fixedparams}} \textendash{} a boolean vector,  same length as the parameters,  true means cooresponding parameters fixed by direction and radius,  false values are marginal and optimized (if they exist)
+\sphinxstyleliteralstrong{\sphinxupquote{fixed\_params}} (\sphinxstyleliteralemphasis{\sphinxupquote{array\sphinxhyphen{}like}}\sphinxstyleliteralemphasis{\sphinxupquote{, }}\sphinxstyleliteralemphasis{\sphinxupquote{booleans}}) \textendash{} A boolean vector that is the same length as the
+model’s parameter vector. True values imply the cooresponding parameter (by position)
+should remain fixed in the solver object by the provideddirection and radius,
+False values indicate the corresponding parameter is marginal and should optimized.
 
 \item {} 
-\sphinxstyleliteralstrong{\sphinxupquote{direction}} \textendash{} a direction in parameter space,  coordinate specified as true in fixedparams are used as the search direction
+\sphinxstyleliteralstrong{\sphinxupquote{direction}} (\sphinxstyleliteralemphasis{\sphinxupquote{array\sphinxhyphen{}like}}\sphinxstyleliteralemphasis{\sphinxupquote{, }}\sphinxstyleliteralemphasis{\sphinxupquote{floats}}) \textendash{} A vector that is the same length as the parameter vector
+specifying a direction in parameter space. Coordinate specified as True (non\sphinxhyphen{}marginal)
+in the fixed\_params argument are used as the direction (along which the solver’s
+run\sphinxhyphen{}time radius argument specifies the value of the fixed parameters)
 
 \item {} 
-\sphinxstyleliteralstrong{\sphinxupquote{options}} \textendash{} an options dictionary for passing user options
+\sphinxstyleliteralstrong{\sphinxupquote{options}} (\sphinxstyleliteralemphasis{\sphinxupquote{dictionary}}) \textendash{} A dictionary of user\sphinxhyphen{}defined options encoded as key\sphinxhyphen{}value
+pairs. This dictionary is passed through from a call to Model.fit(), see
+the fit() functions documentation for possible key\sphinxhyphen{}value pairs.
 
 \end{itemize}
 
 \item[{Returns}] \leavevmode
-casadi function/ipopt solver that returns the loglik ratio gap for a given radius,  after optimizing free/marginal parameters if they exist
-profile\_loglik\_jacobian\_solver: casadi function/ipopt derived derivative function that returns the derivative of the loglik ratio gap with respect to the radius (jacobian is 1x1)
-profile\_loglik\_hessian\_solver: casadi function/ipopt derived 2nd derivative function that returns the 2nd derivative of the loglik ratio gap with respect to the radius (hessian is 1x1)
+A Casadi Ipopt solver object is returned, which can optimize the
+loglikelihood ratio gap w.r.t. the marginal parameter values, conditioned on the fixed
+parmeter value which are specified by a radius (set at call time) and direction (set in
+\_\_profile\_setup() above when the solver is created).
 
 \item[{Return type}] \leavevmode
-profile\_loglik\_solver
+casadi solver
 
 \end{description}\end{quote}
 
@@ -855,33 +1080,60 @@ profile\_loglik\_solver
 
 \begin{fulllineitems}
 \phantomsection\label{\detokenize{nloed:nloed.model.Model.__logliksearch}}\pysiglinewithargsret{\sphinxbfcode{\sphinxupquote{\_\_logliksearch}}}{\emph{\DUrole{n}{profile\_loglik\_solver}}, \emph{\DUrole{n}{marginal\_param}}, \emph{\DUrole{n}{options}}, \emph{\DUrole{n}{forward}\DUrole{o}{=}\DUrole{default_value}{True}}}{}
-This function performs a root finding algorithm using solver\_list objects
-It uses halley’s method (currently bisection as of summer 2020) to find the radius value (relative to the mle) where the loglik ratio equals the chi\sphinxhyphen{}squared level
-This radius runs along the direction specified in the solver\_list when they are created
-Halley’s method is a higher order extension of newton’s method for finding roots
+A private helper function for performing a bisection search for profile likelihood
+boundary points.
+
+This private function is used in some calls to the public Model.fit() function and is
+triggered by a user call after instantiation.
+
+This function performs a root finding algorithm using the solver object  (profile\_loglik\_solver)
+generated by \_\_profile\_setup(). Currently the function uses a bisection search. The search
+is performed along the direction vector specified when the solve object is created by
+\_\_profile\_setup(), with the given set of fixed and marginal parameters specified in that
+call. The search dimensions is the radius argument of the solver object, which specified when
+combined with the direction vector hard\sphinxhyphen{}coded in the solver object to specify its magnuted,
+resulst in a specific set of fixed parmaeter values at which the conditional likelihood
+optimization is performed. The radius at which a root is found indicates a boundary point in
+the confidence volume at the confidence level specified by the use in their initating call to
+\begin{quote}
+
+Model.fit().
+\end{quote}
+
+Note a passed version used Halley’s method; a higher order extension of Newton’s method for
+finding roots. This was possible using Casadi’s ability to differentiate optimization solutions
+and was faster, but proved to be numerically unstable.
 \begin{quote}\begin{description}
 \item[{Parameters}] \leavevmode\begin{itemize}
 \item {} 
-\sphinxstyleliteralstrong{\sphinxupquote{solver\_list}} \textendash{} solver/casadi functions for finding the loglikelihood ratio gap at a given radius from mle,  and its 1st/2nd derivatives
+\sphinxstyleliteralstrong{\sphinxupquote{profile\_loglik\_solver}} \textendash{} The Casadi Ipopt solver object functions for finding the conditionally
+optimized loglikelihood ratio gap at a given radius from MLE. This object is generated
+with a call to \_\_profile\_setup().
 
 \item {} 
-\sphinxstyleliteralstrong{\sphinxupquote{marginal\_param}} \textendash{} starting values (usually the mle) for the marginal parameters
+\sphinxstyleliteralstrong{\sphinxupquote{marginal\_param}} (\sphinxstyleliteralemphasis{\sphinxupquote{array\sphinxhyphen{}like}}\sphinxstyleliteralemphasis{\sphinxupquote{, }}\sphinxstyleliteralemphasis{\sphinxupquote{floats}}) \textendash{} The starting values (usually the MLE) for the
+marginal parameters that are passed to the Ipopt solver.
 
 \item {} 
-\sphinxstyleliteralstrong{\sphinxupquote{options}} \textendash{} an options dictionary for passing user options
+\sphinxstyleliteralstrong{\sphinxupquote{options}} (\sphinxstyleliteralemphasis{\sphinxupquote{dictionary}}) \textendash{} A dictionary of user\sphinxhyphen{}defined options encoded as key\sphinxhyphen{}value
+pairs. This dictionary is passed through from a call to Model.fit(), see
+the fit() functions documentation for possible key\sphinxhyphen{}value pairs.
 
 \item {} 
-\sphinxstyleliteralstrong{\sphinxupquote{forward}} \textendash{} boolean,  if true search is done in the forward (positive) radius direction (relative to direction specidied in solver list),  if false perform search starting with a negative radius
+\sphinxstyleliteralstrong{\sphinxupquote{forward}} (\sphinxstyleliteralemphasis{\sphinxupquote{boolean}}) \textendash{} A boolean indicating the directino of the search, if True the search
+is done in the forward (positive) radius direction (relative to direction specidied
+in solver object), if False the search is performed starting with a negative radius.
 
 \end{itemize}
 
 \item[{Returns}] \leavevmode
-returns the radius corresponding to the chi\sphinxhyphen{}squared boundary of the loglikelihood region
-marginal\_param: returns the optimal setting of the marginal parameters at the boundary
-ratio\_gap: returns the residual loglikelihood ratio gap at the boundary (it should be small,  within tolerance)
+The return object is a three element list, the first entry is  contains the radius
+value at which the root was found, the second entry contains a list of the optimzed marginal
+parameter values at the root, and the third entry contains the residual value of the LLR
+gap at the root (this should be near zero).
 
 \item[{Return type}] \leavevmode
-radius
+list
 
 \end{description}\end{quote}
 

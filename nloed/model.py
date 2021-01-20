@@ -115,13 +115,36 @@ class Model:
     def __init__(self, observ_struct, input_names, param_names, options={}):
         """ The class constructor for NLoed's Model class. 
 
-        This function
+        This function accepts the users Casadi functions, distribution lables, and input and
+        parmeter names, and generate an NLoed model object for the specified model. During instantiation
+        the Casadi functions are used to generate a variety of function attributes for each model
+        observation variable; including functions for computing model predictions, loglikelihood,
+        fisher information and data sampling. These function attributes are used both by the NLoed
+        Model instance's public function and if/when the Model instance is passed to the NLoed Design
+        class for optimizing an experimental design.
 
         Args:
-            observ_struct:
-            input_names:
-            param_names:
-            options:
+            observ_struct (list of tuples): A list of tuples, one tuple for each of the models
+                observation variables. The first element of the tuple is a Casadi function mapping
+                the model inputs and parameters to the given observation's sampling statistics. The
+                second element of each tuple is a string indicating the type of parameteric distribution
+                assigned to that observation variable. Observation names are extracted from the string
+                label of the Casadi function for each obervation variable.
+            input_names (list of strings): A list of strings specifying the names of the model inputs
+                in the same order that the inputs are expected by the Casadi functions also passed by
+                the user.
+            param_names (list of strings): A list of strings specifying the names of the model parameters
+                in the same order that the parameters are expected by the Casadi functions also passed by
+                the user.
+            options (dict, optional): A dictionary of user-defined options, possible key-value pairs
+                include:
+
+                "ScalarSymbolics" --
+                Purpose: Determines whether SX or MX Casadi symbolics are used within the NLoed Model
+                class, True implies scalar symbolics via SX.,
+                Type: boolean,
+                Default Value: True,
+                Possible Values: True or False
 
         """
 
@@ -209,7 +232,7 @@ class Model:
             self.observation_sampler[observ_name] = obs_sampler
             self.observation_percentile[observ_name] = obs_percent
             
-# --------------- Public functions -----------------------------------------------------------------
+# --------------- Public (user-callable) functions -------------------------------------------------
 
     def fit(self, datasets, start_param=None, options={}):
         """ A function for fitting the NLoed model to a dataset contained in a dataframe.
@@ -467,7 +490,7 @@ class Model:
                     interval_list = self.__profile_plot(param_vec, loglik_func_list[d], fig, options)[0]
                     #if contour plots are requested specifically, run contour function to plot the projected confidence contours
                     if options['Confidence']=="Contours":
-                        self.__contourplot(param_vec, loglik_func_list[d], fig, options)
+                        self.__contour_plot(param_vec, loglik_func_list[d], fig, options)
                 elif options['Confidence']=="Intervals":
                     #if confidence intervals are requested, run confidenceintervals to get CI's and add them to replicate list
                     interval_list = self.__confidence_intervals(param_vec, loglik_func_list[d], options)
@@ -503,7 +526,7 @@ class Model:
         Args:
             designs (dataframe OR list of dataframes): A dataframe containing the design to be simulated,
                 OR a list of dataframes containing multiple designs to be simulated
-            param (array-like): The parameter values used to generate the data
+            param (array-like, floats): The parameter values used to generate the data
             design_replicates (integer, optional): An integer indicating the number of dataset 
                 replicates to be generated for each design. The default is 1 per design passed.
             options (dict, optional): A dictionary of user-defined options, possible key-value pairs
@@ -586,8 +609,8 @@ class Model:
         Args:
             input_struct (dataframe): A dataframe specifying the combination of inputs values and 
                 observations at which predictions are desired.
-            param (array-like): The parameter vector values at which the predictions are to be made.
-            covariance_matrix (array-like, optional): A symetric matrix specifying the parameter's 
+            param (array-like, floats): The parameter vector values at which the predictions are to be made.
+            covariance_matrix (array-like, floats, optional): A symetric matrix specifying the parameter's 
                 normal covariance matrix, required if parameter uncertainty is to be included. The
                 prior mean set by the values passed via the param argument.
             options (dictionary, optional): A dictionary of user-defined options, possible key-value
@@ -792,7 +815,7 @@ class Model:
             designs (dataframe OR list of dataframes): A dataframe specifying the experimental design
                 to be evaluated,
                 OR a list of dataframes describing a set ofexperimental designs to be evaluated.
-            param (array-like): The parameter vector values at which the predictions are to be made.
+            param (array-like, floats): The parameter vector values at which the predictions are to be made.
             options (dictionary, optional): A dictionary of user-defined options, possible key-value
                 pairs include:
 
@@ -1159,7 +1182,7 @@ class Model:
         around the MLE estimate using profile likelihoods.
 
         Args:
-            mle_params (array-like): A vector specifying the MLE parameter estimates generated and 
+            mle_params (array-like, floats): A vector specifying the MLE parameter estimates generated and 
                 passed during a call to Model.fit().
             loglik_func: A Casadi function for computing the total data log-likelihood for the
                 current dataset being handled within the calling Model.fit() call. The only argument
@@ -1186,15 +1209,15 @@ class Model:
             direction = [0]*self.num_param
             direction[p] = 1
             #setup the profile solver
-            solver_list = self.__profilesetup(mle_params, loglik_func, fixed_param, direction, options)
+            solver_list = self.__profile_setup(mle_params, loglik_func, fixed_param, direction, options)
             #extract starting values for marginal parameters (those to be optimized during profile)
             marginal_param = [mle_params[i] for i in range(self.num_param) if direction[i]==0]
             #search to find the radius length in the specified profile direction,  positive search
-            upper_radius = self.__logliksearch(solver_list, marginal_param, options, True)[0]
+            upper_radius = self.__loglik_search(solver_list, marginal_param, options, True)[0]
             #compute the location of the upper parameter bound
             upper_bound = mle_params[p] + direction[p] * upper_radius
             #search to find the radius length in the specified profile direction,  negative search
-            lower_radius  =self.__logliksearch(solver_list, marginal_param, options, False)[0]
+            lower_radius  =self.__loglik_search(solver_list, marginal_param, options, False)[0]
             #compute the location of the lower parameter bound
             lower_bound = mle_params[p]+direction[p]*lower_radius
             interval_list.append([lower_bound, upper_bound])
@@ -1210,7 +1233,7 @@ class Model:
         This private function is used in some calls to the public Model.fit() function and is 
         triggered by a user call after instantiation.
 
-        This function generate a square grid of Matplotlib sub-plots, with a row and column for each
+        This function generates a square grid of Matplotlib sub-plots, with a row and column for each
         parameter. The logelikelihood profiles of each parameter are plotted on sub-plots along the
         diagonal. These diganol plots also include a horizantal reference line indicating 
         loglikleihood value at which the perscribed confidence level boundaries occur. Projections 
@@ -1219,7 +1242,7 @@ class Model:
         traces and profiles.
 
         Args:
-            mle_params (array-like): A vector specifying the MLE parameter estimates generated and 
+            mle_params (array-like, floats): A vector specifying the MLE parameter estimates generated and 
                 passed during a call to Model.fit().
             loglik_func (function): A Casadi function for computing the total data log-likelihood 
                 for the current dataset being handled within the calling Model.fit() call. The only 
@@ -1239,13 +1262,14 @@ class Model:
                 contains the value of the parameter vector at that point in the parameter trace.
                 3 - a ;ist of lists where the outer index corresponds to each parameter value and 
                 the inner index corresponds to logliklihood ratio values for the given parameter
-                at points along the likelihood profile.
+                at points along the likelihood profile. Note this return is passed up from a call
+                to __profile_trace()
         """
 
         #extract the confidence level and compute the chisquared threshold
         chi_squared_level = st.chi2.ppf( options['ConfidenceLevel'],  self.num_param)
         #run profile trace to get the CI's,  parameter traces,  and LR profile
-        [interval_list, trace_list, profile_list] = self.__profile_plot(mle_params, loglik_func, options)
+        [interval_list, trace_list, profile_list] = self.__profile_trace(mle_params, loglik_func, options)
         #loop over each pair of parameters
         for p1 in range(self.num_param):
             for p2 in range(p1, self.num_param):
@@ -1283,25 +1307,41 @@ class Model:
         return [interval_list, trace_list, profile_list]
 
     def __profile_trace(self, mle_params, loglik_func, options):
-        """ A private helper function for computing all of the parameters profile likelihood's 
-        loglikelihood values and parameter traces.
+        """ A private helper function for computing the likelihood profile and trace for each 
+        parameter.
 
         This private function is used in some calls to the public Model.fit() function and is 
         triggered by a user call after instantiation.
 
-        This function compute the profile logliklihood parameter trace for each parameter in the model
+        This function accepts the MLE parameter estimate and a Casadi function for the total data
+        log-likelihood of the target dataset being processed by the current Model.fit() call
+        and uses this to organize computation of a profile likelihood and the corresponding 
+        parameter vector trace along the computed profile, for each parameter. In the 
+        course of the this computation, this function also computes the likelihood confidence 
+        intervals for each parameter as well. This function organizes the profile computation for 
+        each parameter and in both increasing and decreasing directions, however it relies on lower
+        level helper functions (__loglik_search and __profile_setup) to do the actual computing.
 
         Args:
-            mle_params: mle parameter estimates,  recieved from fitting
-            loglik_func: casadi logliklihood function for the given dataset
+            mle_params (array-like, floats): A vector specifying the MLE parameter estimates generated and 
+                passed during a call to Model.fit().
+            loglik_func (function): A Casadi function for computing the total data log-likelihood 
+                for the current dataset being handled within the initating Model.fit() call. The only 
+                argument is a putative parameter vector.
             options (dictionary): A dictionary of user-defined options encoded as key-value
                 pairs. This dictionary is passed through from a call to Model.fit(), see
                 the fit() functions documentation for possible key-value pairs.
 
         Returns:
-            interval_list: list of lists of upper and lower bounds for each parameter
-            trace_list: list of list of lists of parameter vector values along profile trace for each parameter
-            profile_list: List of lists of logliklihood ratio values for each parameter along the profile trace
+            nested lists: A multi-level list of lists is returned, the outer list contains three elements;
+                1 - a list of lists where the outer index corresponds to each parameter and the 
+                inner list contains the upper and lower confidence interval bounds for each parameter,
+                2 - a list of list of lists where the outer index corresponds to each parameter and
+                the middle index corresponds to points along each profile trace and the inner list
+                contains the value of the parameter vector at that point in the parameter trace.
+                3 - a ;ist of lists where the outer index corresponds to each parameter value and 
+                the inner index corresponds to logliklihood ratio values for the given parameter
+                at points along the likelihood profile.
         """
         if options['Verbose']:
             progress_counter=0
@@ -1322,17 +1362,17 @@ class Model:
             direction = [0]*self.num_param
             direction[p] = 1
             #generate the profile solvers
-            profile_loglik_solver = self.__profilesetup(mle_params, loglik_func, fixed_param, direction, options)
+            profile_loglik_solver = self.__profile_setup(mle_params, loglik_func, fixed_param, direction, options)
             #set the starting values of the marginal parameters from the mle estimates
             marginal_param = [mle_params[i] for i in range(self.num_param) if not fixed_param[i]]
             #preform a profile search to find the upper bound on the radius for the profile trace
-            [upper_radius, upper_param_list, upper_loglik_ratio_gap] = self.__logliksearch(profile_loglik_solver, marginal_param, options, True)
+            [upper_radius, upper_param_list, upper_loglik_ratio_gap] = self.__loglik_search(profile_loglik_solver, marginal_param, options, True)
             #compute the parameter upper bound
             upper_bound = mle_params[p] + direction[p]*upper_radius
             #insert the profile parameter (upper) in the marginal parameter vector (upper),  creates a complete parameter vector
             upper_param_list.insert(p, upper_bound)
             #preform a profile search to find the lower bound on the radius for the profile trace
-            [lower_radius, lower_param_list, lower_loglik_ratio_gap] = self.__logliksearch(profile_loglik_solver, marginal_param, options, False)
+            [lower_radius, lower_param_list, lower_loglik_ratio_gap] = self.__loglik_search(profile_loglik_solver, marginal_param, options, False)
             #compute the parameter lower bound
             lower_bound = mle_params[p] + direction[p]*lower_radius
             #insert the profile parameter (lower) in the marginal parameter vector (lower),  creates a complete parameter vector
@@ -1376,16 +1416,28 @@ class Model:
         #return the intervals,  parameter trace and loglik ratio profile
         return [interval_list, trace_list, profile_list]
 
-    def __contourplot(self, mle_params, loglik_func, figure, options):
-        """ 
-        This function plots the projections of the confidence volume in a 2d plane for each pair of parameters
-        this creates marginal confidence contours for each pair of parameters
+    def __contour_plot(self, mle_params, loglik_func, figure, options):
+        """ A private helper function for plotting the likelihood confidence contour plots during 
+        calls to Model.fit()
+
+        This private function is used in some calls to the public Model.fit() function and is 
+        triggered by a user call after instantiation.
+
+        This function plots the projections of the profile likelihood-based confidence volume in a
+        2d plane for each pair of parameters using Matplotlib. This creates marginal confidence 
+        contours for each pair of parameters which are added to the trace projection plots generated
+        by __profile_plot() in the lower-triangualr sub-plots of the passed figure.
 
         Args:
-            mle_params: mle parameter estimates,  recieved from fitting
-            loglik_func: casadi logliklihood function for the given dataset
-            figure: the figure object on which plotting occurs
-            options: an options dictionary for passing user options
+            mle_params (array-like, floats): A vector specifying the MLE parameter estimates generated and 
+                passed during a call to Model.fit().
+            loglik_func (function): A Casadi function for computing the total data log-likelihood 
+                for the current dataset being handled within the calling Model.fit() call. The only 
+                argument is a putative parameter vector.
+            figure (integer):The figure object handle on which the plot is generated.
+            options (dictionary): A dictionary of user-defined options encoded as key-value
+                pairs. This dictionary is passed through from a call to Model.fit(), see
+                the fit() functions documentation for possible key-value pairs.
         """
         if options['Verbose']:
             total_iterations = self.num_param*(self.num_param-1)/2
@@ -1396,7 +1448,7 @@ class Model:
         for p1 in range(self.num_param):
             for p2 in range(p1+1, self.num_param):
                 #compute the x and y values for the contour trace
-                [x_fit, y_fit] = self.__contourtrace(mle_params, loglik_func, [p1, p2], options)
+                [x_fit, y_fit] = self.__contour_trace(mle_params, loglik_func, [p1, p2], options)
                 #plot the contour on the appropriate subplot (passed in from fit function,  shared with profileplot)
                 plt.subplot(self.num_param,  self.num_param,  p2*self.num_param+p1+1)
                 plt.plot(x_fit,  y_fit, label=self.param_name_list[p1]+' '+self.param_name_list[p2]+' contour')
@@ -1408,19 +1460,41 @@ class Model:
                     self._progress_bar(progress_counter, total_iterations, prefix = 'Contour Traces:')
 
 
-    def __contourtrace(self, mle_params, loglik_func, coordinates, options):
-        """ 
-        This function plots the projections of the confidence volume in a 2d plane for each pair of parameters
-        this creates marginal confidence contours for each pair of parameters
+    def __contour_trace(self, mle_params, loglik_func, coordinates, options):
+        """ A private helper function for computing the profile likelihood confidence contour
+        projections for a specified pair of parameters.
+
+        This private function is used in some calls to the public Model.fit() function and is 
+        triggered by a user call after instantiation.
+
+        This function computes a projection boundary of the profile likelihood confidence volume in
+        a 2D plane for the specified pair of parameters. To do this a series of vectors radiating
+        out from the MLE in the target parameter pair plane are searched. Along these vectors the
+        marginal (non-target-pair) parameters are re-optimized iteratively. The vectors are extended
+        until the conditionally optimized value of the likelihood falls below the selected confidence
+        threshold. The 2D coordinates of these boundary points are recorded and their values are used
+        to interpolate the projected confidence boundary via a periodic spline. This function
+        sets up the radial search and performs the interpolation but relies on lower level helper 
+        functions (__profile_setup and __loglik_search) to compute the boundary points.
 
         Args:
-            mle_params: mle parameter estimates,  recieved from fitting
-            loglik_func: casadi logliklihood function for the given dataset
-            coordinates: a pair of parameter coordinates specifying the 2d contour to be computed in parameter space
-            options: an options dictionary for passing user options
+            mle_params (array-like, floats): A vector specifying the MLE parameter estimates generated and 
+                passed during a call to Model.fit().
+            loglik_func (function): A Casadi function for computing the total data log-likelihood 
+                for the current dataset being handled within the calling Model.fit() call. The only 
+                argument is a putative parameter vector.
+            coordinates (array-like, integers): A pair of parameter indices specifying the specific 
+                parameter pair for which a two 2D contour is to be computed in parameter space.
+            options (dictionary): A dictionary of user-defined options encoded as key-value
+                pairs. This dictionary is passed through from a call to Model.fit(), see
+                the fit() functions documentation for possible key-value pairs.
 
         Returns:
-            [x_fit, y_fit]: x, y-values in parameter space specified by coordinates tracing the projected profile confidence contour outline
+            list of lists: A list of lists is returned, where the outer list contains two entries;
+            a list of x coorindates followed by a list of y coordinates. The coordinates fall on
+            the contour projection in the 2D target parameter pair plane. The number of of x and y
+            coordinates is equal and is set by the "RadialNumber" key in Model.fit()'s options
+            dictionary.
         """
         #extract the parameter coordinat indicies for the specified trace
         p1 = coordinates[0]
@@ -1445,9 +1519,9 @@ class Model:
             direction[p1] = angle_cosine
             direction[p2] = angle_sine
             #setup the solver for the search
-            solver_list = self.__profilesetup(mle_params, loglik_func, fixed_param, direction, options)
+            solver_list = self.__profile_setup(mle_params, loglik_func, fixed_param, direction, options)
             #run the profile loglik search and return the found radia for the given angle
-            radius = self.__logliksearch(solver_list, marginal_param, options, True)[0]
+            radius = self.__loglik_search(solver_list, marginal_param, options, True)[0]
             #record the radius
             radius_list.append(radius)
         #fit a periodic spline to the Radius-Angle data
@@ -1467,30 +1541,65 @@ class Model:
         #NOTE: should maybe pass profile extrema from CI's into contours to add to fit points in interpolation
         #        it is unlikely we will 'hit' absolute extrema unless we have very dense sampling,  splines don't need an even grid
 
-    def __profilesetup(self, mle_params, loglik_func, fixedparams, direction, options):
-        """ 
-        This function creates function/solver objects for performing a profile likelihood search for the condifence boundary
-        in the specified direction,  the function/solver objects compute the logliklihood ratio gap
-        at a given radius (along the specified direction),  along with the LLR gaps 1st and 2nd derivative with respect to the radius.
-        marginal (free) parameters (if they exist) are optimized conditional on the fixed parameters specified by the radius and direction
-        the likelihood ratio gap is the negative difference between the chi-squared boundary and the loglik ratio at the current radius
+    def __profile_setup(self, mle_params, loglik_func, fixed_params, direction, options):
+        """ A private helper function for constructing profile likelihood optimization solvers.
+
+        This private function is used in some calls to the public Model.fit() function and is 
+        triggered by a user call after instantiation.
+
+        This function creates a Casadi optimization solver object for optimizing the model's 
+        likelihood (on the target dataset of the iniating Model.fit() call) w.r.t. the marginal
+        parameter values while holding a specific subset of parameters fixed at specified values.
+        
+        There can be a single fixed parameter (for the common profile likelihood computations), or a set
+        (currently we only ever need a pair, used for computing confidence contour projections in 2D).
+        The fixed parameter values are specified by a radius and direction vector which makes it
+        easy to perform radial searches required for the confidence contour trace (the optimizer is
+        iteratively run with different radia values in order to find the boundary points). The 
+        direction vector is hard-coded into the resulting solver object after a call to 
+        __profile_setup() but the radius can be adjust (hence moving the 'fixed' parameters) when 
+        the solver object is actually run for optimization. This alterable radius value
+        enables the actual profile likelihood search.
+        
+        The solver object actually optimizes the loglikelihood ratio (LLR) gap, the likelihood ratio
+        gap is the negative difference between the chi-squared boundary (specified by the user in 
+        the initiating call to Model.fit()) and the loglikelihood ratio at the current marginal
+        parameter vector being optimized. This is just a rezeroing of the scale and is equivlant to
+        optimizing the loglikelihood but makes some of the numerics and output more convenient to 
+        manage.
+
+        Note that limited testing has been done on single parameter models however the resulting
+        return object for a 1D model should behave like a regular solver but actually just returns
+        the LLR gap value at the radius-specified fixed values of the lone parameter.
 
         Args:
-            mle_params: mle parameter estimates,  recieved from fitting
-            loglik_func: casadi logliklihood function for the given dataset
-            fixedparams: a boolean vector,  same length as the parameters,  true means cooresponding parameters fixed by direction and radius,  false values are marginal and optimized (if they exist)
-            direction: a direction in parameter space,  coordinate specified as true in fixedparams are used as the search direction
-            options: an options dictionary for passing user options
+            mle_params (array-like, floats): A vector specifying the MLE parameter estimates generated and 
+                passed during a call to Model.fit().
+            loglik_func (function): A Casadi function for computing the total data log-likelihood 
+                for the current dataset being handled within the calling Model.fit() call. The only 
+                argument is a putative parameter vector.
+            fixed_params (array-like, booleans): A boolean vector that is the same length as the 
+                model's parameter vector. True values imply the cooresponding parameter (by position)
+                should remain fixed in the solver object by the provideddirection and radius,
+                False values indicate the corresponding parameter is marginal and should optimized.
+            direction (array-like, floats): A vector that is the same length as the parameter vector
+                specifying a direction in parameter space. Coordinate specified as True (non-marginal)
+                in the fixed_params argument are used as the direction (along which the solver's
+                run-time radius argument specifies the value of the fixed parameters)
+            options (dictionary): A dictionary of user-defined options encoded as key-value
+                pairs. This dictionary is passed through from a call to Model.fit(), see
+                the fit() functions documentation for possible key-value pairs.
 
         Returns:
-            profile_loglik_solver: casadi function/ipopt solver that returns the loglik ratio gap for a given radius,  after optimizing free/marginal parameters if they exist
-            profile_loglik_jacobian_solver: casadi function/ipopt derived derivative function that returns the derivative of the loglik ratio gap with respect to the radius (jacobian is 1x1)
-            profile_loglik_hessian_solver: casadi function/ipopt derived 2nd derivative function that returns the 2nd derivative of the loglik ratio gap with respect to the radius (hessian is 1x1)
+            casadi solver: A Casadi Ipopt solver object is returned, which can optimize the 
+            loglikelihood ratio gap w.r.t. the marginal parameter values, conditioned on the fixed
+            parmeter value which are specified by a radius (set at call time) and direction (set in
+            __profile_setup() above when the solver is created). 
         """
         #compute the chi-squared level from confidence level
         chi_squared_level = st.chi2.ppf(options['ConfidenceLevel'],  self.num_param)
         #compute the number of fixed parameters (along which we do boundary search,  radius direction)
-        num_fixed_param = sum(fixedparams)
+        num_fixed_param = sum(fixed_params)
         #compute the number of free/marginal parameters,  which are optimized at each step of the search
         num_marginal_param = self.num_param-num_fixed_param
         if num_fixed_param == 0:
@@ -1512,7 +1621,7 @@ class Model:
         marginal_counter = 0
         #loop over the parameters
         for i in range(self.num_param):   
-            if fixedparams[i]:
+            if fixed_params[i]:
                 #if the parameter is fixed,  add an entry parameterized by the radius from the mle in given direction
                 param_list.append( direction[i]*radius_symbol + mle_params[i] )
             else:
@@ -1537,23 +1646,46 @@ class Model:
         #return the solvers/functions
         return profile_loglik_solver
 
-    def __logliksearch(self, profile_loglik_solver, marginal_param, options, forward=True):
-        """ 
-        This function performs a root finding algorithm using solver_list objects
-        It uses halley's method (currently bisection as of summer 2020) to find the radius value (relative to the mle) where the loglik ratio equals the chi-squared level
-        This radius runs along the direction specified in the solver_list when they are created
-        Halley's method is a higher order extension of newton's method for finding roots
+    def __loglik_search(self, profile_loglik_solver, marginal_param, options, forward=True):
+        """ A private helper function for performing a bisection search for profile likelihood 
+        boundary points.
+
+        This private function is used in some calls to the public Model.fit() function and is 
+        triggered by a user call after instantiation.
+
+        This function performs a root finding algorithm using the solver object  (profile_loglik_solver)
+        generated by __profile_setup(). Currently the function uses a bisection search. The search 
+        is performed along the direction vector specified when the solve object is created by 
+        __profile_setup(), with the given set of fixed and marginal parameters specified in that 
+        call. The search dimensions is the radius argument of the solver object, which specified when
+        combined with the direction vector hard-coded in the solver object to specify its magnuted, 
+        resulst in a specific set of fixed parmaeter values at which the conditional likelihood 
+        optimization is performed. The radius at which a root is found indicates a boundary point in
+        the confidence volume at the confidence level specified by the use in their initating call to
+        Model.fit().
+
+        Note a passed version used Halley's method; a higher order extension of Newton's method for
+        finding roots. This was possible using Casadi's ability to differentiate optimization solutions
+        and was faster, but proved to be numerically unstable.
 
         Args:
-            solver_list: solver/casadi functions for finding the loglikelihood ratio gap at a given radius from mle,  and its 1st/2nd derivatives
-            marginal_param: starting values (usually the mle) for the marginal parameters
-            options: an options dictionary for passing user options
-            forward: boolean,  if true search is done in the forward (positive) radius direction (relative to direction specidied in solver list),  if false perform search starting with a negative radius
+            profile_loglik_solver: The Casadi Ipopt solver object functions for finding the conditionally
+                optimized loglikelihood ratio gap at a given radius from MLE. This object is generated
+                with a call to __profile_setup().
+            marginal_param (array-like, floats): The starting values (usually the MLE) for the 
+                marginal parameters that are passed to the Ipopt solver.
+            options (dictionary): A dictionary of user-defined options encoded as key-value
+                pairs. This dictionary is passed through from a call to Model.fit(), see
+                the fit() functions documentation for possible key-value pairs.
+            forward (boolean): A boolean indicating the directino of the search, if True the search
+                is done in the forward (positive) radius direction (relative to direction specidied
+                in solver object), if False the search is performed starting with a negative radius.
 
         Returns:
-            radius: returns the radius corresponding to the chi-squared boundary of the loglikelihood region
-            marginal_param: returns the optimal setting of the marginal parameters at the boundary
-            ratio_gap: returns the residual loglikelihood ratio gap at the boundary (it should be small,  within tolerance)
+            list: The return object is a three element list, the first entry is  contains the radius
+            value at which the root was found, the second entry contains a list of the optimzed marginal
+            parameter values at the root, and the third entry contains the residual value of the LLR 
+            gap at the root (this should be near zero).
         """
         #check if the search is run in negative or positive direction,  set intial step accordingly
         if forward:
@@ -1634,6 +1766,8 @@ class Model:
         #return the radius of the root,  the optimal marginal parameters at the root and the ratio_gap at the root (should be near 0)
         return [middle_radius.item(), list(middle_marginal_param), middle_ratio_gap]
 
+
+#NOTE: this should be added to the class I think (Jan 2021)
     def __creategrid(self,input_candidate_list):
         new_grid = []
         candidates_current_dim = input_candidate_list.pop()
@@ -1649,6 +1783,7 @@ class Model:
 
         return new_grid
 
+#NOTE: this should be added to the class I think (Jan 2021)
     def _progress_bar (self, iteration, total, prefix = ''):
         """
         Helper function to print progress bar in a looped process
@@ -1666,6 +1801,7 @@ class Model:
         if iteration == total: 
             print()
 
+#NOTE: Note sure if these can be included in the class somehow
 @contextmanager
 def silence_stdout():
     old_target = sys.stdout
@@ -1702,7 +1838,7 @@ class factorial(cs.Callback):
 
 #NOTE: commented stuff is saved from using newton type root search in profile loglik
 #NOTE: replaced with grid search for stability in more complex models (currently in code ~June 2020)
-    # def __profilesetup(self, mle_params, loglik_func, fixedparams, direction, options):
+    # def __profile_setup(self, mle_params, loglik_func, fixed_params, direction, options):
     #     """ 
     #     This function creates function/solver objects for performing a profile likelihood search for the condifence boundary
     #     in the specified direction,  the function/solver objects compute the logliklihood ratio gap
@@ -1713,8 +1849,8 @@ class factorial(cs.Callback):
     #     Args:
     #         mle_params: mle parameter estimates,  recieved from fitting
     #         loglik_func: casadi logliklihood function for the given dataset
-    #         fixedparams: a boolean vector,  same length as the parameters,  true means cooresponding parameters fixed by direction and radius,  false values are marginal and optimized (if they exist)
-    #         direction: a direction in parameter space,  coordinate specified as true in fixedparams are used as the search direction
+    #         fixed_params: a boolean vector,  same length as the parameters,  true means cooresponding parameters fixed by direction and radius,  false values are marginal and optimized (if they exist)
+    #         direction: a direction in parameter space,  coordinate specified as true in fixed_params are used as the search direction
     #         options: an options dictionary for passing user options
 
     #     Returns:
@@ -1725,7 +1861,7 @@ class factorial(cs.Callback):
     #     #compute the chi-squared level from confidence level
     #     chi_squared_level = st.chi2.ppf(options['ConfidenceLevel'],  self.num_param)
     #     #compute the number of fixed parameters (along which we do boundary search,  radius direction)
-    #     num_fixed_param = sum(fixedparams)
+    #     num_fixed_param = sum(fixed_params)
     #     #compute the number of free/marginal parameters,  which are optimized at each step of the search
     #     num_marginal_param = self.num_param-num_fixed_param
     #     if num_fixed_param == 0:
@@ -1741,7 +1877,7 @@ class factorial(cs.Callback):
     #     marginal_counter = 0
     #     #loop over the parameters
     #     for i in range(self.num_param):   
-    #         if fixedparams[i]:
+    #         if fixed_params[i]:
     #             #if the parameter is fixed,  add an entry parameterized by the radius from the mle in given direction
     #             param_list.append( direction[i]*radius_symbol + mle_params[i] )
     #         else:
@@ -1785,7 +1921,7 @@ class factorial(cs.Callback):
     #     #return the solvers/functions
     #     return [profile_loglik_solver, profile_loglik_jacobian_solver, profile_loglik_hessian_solver]
 
-    # def __logliksearch(self, solver_list, marginal_param, options, forward=True):
+    # def __loglik_search(self, solver_list, marginal_param, options, forward=True):
     #     """ 
     #     This function performs a root finding algorithm using solver_list objects
     #     It uses halley's method to find the radius value (relative to the mle) where the loglik ratio equals the chi-squared level
@@ -2024,7 +2160,7 @@ class factorial(cs.Callback):
     #                 interval_list = self.__profile_plot(param_vec, loglik_func_list[d], fig, options)[0]
     #                 #if contour plots are requested specifically, run contour function to plot the projected confidence contours
     #                 if options['Confidence']=="Contours":
-    #                     self.__contourplot(param_vec, loglik_func_list[d], fig, options)
+    #                     self.__contour_plot(param_vec, loglik_func_list[d], fig, options)
     #             elif options['Confidence']=="Intervals":
     #                 #if confidence intervals are requested, run confidenceintervals to get CI's and add them to replicate list
     #                 interval_list = self.__confidence_intervals(param_vec, loglik_func_list[d], options)
