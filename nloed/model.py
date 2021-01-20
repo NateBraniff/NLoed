@@ -83,7 +83,6 @@ class Model:
 
             Call Structure: Model.model_variance[obs_name](percentile, inputs, parameters)
 
-    
     """
 
     # FEATURES TO ADD & TESTING
@@ -114,7 +113,18 @@ class Model:
                         'Gamma':        ['Shape','Scale']}
 
     def __init__(self, observ_struct, input_names, param_names, options={}):
-        
+        """ The class constructor for NLoed's Model class. 
+
+        This function
+
+        Args:
+            observ_struct:
+            input_names:
+            param_names:
+            options:
+
+        """
+
         default_options = \
           { 'ScalarSymbolics':       [True,       lambda x: isinstance(x,bool) ]}
         options=cp.deepcopy(options)
@@ -190,7 +200,7 @@ class Model:
             #self.distribution[observ_name] = observ_distribution
             #self.model[observ_name] = observ_model
             [loglik, fish_info, model_mean, model_sens, model_var, obs_sampler, obs_percent] = \
-                self._get_distribution_functions(observ_model, observ_distribution)
+                self.__get_distribution_functions(observ_model, observ_distribution)
             self.loglik[observ_name] = loglik
             self.fisher_info_matrix[observ_name] = fish_info
             self.model_mean[observ_name] = model_mean
@@ -454,7 +464,7 @@ class Model:
                     #if so, create a figure to plot on
                     fig = plt.figure()
                     #run profileplots to plot the profile traces and return CI's
-                    interval_list = self.__profileplot(param_vec, loglik_func_list[d], fig, options)[0]
+                    interval_list = self.__profile_plot(param_vec, loglik_func_list[d], fig, options)[0]
                     #if contour plots are requested specifically, run contour function to plot the projected confidence contours
                     if options['Confidence']=="Contours":
                         self.__contourplot(param_vec, loglik_func_list[d], fig, options)
@@ -761,13 +771,81 @@ class Model:
 
     #NOTE: should maybe rename this
     def evaluate(self, designs, param, options={}):
-        """ A function for evaluating the peformance metrics of a passed design with the NLoed Model.
+        """ A function for evaluating the peformance metrics of an experimental design applied to
+         the NLoed Model.
 
-        This function 
+        This function can be used to produce evaluation metrics regarding the expected parameter
+        fitting accurach a given experimental design will achieve when used with the given NLoed 
+        Model instance. 
+        
+        Evaluation metrics inclide the expected parameter covariance, bias and mean
+        squared error as well as the Fisher information matrix. These metrics can be computed either
+        asymptoticall (i.e. via the Fisher information matrix; in this case the bias is zero and the
+        covariance and MSE are equal) or using Monte Carlo simulation and fitting (in which case the
+        bias, covariance and MSE may be unique). By default this function only returns the parameter
+        covariance for the design, computed asymptoticall.
+        
+        All evaluation is performed at the candidate parameter vector passed, and as such these 
+        metrics are only local appoximations valid near the candidate point.
 
         Args:
+            designs (dataframe OR list of dataframes): A dataframe specifying the experimental design
+                to be evaluated,
+                OR a list of dataframes describing a set ofexperimental designs to be evaluated.
+            param (array-like): The parameter vector values at which the predictions are to be made.
+            options (dictionary, optional): A dictionary of user-defined options, possible key-value
+                pairs include:
 
-        Return:
+                "Method" --
+                Purpose: A string indicating which computational method, asymptotic or Monte Carlo,
+                is used to compute the evaluation metrics.
+                Type: string
+                Default Value: "Asymptotic
+                Possible Values: "Asymptotic"=Uses a first-order approximation based onvthe FIM 
+                matrix to compute the parameter covariance; bias is zero. "MonteCarlo"= Uses 
+                repeated data simulation and fitting to compute the evaluation metrics.
+
+                "Covariance" --
+                Purpose: A boolean value indicating if the parameter covariance matrix should be
+                computed and returned, true implies yes.
+                Type: boolean
+                Default Value: True
+                Possible Values: True or False
+
+                "Bias" --
+                Purpose: A boolean value indicating if the parameter bias vector should be
+                computed and returned, true implies yes.
+                Type: boolean
+                Default Value: False
+                Possible Values: True or False
+
+                "MSE" --
+                Purpose: A boolean value indicating if the parameter mean squated error vector 
+                should be computed and returned, true implies yes.
+                Type: boolean
+                Default Value: False
+                Possible Values: True or False
+
+                "FIM" --
+                Purpose: A boolean value indicating if the Fisher information matrix 
+                should be computed and returned, true implies yes.
+                Type: boolean
+                Default Value: False
+                Possible Values: True or False
+
+                "SampleNumber" --
+                Purpose: An integer indicating the number of simulations of the experimental design,
+                and subsequent fittings, that should be performed if the Monte Carlo method is used
+                to compute the evaluation metrics.
+                Type: integer
+                Default Value: 1000
+                Possible Values: >0, must be large enough for a statistically stable estimate
+                
+
+        Return: 
+            dataframe: A dataframe containg the design evaluation metrics,
+            OR if a list of design dataframes was passed, a list of dataframes is returned
+            each containing the design evaluation metrics for its corresponding design.
 
         """
         #maybe this should move to the design class(??)
@@ -899,11 +977,11 @@ class Model:
 
 # --------------- Private functions (for constructor) ----------------------------------------------
 
-    def _get_distribution_functions(self, observ_model, observ_distribution ):
-        """ A private function that automatically generates function attributes for the given 
+    def __get_distribution_functions(self, observ_model, observ_distribution ):
+        """ A private function that automatically generates function attributes for the provided 
         observation variable information.
         
-        This private function is used during the NLoed model class construction.
+        This private function is used during the NLoed Model class construction.
 
         This function accepts the observation name, distribution type
         and observation model and constructs casadi functions to compute
@@ -911,14 +989,15 @@ class Model:
         and also a numpy/casadi function to return random samples from the the model
 
         Args:
-            observ_name: a string specifying the observation variable name
-            observ_distribution: a string specifying the observation distribution type (i.e 'Normal')
-            observ_model: a casadi function mapping input and parameter vectors to sampling distribution statistics
-
+            observ_model: A symbolic Casadi function mapping the model input and parameter vectors 
+                to the observation distribution statistics.
+            observ_distribution (string): A string specifying the observation distribution type, 
+                must be one of the supported distributions.
+            
         Returns:
-            list: A list of casadi/numpy functions in the following order;
-                    loglik, fisher info, prediction mean , prediction mean sensitivity,
-                    prediction variance, observation sampler
+            list of functions: A list of Casadi(-based) functions in the following order;
+                    loglikelihood, fisher information, observation mean , observation variance, 
+                    mean sensitivity, observation sampler, observation percentile
         """
         #get the observation name
         observ_name = observ_model.name()
@@ -1068,20 +1147,30 @@ class Model:
 
         return function_list
 
-# --------------- Private functions (for public functions) -----------------------------------------
+# --------------- Private functions (used by public functions) -------------------------------------
 
     def __confidence_intervals(self, mle_params, loglik_func, options):
-        """ 
+        """ A private helper function for computing parameter confidence intervals.
+
+        This private function is used in some calls to the public Model.fit() function and is 
+        triggered by a user call after instantiation.
+
         This function computes marginal parameter confidence intervals for the model
-        around the MLE estimate using the profile likelihood
+        around the MLE estimate using profile likelihoods.
 
         Args:
-            mle_params: mle parameter estimates,  recieved from fitting
-            loglik_func: casadi logliklihood function for the given dataset
-            options: an options dictionary for passing user options
+            mle_params (array-like): A vector specifying the MLE parameter estimates generated and 
+                passed during a call to Model.fit().
+            loglik_func: A Casadi function for computing the total data log-likelihood for the
+                current dataset being handled within the calling Model.fit() call. The only argument
+                is a putative parameter vector.
+            options (dictionary): A dictionary of user-defined options encoded as key-value
+                pairs. This dictionary is passed through from a call to Model.fit(), see
+                the fit() functions documentation for possible key-value pairs.
 
         Returns:
-            interval_list: list of lists of upper and lower bounds for each parameter
+            list of lists: A list of lists, the outer index corresponds to each parameter coordinate,
+                the innder list contains both the upper and lower bounds for each parameter.
         """
         if options['Verbose']:
             progress_counter=0
@@ -1114,26 +1203,49 @@ class Model:
                 self._progress_bar(progress_counter, self.num_param, prefix = 'Confidence Intervals:')
         return interval_list
 
-    def __profileplot(self, mle_params, loglik_func, figure, options):
-        """ 
-        This function plots profile parameter traces for each parameter value
+    def __profile_plot(self, mle_params, loglik_func, figure, options):
+        """ A private helper function for plotting both the profile likelihoods and the projections
+        of the profiles traces.
+
+        This private function is used in some calls to the public Model.fit() function and is 
+        triggered by a user call after instantiation.
+
+        This function generate a square grid of Matplotlib sub-plots, with a row and column for each
+        parameter. The logelikelihood profiles of each parameter are plotted on sub-plots along the
+        diagonal. These diganol plots also include a horizantal reference line indicating 
+        loglikleihood value at which the perscribed confidence level boundaries occur. Projections 
+        of the profile likelihood traces for each pair of parameters value are plotted on the lower
+        triangular sub-plots. This function also returns lists containing the computed intervals,
+        traces and profiles.
 
         Args:
-            mle_params: mle parameter estimates,  recieved from fitting
-            loglik_func: casadi logliklihood function for the given dataset
-            figure: the figure object on which plotting occurs
-            options: an options dictionary for passing user options
+            mle_params (array-like): A vector specifying the MLE parameter estimates generated and 
+                passed during a call to Model.fit().
+            loglik_func (function): A Casadi function for computing the total data log-likelihood 
+                for the current dataset being handled within the calling Model.fit() call. The only 
+                argument is a putative parameter vector.
+            figure (integer):The figure object handle on which the plot is generated.
+            options (dictionary): A dictionary of user-defined options encoded as key-value
+                pairs. This dictionary is passed through from a call to Model.fit(), see
+                the fit() functions documentation for possible key-value pairs.
+
 
         Returns:
-            interval_list: list of lists of upper and lower bounds for each parameter
-            trace_list: list of list of lists of parameter vector values along profile trace for each parameter
-            profile_list: List of lists of logliklihood ratio values for each parameter along the profile trace
+            nested lists: A multi-level list of lists is returned, the outer list contains three elements;
+                1 - a list of lists where the outer index corresponds to each parameter and the 
+                inner list contains the upper and lower confidence interval bounds for each parameter,
+                2 - a list of list of lists where the outer index corresponds to each parameter and
+                the middle index corresponds to points along each profile trace and the inner list
+                contains the value of the parameter vector at that point in the parameter trace.
+                3 - a ;ist of lists where the outer index corresponds to each parameter value and 
+                the inner index corresponds to logliklihood ratio values for the given parameter
+                at points along the likelihood profile.
         """
 
         #extract the confidence level and compute the chisquared threshold
         chi_squared_level = st.chi2.ppf( options['ConfidenceLevel'],  self.num_param)
-        #run profile trave to get the CI's,  parameter traces,  and LR profile
-        [interval_list, trace_list, profile_list] = self.__profiletrace(mle_params, loglik_func, options)
+        #run profile trace to get the CI's,  parameter traces,  and LR profile
+        [interval_list, trace_list, profile_list] = self.__profile_plot(mle_params, loglik_func, options)
         #loop over each pair of parameters
         for p1 in range(self.num_param):
             for p2 in range(p1, self.num_param):
@@ -1170,14 +1282,21 @@ class Model:
         #return CI,  trace and profilem (for extensibility)
         return [interval_list, trace_list, profile_list]
 
-    def __profiletrace(self, mle_params, loglik_func, options):
-        """ 
+    def __profile_trace(self, mle_params, loglik_func, options):
+        """ A private helper function for computing all of the parameters profile likelihood's 
+        loglikelihood values and parameter traces.
+
+        This private function is used in some calls to the public Model.fit() function and is 
+        triggered by a user call after instantiation.
+
         This function compute the profile logliklihood parameter trace for each parameter in the model
 
         Args:
             mle_params: mle parameter estimates,  recieved from fitting
             loglik_func: casadi logliklihood function for the given dataset
-            options: an options dictionary for passing user options
+            options (dictionary): A dictionary of user-defined options encoded as key-value
+                pairs. This dictionary is passed through from a call to Model.fit(), see
+                the fit() functions documentation for possible key-value pairs.
 
         Returns:
             interval_list: list of lists of upper and lower bounds for each parameter
@@ -1902,7 +2021,7 @@ class factorial(cs.Callback):
     #                 #if so, create a figure to plot on
     #                 fig = plt.figure()
     #                 #run profileplots to plot the profile traces and return CI's
-    #                 interval_list = self.__profileplot(param_vec, loglik_func_list[d], fig, options)[0]
+    #                 interval_list = self.__profile_plot(param_vec, loglik_func_list[d], fig, options)[0]
     #                 #if contour plots are requested specifically, run contour function to plot the projected confidence contours
     #                 if options['Confidence']=="Contours":
     #                     self.__contourplot(param_vec, loglik_func_list[d], fig, options)
