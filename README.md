@@ -106,15 +106,15 @@ versions and dependencies.
 brew install openssl readline sqlite3 xz zlib
 ```
 
-* Install pyenv either with..
-a) Homebrew itself:..
-```sh
-brew install pyenv
-```
-b) The auto-installer script (https://github.com/pyenv/pyenv-installer):..
-```sh
-curl https://pyenv.run | bash
-```
+* Install pyenv either with
+    a) Homebrew itself:
+    ```sh
+    brew install pyenv
+    ```
+    b) The auto-installer script (https://github.com/pyenv/pyenv-installer):..
+    ```sh
+    curl https://pyenv.run | bash
+    ```
 
 * Run the following to set up your shell environment:
 ```sh
