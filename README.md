@@ -64,36 +64,38 @@ There are two simple options for getting Python >3.6.1 on your Mac:
 This is useful if you aren't doing much with Python other than NLoed, but it is a bit less flexible.
 
 * Make sure Xcode dependencies are installed (Homebrew needs these to do stuff):  
-```sh
-xcode-select --install
-```
+    ```sh
+    xcode-select --install
+    ```
 
 * Install Homebrew, its a package manager for installing software on Macs:
-$ /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+    ```sh
+    /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+    ```
 
 * Check Homebrew is installed properly:
-```sh
-brew --version
-[should print out a version number]
-```
+    ```sh
+    brew --version
+    [should print out a version number]
+    ```
 
 * Install Python 3 with:
-```sh
-brew install python3
-```
+    ```sh
+    brew install python3
+    ```
 
 * Check python 3 is installed with:
-```sh
-python3 -V
-```
+    ```sh
+    python3 -V
+    ```
 
 * As the command 'python' points to the native 2.7 installed by default on your Mac, you will
 now need to use 'python3' to start the newer version installed with Homebrew. To install NLoed on
 your python 3 installation specifically, run:
-```sh
-$ pip3 install nloed
-```
-Here Homebrew has setup 'pip3' to replace 'pip' in order to avoid confusion.
+    ```sh
+    $ pip3 install nloed
+    ```
+    Here Homebrew has setup 'pip3' to replace 'pip' in order to avoid confusion.
 
 ##### 2) Use Pyenv (https://github.com/pyenv/pyenv)
 This method is better if you are going to do a lot of work in Python and want to organize many 
@@ -102,11 +104,11 @@ versions and dependencies.
 * Make sure Homebrew is installed as above.
 
 * Run the following to install some needed dependencies;
-```sh
-brew install openssl readline sqlite3 xz zlib
-```
+    ```sh
+    brew install openssl readline sqlite3 xz zlib
+    ```
 
-* Install pyenv either with
+* Install pyenv either with  
     a) Homebrew itself:
     ```sh
     brew install pyenv
@@ -117,29 +119,28 @@ brew install openssl readline sqlite3 xz zlib
     ```
 
 * Run the following to set up your shell environment:
-```sh
-echo -e 'if command -v pyenv 1>/dev/null 2>&1; then\n  eval "$(pyenv init -)"\nfi' >> ~/.bash_profile
-exec "$SHELL"
-```
+    ```sh
+    echo -e 'if command -v pyenv 1>/dev/null 2>&1; then\n  eval "$(pyenv init -)"\nfi' >> ~/.bash_profile
+    exec "$SHELL"
+    ```
 
 * Check pyenv is installed correctly:
-```sh
-pyenv versions
-[prints out some version, likely just 'system']
-```
+    ```sh
+    pyenv versions
+    [prints out some version, likely just 'system']
+    ```
 
 * Install a version of python greater than 3.6.1, for example:
     ```sh
     pyenv install 3.7.0
     ```
 
-* You then need to make this new version active, the easiest way to do it is to make it the global
-default by running:
-  ```sh
-  pyenv global 3.7.0
-  ```
-Note the version number here should be the same one you installed in the previous step.
-Check you the pyenv documentation for more options for managing versions, it is very flexible.
+* You then need to make this new version active, the easiest way to do it is to make it the global default by running:
+    ```sh
+    pyenv global 3.7.0
+    ```
+    Note the version number here should be the same one you installed in the previous step.
+    Check you the pyenv documentation for more options for managing versions, it is very flexible.
 
 *   Finally install the NLoed package on the new pyenv version by running:
     ```sh
