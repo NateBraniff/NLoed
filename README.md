@@ -63,7 +63,7 @@ There are two simple options for getting Python >3.6.1 on your Mac:
 ##### Use Homebrew (https://brew.sh/)
 This is useful if you aren't doing much with Python other than NLoed, but it is a bit less flexible.
 
-* Make sure Xcode dependencies are installed (Homebrew needs these to do stuff):
+* Make sure Xcode dependencies are installed (Homebrew needs these to do stuff):  
 ```sh
 xcode-select --install
 ```
@@ -106,15 +106,15 @@ versions and dependencies.
 brew install openssl readline sqlite3 xz zlib
 ```
 
-* Install pyenv either with
-    a) Homebrew itself:
-    ```sh
-    brew install pyenv
-    ```
-    b) The auto-installer script (https://github.com/pyenv/pyenv-installer):
-    ```sh
-    curl https://pyenv.run | bash
-    ```
+* Install pyenv either with..
+a) Homebrew itself:..
+```sh
+brew install pyenv
+```
+b) The auto-installer script (https://github.com/pyenv/pyenv-installer):..
+```sh
+curl https://pyenv.run | bash
+```
 
 * Run the following to set up your shell environment:
 ```sh
