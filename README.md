@@ -141,10 +141,10 @@ default by running:
 Note the version number here should be the same one you installed in the previous step.
 Check you the pyenv documentation for more options for managing versions, it is very flexible.
 
-* Finally install the NLoed package on the new pyenv version by running:
-  ```sh
-  pip install nloed
-  ```
+*   Finally install the NLoed package on the new pyenv version by running:
+    ```sh
+    pip install nloed
+    ```
 
 #### Linux (Ubuntu/Debian)
 
