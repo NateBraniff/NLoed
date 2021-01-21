@@ -9,7 +9,7 @@ setuptools.setup(
     version="0.0.2",
     author='Nate Braniff',
     author_email='nbraniff@uwaterloo.ca',
-    description="A library for nonlinear optimal experimental design",
+    description="A package for nonlinear optimal experimental design",
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/NateBraniff/NLoed",
@@ -27,6 +27,7 @@ setuptools.setup(
         "Programming Language :: Python :: 3",
         "Operating System :: OS Independent",
     ],
+    license = 'LGPLv3+'
     # py_modules=["model","design"],
     # package_dir={'':'nloed'},
 )
