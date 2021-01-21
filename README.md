@@ -107,14 +107,14 @@ brew install openssl readline sqlite3 xz zlib
 ```
 
 * Install pyenv either with
-a) Homebrew itself:
-```sh
-brew install pyenv
-```
-b) The auto-installer script (https://github.com/pyenv/pyenv-installer):
-```sh
-curl https://pyenv.run | bash
-```
+    a) Homebrew itself:
+    ```sh
+    brew install pyenv
+    ```
+    b) The auto-installer script (https://github.com/pyenv/pyenv-installer):
+    ```sh
+    curl https://pyenv.run | bash
+    ```
 
 * Run the following to set up your shell environment:
 ```sh
@@ -129,22 +129,22 @@ pyenv versions
 ```
 
 * Install a version of python greater than 3.6.1, for example:
-```sh
-pyenv install 3.7.0
-```
+    ```sh
+    pyenv install 3.7.0
+    ```
 
 * You then need to make this new version active, the easiest way to do it is to make it the global
 default by running:
-```sh
-pyenv global 3.7.0
-```
+  ```sh
+  pyenv global 3.7.0
+  ```
 Note the version number here should be the same one you installed in the previous step.
 Check you the pyenv documentation for more options for managing versions, it is very flexible.
 
 * Finally install the NLoed package on the new pyenv version by running:
-```sh
-pip install nloed
-```
+  ```sh
+  pip install nloed
+  ```
 
 #### Linux (Ubuntu/Debian)
 
