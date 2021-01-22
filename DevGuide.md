@@ -120,6 +120,9 @@ dependencies and do a local install of the package for development.
         ```
 
 ## Packaging and Release
+In order to make NLoed available using pip, it needs to be packaged properly and uploaded to the
+PyPI repository. This involves creating a source and built distribution, followed uploading the resulting files.
+It is also a good idea to tag all releases to PyPI on the Github repo.
 
 1. **Creating a Source Distribution using sdist**
     Source distributions bundles the source code into a .tar.gz, basic but not fast and may contain
