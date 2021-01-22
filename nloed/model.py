@@ -416,7 +416,7 @@ class Model:
 
         if options['Verbose']:
             progress_counter=0
-            self._progress_bar(progress_counter, num_datasets, prefix = 'Fitting Dataset(s):')
+            self.__progress_bar(progress_counter, num_datasets, prefix = 'Fitting Dataset(s):')
 
         #loop over replicates within each design
         for r in range(num_datasets):
@@ -443,7 +443,7 @@ class Model:
             if options['InitParamBounds']:
                 candidate_list = [np.linspace(bnds[0],bnds[1],options['InitSearchNumber']) \
                                     for bnds in options['InitParamBounds']]
-                param_grid = self.__creategrid(candidate_list)
+                param_grid = self.__create_grid(candidate_list)
                 param_grid.append(start_param)
                 loglik_value = -1e7
                 for param in param_grid:
@@ -464,7 +464,7 @@ class Model:
 
             if options['Verbose']:
                 progress_counter += 1
-                self._progress_bar(progress_counter, num_datasets, prefix = 'Fitting Dataset(s):')
+                self.__progress_bar(progress_counter, num_datasets, prefix = 'Fitting Dataset(s):')
 
         #create row index for parameter dataframe export, specifies design index for each datset
         #design_index = [design_indx+1 for design_indx in range(num_designs) for i in range(num_replicat_list[design_indx])]
@@ -574,7 +574,7 @@ class Model:
         replicat_datasets = []
         if options['Verbose']:
             progress_counter=0
-            self._progress_bar(progress_counter, design_replicates, prefix = 'Sampling Datasets:')
+            self.__progress_bar(progress_counter, design_replicates, prefix = 'Sampling Datasets:')
         #loop over the number of replicates
         for r in range(design_replicates):
             dataset=itemized_design.copy()
@@ -587,7 +587,7 @@ class Model:
             replicat_datasets.append(dataset)
             if options['Verbose']:
                 progress_counter += 1
-                self._progress_bar(progress_counter, design_replicates, prefix = 'Sampling Datasets:')
+                self.__progress_bar(progress_counter, design_replicates, prefix = 'Sampling Datasets:')
                 
         if design_replicates==1:
             #if a single design was passed and there replicate count is 1,  return a single dataset
@@ -1197,7 +1197,7 @@ class Model:
         """
         if options['Verbose']:
             progress_counter=0
-            self._progress_bar(progress_counter, self.num_param, prefix = 'Confidence Intervals:')
+            self.__progress_bar(progress_counter, self.num_param, prefix = 'Confidence Intervals:')
         #create a list to store intervals
         interval_list = []
         #loop over parameters in model
@@ -1223,7 +1223,7 @@ class Model:
             interval_list.append([lower_bound, upper_bound])
             if options['Verbose']:
                 progress_counter += 1
-                self._progress_bar(progress_counter, self.num_param, prefix = 'Confidence Intervals:')
+                self.__progress_bar(progress_counter, self.num_param, prefix = 'Confidence Intervals:')
         return interval_list
 
     def __profile_plot(self, mle_params, loglik_func, figure, options):
@@ -1345,7 +1345,7 @@ class Model:
         """
         if options['Verbose']:
             progress_counter=0
-            self._progress_bar(progress_counter, self.num_param, prefix = 'Profile Traces:')
+            self.__progress_bar(progress_counter, self.num_param, prefix = 'Profile Traces:')
 
         #extract the confidence level and compute the chisquared threshold
         chi_squared_level = st.chi2.ppf(options['ConfidenceLevel'],  self.num_param)
@@ -1412,7 +1412,7 @@ class Model:
             trace_list.append(param_trace)
             if options['Verbose']:
                 progress_counter += 1
-                self._progress_bar(progress_counter, self.num_param, prefix = 'Profile Traces:')
+                self.__progress_bar(progress_counter, self.num_param, prefix = 'Profile Traces:')
         #return the intervals,  parameter trace and loglik ratio profile
         return [interval_list, trace_list, profile_list]
 
@@ -1442,7 +1442,7 @@ class Model:
         if options['Verbose']:
             total_iterations = self.num_param*(self.num_param-1)/2
             progress_counter=0
-            self._progress_bar(progress_counter, total_iterations, prefix = 'Contour Traces:')
+            self.__progress_bar(progress_counter, total_iterations, prefix = 'Contour Traces:')
 
         #loop over each unique pair of parameters 
         for p1 in range(self.num_param):
@@ -1457,7 +1457,7 @@ class Model:
                 plt.ylabel(self.param_name_list[p2])
                 if options['Verbose']:
                     progress_counter += 1
-                    self._progress_bar(progress_counter, total_iterations, prefix = 'Contour Traces:')
+                    self.__progress_bar(progress_counter, total_iterations, prefix = 'Contour Traces:')
 
 
     def __contour_trace(self, mle_params, loglik_func, coordinates, options):
@@ -1767,13 +1767,30 @@ class Model:
         return [middle_radius.item(), list(middle_marginal_param), middle_ratio_gap]
 
 
-#NOTE: this should be added to the class I think (Jan 2021)
-    def __creategrid(self,input_candidate_list):
+
+    def __create_grid(self,input_candidate_list):
+        """A private helper function to create a grid of candidate parameter points 
+
+        This fucntion creates a grid of candidate parameter points by permuting a lits of candidate
+        points. This is used for an a crude initial parmeter search prior to maximum likelihood 
+        optimization by the Model.fit function. This function uses recursion to permute the candidate
+        grid.
+
+        Args:
+            input_candidate_list (list of array-likes): A list, the same length as the model's 
+                parameter vector, each element is an array-like vector of candidate parameter
+                values for the given parameter.
+
+        Returns:
+            list of arrays: The return is a list, the same length as the number of permutations of
+            the candidate paramter points passed, each element of the list contains a Numpy parameter
+            vector with a unique permutation of the candidate points.  
+        """
         new_grid = []
         candidates_current_dim = input_candidate_list.pop()
 
         if len(input_candidate_list)>0:
-            current_grid = self.__creategrid(input_candidate_list)
+            current_grid = self.__create_grid(input_candidate_list)
             for current_grid_point in current_grid:
                 for canidate_element in candidates_current_dim:
                     new_grid_point = np.hstack((current_grid_point,canidate_element))
@@ -1783,15 +1800,16 @@ class Model:
 
         return new_grid
 
-#NOTE: this should be added to the class I think (Jan 2021)
-    def _progress_bar (self, iteration, total, prefix = ''):
-        """
-        Helper function to print progress bar in a looped process
+    def __progress_bar (self, iteration, total, prefix = ''):
+        """A private helper function to print a progress bar in a looped process
+
+        This fucntion prints or update a progress bar on the commandline output indicating, the 
+        current progress through a loop.
 
         Args:
-            iteration:   current iteration in the process
-            total:       total iterations in the process
-            prefix:      prefix string to name process
+            iteration (integer): Current iteration in the process
+            total (integer): Total number of iterations in the process
+            prefix (string): A prefix string to name the process
         """
         max_length= 50
         percent = ("{0:.1f}").format(100 * (iteration / float(total)))
@@ -1812,28 +1830,38 @@ def silence_stdout():
     finally:
         sys.stdout = old_target
 
-class factorial(cs.Callback):
-    def __init__(self,  name,  options = {}):
-        cs.Callback.__init__(self)
-        self.construct(name,  options)
+# class factorial(cs.Callback):
+#     """A private helper function to print a progress bar in a looped process
 
-    # Number of inputs and outputs
-    def get_n_in(self): return 1
-    def get_n_out(self): return 1
+#         This fucntion prints or update a progress bar on the commandline output indicating, the 
+#         current progress through a loop.
 
-    # Initialize the object
-    def init(self):
-        print('initializing object')
+#         Args:
+#             iteration (integer): Current iteration in the process
+#             total (integer): Total number of iterations in the process
+#             prefix (string): A prefix string to name the process
+#         """
+#     def __init__(self,  name,  options = {}):
+#         cs.Callback.__init__(self)
+#         self.construct(name,  options)
 
-    # Evaluate numerically
-    def eval(self,  arg):
-        k  =  arg[0]
-        cnt = 1
-        f = max(k,1)
-        while (k-cnt)>0:
-            f = f*(k-cnt)
-            cnt = cnt+1
-        return [f]
+#     # Number of inputs and outputs
+#     def get_n_in(self): return 1
+#     def get_n_out(self): return 1
+
+#     # Initialize the object
+#     def init(self):
+#         print('initializing object')
+
+#     # Evaluate numerically
+#     def eval(self,  arg):
+#         k  =  arg[0]
+#         cnt = 1
+#         f = max(k,1)
+#         while (k-cnt)>0:
+#             f = f*(k-cnt)
+#             cnt = cnt+1
+#         return [f]
 
 
 #NOTE: commented stuff is saved from using newton type root search in profile loglik

@@ -1,6 +1,22 @@
-# NLoed
-Nonlinear Optimal Experimental Design
+![NLoed_Logo](/NLoed_Logo.png)
+
+A Python package for nonlinear optimal experimental design.
  
+* **[Description](#description)**
+  * [Disclaimer](#disclaimer)
+* **[Installation](#installation)**
+  * [Do I have Python installed?](#do-i-have-python-installed?)
+  * [How do I get the Right Version of Python/Pip Installed?](#how-do-i-get-the-right-version-of-python/pip-installed?)
+    * [OSX](#OSX)
+      * [Use Homebrew](#use-homebrew)
+      * [Use Pyenv](#use-pyenv)
+    * [Linux (Ubuntu/Debian)](#linux-(ubuntu/debian))
+    * [Windows](#windows)
+* **[Dependencies](#dependencies)**
+* **[Contributing](#contributing)**
+* **[Credits](#credits)**
+* **[License](#license)**
+
 ## Description
 NLoed (suggested pronounciation: "en-load") is an open source Python package for building and 
 optimizing experimental designs for non-linear models, with a specific emphasis on applications in systems 
@@ -51,7 +67,7 @@ pip -V
 ```
 This should print out a similar version number as the one python did.
 
-### How do I get the Right Version of Python/Pip installed?
+### How do I get the Right Version of Python/Pip Installed?
 If you don't have the right version of python on your system, you will need install it before
 installed NLoed. For those unfamiliar with Python, here are some helpful pointers depending on 
 your OS:
@@ -62,8 +78,9 @@ compatible with NLoed anyways.
 
 There are two simple options for getting Python >3.6.1 on your Mac:
 
-##### Use Homebrew (https://brew.sh/)
+##### Use Homebrew
 This is useful if you aren't doing much with Python other than NLoed, but it is a bit less flexible.
+See the Homebrew website for details (https://brew.sh/).
 
 * Make sure Xcode dependencies are installed (Homebrew needs these to do stuff):  
     ```sh
@@ -94,9 +111,9 @@ your python 3 installation specifically, run:
     ```
     Here Homebrew has setup 'pip3' to replace 'pip' in order to avoid confusion.
 
-##### Use Pyenv (https://github.com/pyenv/pyenv)
+##### Use Pyenv
 This method is better if you are going to do a lot of work in Python and want to organize many 
-versions and dependencies.
+versions and dependencies. See the pyenv Github for more details (https://github.com/pyenv/pyenv).
 
 * Make sure Homebrew is installed as above.
 * Run the following to install some needed dependencies;
