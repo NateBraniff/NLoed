@@ -9,7 +9,6 @@
 #RELEASE
 #source distribution (sdist) files
 /dist
-/dist/*
 
 #DEVELOPMENT
 #pip editable install files
