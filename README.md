@@ -14,7 +14,7 @@ which greatly improve NLoed's performance.
 
 In addition to design, NLoed provides a number of useful model-building tools including functions for maximum likelihood fitting, sensitivity analysis, data simulation, asymptotic and profile likelihoods, graphical identifiability diagnostics and quantification of prediction uncertainty. These tools, in conjunction with NLoed's core optimal design functionality, aim to provide a complete model building framework, enabling model construction, experimental design, model fitting and diagnostics to all be done within NLoed. This makes NLoed ideal for model builders heading into the lab or for those who wish to study model identifiability via simulation studies.
 
-## Disclaimer
+### Disclaimer
 NLoed is still under development. A reasonable effort has been made to create a stable
 functional interface and to test the current release however, users should  proceed with reasonable 
 caution in writing code for publication or in developing other numerical tools using NLoed. The interface may be subject to change, especially in advance of the first non-beta (i.e. beta realeases are any that preceed version 1.0. Also, the authours make no guarantee for the absolute exahuastic correctness of all numerical routines implemented in NLoed (or its dependencies), and some reasonable testing of the package with the user's specific model, as well as some understanding of general OED theory are recommended when using the packag (especiall before version 1.0). If you identify any bugs or numerical issues, please submit them

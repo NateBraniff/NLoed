@@ -63,7 +63,7 @@ dependencies and do a local install of the package for development.
         exec "$SHELL
         ```
 
-2. **Clone Repo Into the Development Folder**
+2. **Clone Git Repo Into the Development Folder**
     You need to create a folder to contain the package files. You can do this in the file manager or
     from the commandline, after which Git is used to clone the NLoed repository.
     * Open Terminal
