@@ -17,8 +17,9 @@
 /nloed.egg-info
 #bytecode from importing and running lib
 /nloed/__pycache__
-#bytecode from importing and running lib
 /tests/__pycache__
+/examples/__pycache__
+/examples/*/__pycache__
 #ignore pytest
 /.pytest_cache
 #ignore tox 
@@ -26,4 +27,6 @@
 /.tox
 #igrore notebooks files
 /examples/.ipynb_checkpoints
+/examples/*/.ipynb_checkpoints
+
 

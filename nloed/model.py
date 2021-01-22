@@ -204,7 +204,7 @@ class Model:
         #   functions for computing observation sampling statistics, loglikelihood, and fisher info. matrix
         #self.distribution, 
         #self.model,
-        self.loglik, self.fisher_info_matrix = {},{},{},{}
+        self.loglik, self.fisher_info_matrix = {}, {}
         #create a list to store casadi functions for the predicted mean, mean parameteric sensitivity, prediction variance 
         self.model_mean, self.model_variance, self.model_sensitivity = {},{},{}
         self.observation_sampler, self.observation_percentile ={}, {}
