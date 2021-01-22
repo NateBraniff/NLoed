@@ -17,5 +17,8 @@ tox>=3.21.1
 Sphinx>=3.4.3
 rinohtype>=0.4.2
 
+# examples
+notebook>=6.2.0
+
 # packaging
 twine>=3.3.0

@@ -248,7 +248,7 @@ It is also a good idea to tag all releases to PyPI on the Github repo.
         ```
     * (Optional) Installing from the PyPI Test Repository:
         ```sh
-        pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple your-package
+        pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple nloed
         ```
         (dependencies are install from the regular pip repo)
 

@@ -8,11 +8,8 @@
 
 #RELEASE
 #source distribution (sdist) files
-/dist/*
 /dist
-#wheels build files
-/build/*
-/build
+/dist/*
 
 #DEVELOPMENT
 #pip editable install files
@@ -26,4 +23,6 @@
 #ignore tox 
 /.tox/*
 /.tox
+#igrore notebooks files
+/examples/.ipynb_checkpoints
 
