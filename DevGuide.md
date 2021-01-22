@@ -6,6 +6,12 @@ OSX or Ubuntu-like Linux distrobutions.
 
 If you have a Windows machine you can attempt to follow this guide very roughly using tools like [pyenv-win](https://github.com/pyenv-win/pyenv-win), however it may be easier to install something like VirtualBox and the latest Ubuntu release and do the development on a virtual machine.
 
+* **[The Development Environment](#the-development-environment)**
+* **[Testing with Pytest and Tox](#testing-with-pytest-and-tox)**
+* **[Latex Documentation with Sphinx and Overleaf](#latex-documentation-with-sphinx-and-overleaf)**
+* **[Notebook Examples and the Example Pack](#notebook-examples-and-the-example-pack)**
+* **[Packaging and Release](#packaging-and-release)**
+
 ## The Development Environment
 
 This section explains how to set up a virtual environment, git clone the repo, install development
@@ -119,51 +125,6 @@ dependencies and do a local install of the package for development.
         pip install -e
         ```
 
-## Packaging and Release
-In order to make NLoed available using pip, it needs to be packaged properly and uploaded to the
-PyPI repository. This involves creating a source and built distribution, followed uploading the resulting files.
-It is also a good idea to tag all releases to PyPI on the Github repo.
-
-1. **Creating a Source Distribution using sdist**
-    Source distributions bundles the source code into a .tar.gz, basic but not fast and may contain
-    more than is needed (this is controlled by the MANIFEST.in file)
-    * Create a Source Distribution:
-        ```sh
-        python setup.py sdist
-        ```
-
-2. **Creating a Built Distribution using Wheels**
-    Wheels distrobutions are built and ready to install, pip uses these by default. 
-    * Create a Wheels Built Distribution:
-        ```sh
-        python setup.py bdist_wheels
-        ```
-
-3. **Uploading to PyPI using Twine**
-    PyPI is the repository where pip installs packages from. [Twine](https://twine.readthedocs.io/en/latest/) is the tool used to upload python
-    packages to the repository. In order to update the NLoed package on PyPI the user must have the 
-    appropriate credentials (i.e. password or key). PyPI also maintains a test repository for experimenting
-    with the packaging process. The standard and test repo are completely indpendent and may not
-    have the same packages or version and require seperate accounts.
-
-    * Upload NLoed to the PyPI Repository:
-        ```sh
-        twine upload dist/*
-        ```
-    * (Optional) Upload NLoed to the PyPI Test Repository:
-        ```sh
-        twine upload --repository testpypi dist/*
-        ```
-    * (Optional) Installing from the PyPI Test Repository:
-        ```sh
-        pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple your-package
-        ```
-        (dependencies are install from the regular pip repo)
-
-    4. **Tagging a Release on Github**
-        Marking the version of the code on Github that is uploaded on PyPI is a good idea for tracking which
-        releases map to which versions in the git history. See Github docs for details.
-
 ## Testing with Pytest and Tox
 NLoed has been set up to use [Pytest](https://docs.pytest.org/en/stable/) for testing the package's classes and functions.
 [Tox](https://tox.readthedocs.io/en/latest/) is used to run the Pytest tests with various python versions and dependencies.
@@ -246,3 +207,51 @@ Sphinx will already be installed along with the other development dependencies f
 s
 
 ## Notebook Examples and the Example Pack
+
+Needs to be added
+
+
+## Packaging and Release
+In order to make NLoed available using pip, it needs to be packaged properly and uploaded to the
+PyPI repository. This involves creating a source and built distribution, followed uploading the resulting files.
+It is also a good idea to tag all releases to PyPI on the Github repo.
+
+1. **Creating a Source Distribution using sdist**
+    Source distributions bundles the source code into a .tar.gz, basic but not fast and may contain
+    more than is needed (this is controlled by the MANIFEST.in file)
+    * Create a Source Distribution:
+        ```sh
+        python setup.py sdist
+        ```
+
+2. **Creating a Built Distribution using Wheels**
+    Wheels distrobutions are built and ready to install, pip uses these by default. 
+    * Create a Wheels Built Distribution:
+        ```sh
+        python setup.py bdist_wheels
+        ```
+
+3. **Uploading to PyPI using Twine**
+    PyPI is the repository where pip installs packages from. [Twine](https://twine.readthedocs.io/en/latest/) is the tool used to upload python
+    packages to the repository. In order to update the NLoed package on PyPI the user must have the 
+    appropriate credentials (i.e. password or key). PyPI also maintains a test repository for experimenting
+    with the packaging process. The standard and test repo are completely indpendent and may not
+    have the same packages or version and require seperate accounts.
+
+    * Upload NLoed to the PyPI Repository:
+        ```sh
+        twine upload dist/*
+        ```
+    * (Optional) Upload NLoed to the PyPI Test Repository:
+        ```sh
+        twine upload --repository testpypi dist/*
+        ```
+    * (Optional) Installing from the PyPI Test Repository:
+        ```sh
+        pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple your-package
+        ```
+        (dependencies are install from the regular pip repo)
+
+    4. **Tagging a Release on Github**
+        Marking the version of the code on Github that is uploaded on PyPI is a good idea for tracking which
+        releases map to which versions in the git history. See Github docs for details.

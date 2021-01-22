@@ -7,7 +7,7 @@ A Python package for nonlinear optimal experimental design.
   * [Disclaimer](#disclaimer)
 * **[Installation](#installation)**
   * [Do I have Python installed?](#do-i-have-python-installed?)
-  * [How do I get the Right Version of Python/Pip Installed?](#how-do-i-get-the-right-version-of-python/pip-installed?)
+  * [How do I get the right version of Python/Pip installed?](#how-do-i-get-the-right-version-of-python/pip-installed?)
     * [OSX](#OSX)
       * [Use Homebrew](#use-homebrew)
       * [Use Pyenv](#use-pyenv)
@@ -68,7 +68,7 @@ pip -V
 ```
 This should print out a similar version number as the one python did.
 
-### How do I get the right version of Python/Pip Installed?
+### How do I get the right version of Python/Pip installed?
 If you don't have the right version of python on your system, you will need install it before
 installed NLoed. For those unfamiliar with Python, here are some helpful pointers depending on 
 your OS:
