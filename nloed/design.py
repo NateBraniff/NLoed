@@ -297,7 +297,6 @@ class Design:
 
 # --------------- Public (user-callable) functions -------------------------------------------------
 
-
     def round(self, sample_size, options={}):
         """ A function 
 

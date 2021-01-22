@@ -1,6 +1,7 @@
 \documentclass{article}
 \usepackage[utf8]{inputenc}
 \usepackage{minted}
+\usepackage{bm}
 \usemintedstyle{tango}
 \usepackage{geometry}
  \geometry{
@@ -142,7 +143,287 @@ Furthermore, in the authors experience, any single optimal design, while valuabl
 %   \item No multiple-shooting or collocation in initial release
 % \end{itemize}
 
-\section{Workflow and Definitions}
+\section{Mathematical Necessities for Optimal Experimental Design}
+
+Optimal experimental design centres on choosing an ideal set of experimental conditions in which to take observations. However, in order to define what conditions are useful and to be able to pose this as an optimization problem, some mathematical background needs to be developed. In this thesis I have primarily focuses on optimizing experiments for fitting model parameters. In this subsection I mathematically formalize the general definition of a model, with special attention paid to the connection between the model structure and the sampling distribution of observations. I also formalize the notion of an experimental design for a given model, which determines the structure of a dataset that will be used for fitting. After this I give a brief overview of maximum likelihood estimation (MLE) and its asymptotic properties, which provides a flexible framework for fitting a large variety of models. The asymptotic properties of the MLE parameter estimates allows us to quantify the expected variability of the parameter estimates around the true parameter value. These asymptotics also lead to the Fisher information matrix (FIM), which can be used to compute the expected utility of experiments that have not yet been performed. I conclude by discussing objective functions computed from the FIM and by giving a brief introduction to OED-type optimization problems. It should be noted that the resulting optimal experimental design depends on all of the mathematical components discussed in this chapter. Designs are optimized for a specific model, combined with a specific fitting method, and for specific asymptotic objectives. This means that careful attention should be paid to all model components, estimation methods and assumptions, as changing any aspect of the overall modelling process can alter the structure of the resulting optimal design. 
+
+\subsection{Components of a Data-generating Model}
+
+% \textbf{This section will define what constitutes a valid model for OED. We can perhaps give an example of static and dynamic models, as well as implicit function models and differential algebraic equations. Then we need to emphasize that the sampling distribution (error model) is part of the model process that is integral to OED.}
+
+%From a statistical perspective, , the mathematics embodies a hypothesis about the physical system that is generating each observation. 
+
+Models are abstraction of a true underlying data-generating process in a given experimental scenario. For the purposes of this thesis a model can be defined as a mathematical structure that connects the observation variables, $Y_i$, -- which are measured during an experiment -- with the experimental conditions that are known or can be controlled, $\bm{x}_j$. Here the observation variables are indexed by $i$ where each $i$, from $1$ to $M$, corresponds to a unique observation variable (i.e. different measurement types taken of the system).
+%BPI: should probably say this includes different or time or space points (same variable), 'measurements' NB: I do clarify this relation below, not sure if its better here or better below after developing formalism a bit
+The experimental conditions, $\bm{x}_j$, are vector-valued, numerical encodings of any of the relevant conditions known or controlled by the experimenter when the observations are taken (i.e. ambient conditions, treatments, physical or chemical perturbations etc.). Each dimension of the input vector may be subject to various restrictions, such as some inputs being restricted to a real interval or being drawn from a discrete set. (These constraints can be ignored for the purposes of this exposition; see Chapter \ref{package_chapter} for further discussion of how these constraints are handled in practice.) 
+%BPI: are x_j alwayes referred to as vectors? Seems they’re more general than that, e.g. taking into account boolean decisisons. Not better to just call them members of the input/condition set? NB: added note above, this is true, they can have additional restrictions on them, in fact all inputs actually need to be restricted for math/practice reasons, discrete is just more limited than real ranges, I do want them as a single symbol and I've been using bold for real vectors so maybe this is bad, but I like the reader thinking of real input vector space before considering sliced up domain
+As the system can be observed in multiple sets of conditions in a single experiment, the set of condition vectors is index by $j$, from $1$ to $N$, with a total of $N$ possible experimental condition vectors. As all experimental observations are effected by random errors or uncontrolled variation, the observation variables, $Y_i$, are random variables. The observation distribution, $p_i(.)$, of each observation variable is conditional on the experimental vector, $\bm{x}_j$, and so to be formally correct, each observation type in each unique condition is a unique random variable, $Y_{i,j}$. (However, it is convenient when referring to all observations of the same type, regardless of the experimental conditions, to suppress the $j$ subscript and use $Y_i$.)  
+With the above definitions, a full model can be formalized as
+\begin{align}
+Y_{i,j} \sim p_i(y_{i,j}|\bm{\eta}_{i,j}{=}\bm{f}_i(\bm{x}_j,\bm{\theta})).
+\label{eq:model_def}
+\end{align}
+%BPI: p subscript with j?? NB: technically i only indicates the type of distribution, the only thing changing across j are eta, I can add for asthetic but I'm not sure its needed formally 
+In this work $p_i(.)$ is generally approximated as a parametric distribution, for example the normal, log-normal or Poisson distributions. Observation variables, $Y_i$, are assumed to come from one parametric distribution type, such that each $p_i(.)$ always has the same type regardless of the inputs, $\bm{x}_j$, or parameter values, $\bm{\theta}$. The support of $Y_i$ depends on the distribution type assumed such that $Y_i$ can be restricted to the real numbers, positive real numbers or positive integers as the experimental situation dictates. Here $\bm{\eta}_{i,j}$ are the distribution $p(.)_i$'s natural parameters; in this work they are referred to as the \textit{sampling statistics} of the distribution. For example, the normal distribution would have the mean and variance as its sampling statistics; the Poisson distribution would have the $\lambda$ rate parameter as its sampling statistic. A repeated observation of the same observation variable and experimental conditions is termed a \textit{replicate}. There can be a unique number of replicates of each observation and condition for a total of $\beta_{i,j}$ in each combination.
+%BPI: is ‘k’ and replicates needed here? Just repeated samples from p after all NB: I think I need them for likelihood and FIM sums later but I could suppress them until then
+Each replicate results in a realization $y_{i,j}^{(k)}$, of an identically distributed random variable $Y_{i,j}$; here the $k$ subscript indexes the replicates from $1$ to $\beta_{i,j}$. The deterministic model components $\bm{f}_i(\bm{x}_j,\bm{\theta})$ describes the relationship between the experimental conditions, $\bm{x}_j$, and the sampling distribution statistics, $\bm{\eta}_{i,j}$, and therefore provides the link between the experimental conditions and the random but conditional variability of the observations. It should be stressed that the function $\bm{f}_i(.)$ can take the form of any sufficiently-smooth mathematical or numerical expression; it can therefore be a constant, an algebraic expression, a differential equation solution, the root of an implicit function or the solution to an optimization problem. Finally the functional mapping between the experimental conditions $\bm{x}_j$ and the sampling statistics $\bm{\eta}_{i,j}$, is parameterized by the unknown parameter vector $\bm{\theta}$. In this work it is generally the case that $\bm{\theta}$ needs to be estimated from the data resulting from any designed experiments. Note that in this formulation there is some ambiguity in whether observations of the same type taken at different points in time or space are handled as model input dimensions in $\bm{x}_j$ -- by entering the temporal or spatial location directly as an input dimension value -- or as a separate observation variables $Y_i$ -- with their own distributions $p_i(.)$ and functions $\bm{f}_i(.)$. However for the theoretical exposition of parameter estimation and optimal design this distinction has no direct impact, see Chapter \ref{package_chapter} for practical considerations.
+
+In this work we assume that the experimenter is confident in postulating the sampling distributions, $p_i(.)$, and model structure, $\bm{f}_i(.)$, for each observation variable. This necessarily implies the experimenter has some knowledge about the system as making choices for these model components imposes significant constraints on the model's flexibility and the resulting optimal design. Information for model specification can come from past data or from mechanistic considerations given knowledge of how the system functions. In this work, it is assumed that the main source of uncertainty for the experimenter is the parameter vector, $\bm{\theta}$, which needs to be fit to the collected observations. Uncertainty in model structure can be included in a more general optimal design framework \cite{apgar2008stimulus,melykuti2010discriminating,liepe2014framework}, however model selection is not a central theme in this work.
+%BPI: DONE maybe can comment that uncertainty about ‘correct’ model structure can be coded into allowing more degrees of freedom in a broad model structure
+
+\subsection{Definition of an Experimental Design}
+
+An experimental design specifies the structure of the data that is collected. A design must include two aspects to fully specify an experiment, 1) which experimental conditions are used, $\bm{x}_j$, 2) how many replicates, $\beta_{i,j}$, are taken of each observation variable at the given condition vector. When discussing the set of input conditions used, it is common to refer to the design's \textit{support}, which consists of the unique set of input points used in the experiment \cite{atkinson1992optimum}. Therefore each $\bm{x}_j$ from $1$ to $N$ must be unique, and the full set of $N$ vectors constitutes the design's support. At each unique support point, a design must also specify a set of replication counts, $\beta_{i,j}$, taken for each observation variable, $Y_i$, for $i$ from $1$ to $M$. The replicate count, $\beta_{i,j}$, is integer valued and specifies the number of replicates to be taken from the specific random variable $Y_{i,j}$.
+A design $\mathcal{D}$ is then fully specified by the list of support points $\bm{x}_j\in\mathcal{X}$ and the list of replication counts $\beta_{i,j}\in\mathcal{B}$.
+%BPI:Confusing here. I take it the idea is that *every* possible output is assigned an index i (under x_j), and those not observed get beta=0. But over a space or time continuum this is awkward (indices not discrete). Can’t choice of the Yi be part of the design specification? Maybe can resolve by defining the set of feasible designs for a give investigation. This could be the point at which a particular discretiazaton of space or time is imposed NB: i think what you are saying would involve treating time and space as an input Xj which is possible in current formalism and noted previously, a discretized version (which in reality is always the case) can be done in either xj (by restricting xj to a set) or yi (by giving a unique fi for each time/space point), however dunno if I made this clear, and how clear it needs to be here vs in package chapter?
+Note here that $\beta_{i,j}$ can have a value of zero indicating that no observations of the $i$th observation variable are taken for the $j$th experimental condition vector. The total sample size for the experiment, $N_{Tot}$, is computed as $N_{Tot}=\sum_i^M \sum_j^N \beta_{i,j}$. A dataset, $\bm{y}_{\mathcal{D}}$, corresponding to design, $\mathcal{D}$, consists of a listing of the $N_{Tot}$ observations, $y_{i,j}^{(k)}$, for all replicates, $k$ from $1$ to $\beta_{i,j}$, observation variables, $i$ from $1$ to $M$, and experimental conditions, $j$ from $1$ to $N$. A design determines the structure of the dataset that results from it.
+
+\subsection{Maximum Likelihood Estimation}
+
+Maximum likelihood is a well-tested and generally applicable method for fitting probabilistic models \cite{pawitan2001all,fedorov2013optimal}. The key idea in maximum likelihood estimation is to seek the parameter values that maximize the likelihood of observing the given data \cite{pawitan2001all}. In order to specify a maximum likelihood estimator for a given model, the model must include a sampling distribution, $p_i(.)$ above. In general, it is not always possible to specify an analytic expression for the observation distribution or to know which parametric distribution may best approximate the observations. However it should be noted that even simpler fitting methods like least-square fitting, can be seen as a special case of MLE when the user is (implicitly) assuming normally distributed errors \cite{seber2003nonlinear}. 
+
+In order specify the maximum likelihood estimator, we need to derive an expression for the total data likelihood \cite{pawitan2001all}. The likelihood is directly related to the probability distribution of the data conditioned on the parameter values \cite{pawitan2001all}. Using a single dimensional example, the conditional probability distribution of a random observation variable $Y$ is $p(y|\theta_o)$; this is the distribution for an individual observation $y$ conditioned on a fixed true value of $\theta_o$. The likelihood is functionally identical to the conditional distribution of the observation except with a reversal of the nominal input; for a fixed observation value, $y$, the likelihood $L(\theta;y)=p(y|\theta)$ is a function of any candidate value of $\theta$. Assuming independence of observations, the total likelihood, $L_{Tot}(\bm{\theta};\bm{y}_\mathcal{D},\mathcal{D})$, of all replicates, $y_{i,j}^{(k)}$, in a given experimental dataset with design, $\mathcal{D}$, and observations, $\bm{y}_\mathcal{D}$, can be expressed as
+\begin{align}
+L_{Tot}(\bm{\theta};\bm{y}_\mathcal{D},\mathcal{D}) = \prod_j^N \prod_i^M \prod_k^{\beta_{i,j}} p_i(y_{i,j}^{(k)}|\bm{\eta}_{i,j}=\bm{f}_i(\bm{x}_j,\bm{\theta})).
+\label{eq:data_lik}
+\end{align}
+(Note, dependent observations are discussed below.) The design influences the total likelihood by varying both the inputs, $\bm{x}_j$, and the replicates, $\beta_{i,j}$. The parameter vector, $\bm{\theta}$, that optimizes the likelihood expression is the maximum likelihood estimate, denoted as $\hat{\bm{\theta}}$.
+
+While the likelihood is straightforward to define, it is almost always advisable to maximize the log-likelihood, $l_{Tot}(\bm{\theta};\bm{y}_\mathcal{D},\mathcal{D})=\log(L_{Tot}(\bm{\theta};\bm{y}_\mathcal{D},\mathcal{D}))$. The $log(.)$ function is monotonic increasing and therefore the maximizing parameter vector for the log-likelihood is identical to that of the likelihood. However the log-likelihood can be numerically simpler to compute and more stable.
+%, also taking the logarithm of any distribution from the exponential family (including the normal, Poisson, gamma, binomial, and many others) generally results in a simpler expression analytically. Finally
+Also most of the asymptotic results for the MLE are developed using the log-likelihood because, for independent observations, the logarithm converts products involved in a joint observation distribution into sums. Expressing the estimator in terms of a summation of random terms leads more naturally to the application of various central limit theorems and the subsequent asymptotic derivations \cite{fedorov2013optimal}. For brevity in writing out the complete data log-likelihood we express the log-probability of each data point as
+\begin{align}
+l_i(\bm{\theta};y_{i,j}^{(k)},\bm{x}_j)=\log(p_i(y_{i,j}^{(k)}|\bm{\eta}_{i,j}=\bm{f}_i(\bm{x}_j,\bm{\theta}))).
+\label{eq:point_loglik}
+\end{align}
+ Then the total log-likelihood can be expressed as a summation such that
+\begin{align}
+l_{Tot}(\bm{\theta};\bm{y}_\mathcal{D},\mathcal{D}) = \sum_j^N \sum_i^M \sum_k^{\beta_{i,j}} l_i(\bm{\theta};y_{i,j}^{(k)},\bm{x}_j).
+\label{eq:data_loglik}
+\end{align}
+For brevity, the dependence of the total log-likelihood, $l_{Tot}(\bm{\theta};\bm{y}_{\mathcal{D}},\mathcal{D})$, on the data, $\bm{y}_{\mathcal{D}}$, and the design, $\mathcal{D}$, is often suppressed because for a given dataset these values are constants. In these cases the total log-likelihood is abbreviated as $l_{Tot}(\bm{\theta})$. The additive nature of each data point within the total log-likelihood has important consequence for the structure of optimal experimental design problems. However, not all observation variables are independent. %If we admit dependence between various observations from the model, the dependence can come between different observation variables $Y_i$, different input levels, $\bm{x}_j$, or even between replicates drawn from identical conditions. Regardless, 
+If we admit dependence between various observations, it will be reflected in the joint distribution of various groups of $Y_{i,j}$.
+Dependence between observations means that the total log-likelihood ceases to be additive because the joint probability of two observations does not factor; $p(Y_{a,b},Y_{c,d})\neq p(Y_{a,b})p(Y_{c,d})$. In this case the user must specify a joint distribution for any correlated observations that are taken together, and also specify a marginal distribution for each observation taken alone. In addition analytic multivariate distributions are only available for a subset of the possible observational supports that may be required. For example, expressing correlation between two normal distributions is straightforward but expressing dependence between a normal and Poisson distribution, or between pairs of Poisson distributions is not analytically tractable. If we wish to have an analytically tractable log-likelihood (with consequences later for the optimal design computation), there is a choice in either accommodating multiple data types easily, but with presumed independence, or in handling dependent observations with a much more limited set of observation distributions. In this thesis I have generally focused on models where observations can be approximated as independent.
+
+\subsection{Quantifying the Accuracy of Parameter Estimates}
+
+%\textbf{This is where we will introduce how design's are evaluated, specifically focusing on parameter estimation accuracy. We will need to introduce the parameter estimate distribution under maximum likelihood estimation. We can talk about the variance, bias and mean squared error of the estimator. We can then discus asymptotics for the estimator's distribution/moments and introduce the FIM.}
+
+Observations in a given realization of an experimental design are the result of a random process. This implies that the maximum likelihood estimate, $\hat{\bm{\theta}}$, is also a random variable. The probability of $\hat{\bm{\theta}}$ exactly matching the true parameter value, $\bm{\theta}_o$, is unlikely given randomness inherent in the observations. However despite this variability, we want the estimate to be near to the truth on average, and a key goal in evaluating fitting procedures and experimental designs is in quantifying how close to the truth the estimate is likely to be.
+%Even given the intuitiveness of the MLE -- that we are maximizing the probability of seeing the data -- it is not obvious that the MLE will lead to sensible estimates for many scenarios. 
+At a bare minimum, for a large variety of models, it can be proven that the MLE will recover the true parameter value in the limit of large sample sizes. For example this has been proven for nonlinear regression models \cite{wu1981asymptotic}, generalized linear models \cite{fahrmeir1985consistency}, and models with non-identically distributed data \cite{hoadley1971asymptotic}. (These are all model types that are accommodated by the general formalism outlined previously, however the reader is warned that it is possible to specify models for which the MLE has not been proven to be consistent within the above framework.) 
+%BPI: empty note here
+For the asymptotic results to apply it is important that the model is \textit{identifiable} \cite{martin2002consistency}. Identifiability requires that for any pair of candidate parameter values, $\bm{\theta}_a$ and $\bm{\theta}_b$, the model yields distinguishable prediction for at least one possible input vector $\bm{x}_j$ and observation variable $Y_i$; there must exist conditions for which $\bm{f}_i(\bm{x}_j,\bm{\theta}_a)\neq\bm{f}_i(\bm{x}_j,\bm{\theta}_b)$ holds. This implies that at least one possible observation variable will have a distinguishable difference in distribution for alternative parameter values under some conditions achievable in an experiment. Many models will conform to this assumption if they are not over-parameterized and a sufficient variety of system measurements can be included in an experimental design. Even in some cases that do not satisfy the identifiability condition, re-parameterization can yield an identifiable model. Given this identifiability assumption and some other mild regularity conditions, the maximum likelihood estimate is both asymptotically non-biased and consistent \cite{lehmann2006theory}. For models meeting the required conditions, these properties imply in the limit of large sample sizes the expected difference between the estimate and true parameters goes to zero, and the MLE estimate converges in probability to the true value (i.e. the probability of not generating an exactly true estimate goes to zero in the limit).
+
+The asymptotic non-biasedness and consistency of the estimator suggest that it is at least plausible that the MLE estimate yields reasonable results for identifiable models. However, when dealing with finite sample sizes in real experiments, estimates for non-linear models are almost always biased and can exhibit significant variability in their distribution around the true value \cite{box1971bias}.
+%asymptotically non-biased but almost always biased for finite sample sizes. Are these consistent? maybe i.e. with enough data they are nonbiased? not sure
+%OK, makes more sense given material below. Suggest an alternative introduction to this idea
+With finite sample sizes, the design of the experiments can have a significant impact on the distribution of the estimate, $\hat{\bm{\theta}}$ \cite{fedorov2013optimal}. The experimental design influences $\hat{\bm{\theta}}$'s distribution by mediating the sensitivity of the estimate to the variability inherent in the observations. Therefore it is desirable to have a more precise measure of the effect of a design $\mathcal{D}$ on the distribution of the estimate about the true value. An ideal measure of accuracy is the expected mean squared error of the estimate,
+\begin{align}
+\text{MSE}(\mathcal{D},\bm{\theta_o}) = \text{diag}\{E_{\bm{y}_\mathcal{D}}[(\hat{\bm{\theta}}-\bm{\theta}_o)^T\cdot(\hat{\bm{\theta}}-\bm{\theta}_o)|\mathcal{D},\bm{\theta}_o]\},
+\label{eq:mse}
+\end{align}
+(with respect to the data, $\bm{y}_\mathcal{D}$, as distributed under the true parameter vector, $\bm{\theta}_o$) which is effectively the second central moment of each parameter estimate about its true value \cite{pawitan2001all}. Here $\text{diag}\{.\}$ returns the diagonal elements of a square matrix and $\hat{\bm{\theta}}$ and $\bm{\theta}_o$ are presumed to be row vectors. For computing the MSE, it can be useful to decompose it as follows:
+\begin{align}
+\text{MSE} = \text{diag}\{E_{\bm{y}_\mathcal{D}}[\hat{\bm{\theta}}^T\cdot\hat{\bm{\theta}} |\mathcal{D},\bm{\theta}_o]\}+E_{\bm{y}_\mathcal{D}}[(\hat{\bm{\theta}}-\bm{\theta}_o)|\mathcal{D},\bm{\theta}_o]^2\}.
+\label{eq:mse_decomp}
+\end{align}
+The $E_{\bm{y}_\mathcal{D}}[\hat{\bm{\theta}}^T\cdot\hat{\bm{\theta}} |\mathcal{D},\bm{\theta}_o]$ term is the covariance matrix of the MLE estimate, more conveniently denoted as $\text{Cov}(\hat{\bm{\theta}}|\mathcal{D},\bm{\theta}_o)$. The estimate's covariance tells us about the raw variability of the estimator, but does not contain any information on its nearness to the true value, $\bm{\theta}_o$. The $E_{\bm{y}_\mathcal{D}}[(\hat{\bm{\theta}}-\bm{\theta}_o)|\mathcal{D},\bm{\theta}_o]$ term is the estimate's bias, denoted as $\text{Bias}(\hat{\bm{\theta}}|\mathcal{D},\bm{\theta}_o)$ and measures the expected difference between the estimate and the true parameter vector \cite{pawitan2001all}. (Note, the square in the bias term is applied element-wise.) Unfortunately it is impossible to compute the MSE, covariance, or bias exactly because the  distribution of the estimator, $p(\hat{\bm{\theta}}|\mathcal{D},\bm{\theta}_o)$ is generally not known or analytically tractable, as it results from a nonlinear transformation of the observation randomness propagated through the fitting process.
+
+However it is possible to compute an asymptotic approximation to the MSE, and the bias and covariance terms. To do so, an expansion is taken in the square root of the inverse of the sample size, $N_{Tot}$; this analysis is complex and tedious and further details can be found elsewhere \cite{rilstone1996second}. In performing the expansion it can be shown that the bias has no effect until after the first order, whereas the covariance expansion contains a non-zero first order term \cite{box1971bias,rilstone1996second}. This means that the variability of the estimator is generally dominant in the overall error compared to the estimator's bias, at least for reasonably large sample sizes. Therefore in this work, like most optimal design works, we focus on approximations for the estimator's covariance.
+
+Approximating the covariance matrix of the MLE parameter estimate can be done using the Fisher information matrix. This result is often given as part of the proof of the asymptotic normality of the MLE \cite{seber2003nonlinear,fedorov2013optimal}.
+%Proof of the FIM's relation to the estimator covariance for vector parameters and multidimensional observations is a tedious work in analysis and for further details the reader is referred to external sources (cite).
+ The Fisher information matrix for a single observation, $Y_i$, at input, $\bm{x}_j$, is defined as
+\begin{align}
+I_i(\bm{x}_j,\bar{\bm{\theta}}) =  E_{Y_{i,j}} [\nabla_{\bm{\theta}} l_i(\bar{\bm{\theta}};y_{i,j},\bm{x}_j) \cdot \nabla_{\bm{\theta}} l_i(\bar{\bm{\theta}};y_{i,j},\bm{x}_j)^T ].
+\label{eq:solo_fim}
+\end{align}
+Here $\nabla_{\bm{\theta}}$ is the parametric gradient operator which is treated as a column vector. Note, that the Fisher information would ideally be evaluated at the true parameter value $\bm{\theta}_o$, however this is unknown. Instead, the FIM is generally computed at the estimate, $\hat{\bm{\theta}}$ -- if initial data is available -- or a nominal value, $\bar{\bm{\theta}}$, based on literature or other considerations.
+With independent observations, the total Fisher information matrix for an entire experiment can be computed as a weighted sum of the individual FIM's at each replicate:
+\begin{align}
+I_{Tot}(\mathcal{D},\bar{\bm{\theta}}) = \sum_j^N \sum_i^M \beta_{i,j} I_i(\bm{x}_j,\bar{\bm{\theta}}).
+%\label{eq:tot_fim}
+\end{align}
+Here the weights, $\beta_{i,j}$, are the number of replicates taken in the experimental conditions corresponding to the individual Fisher information matrix, $I_i(\bm{x}_j,\bar{\bm{\theta}})$. Via the asymptotic expansion, it can be shown that the covariance of the parameter estimate with the given experimental design is approximated by the matrix inverse of the total FIM \cite{fedorov2013optimal}:
+\begin{align}
+\text{Cov}(\hat{\bm{\theta}}|\mathcal{D},\bar{\bm{\theta}})=I_{Tot}(\mathcal{D},\bar{\bm{\theta}})^{-1}.
+\label{eq:cov_from_fim}
+\end{align}
+To be clear this relation approximates the estimator's covariance assuming the nominal parameter vector, $\bar{\bm{\theta}}$, is near to the true value of $\bm{\theta}_o$ (i.e. this is a local approximation, see additional comments below).
+
+\begin{figure}[htb!]
+\centering
+\includegraphics[scale=.4]{Images/FIM_diagram.png}
+\caption{A figure comparing the total log-likelihood and score behaviour for multiple realizations of both an optimal design (left) and a sub-optimal design (right). The blue curves correspond to the average log-likelihood (top) and score function (bottom) for the given design -- averaged over all possible datasets. The other colors represent the log-likelihood and score functions for specific realizations of the design each with random observations.}
+\label{fig:fim_diagram}
+\end{figure}
+
+The full proof of the FIM's connection to the parametric covariance is tedious and is not reproduced here, however it is possible to gain some intuition for how the FIM is linked to the covariance by observing some of its easily derived properties. By definition the maximum likelihood estimate occurs at the point, $\hat{\bm{\theta}}$, that maximizes $l_{Tot}(\bm{\theta})$. It follows that, at the optima, $\nabla_{\bm{\theta}}l_{Tot}(\hat{\bm{\theta}})=0$. Here the vector valued function $\nabla_{\bm{\theta}}l_{Tot}(\bm{\theta})$ is called the \textit{score}, and the MLE must occur at a point where all entries in the score are zero (due to first-order optimality conditions) \cite{pawitan2001all}. From the definition of the FIM, we see that it is the matrix of second moments and cross-moments for the score evaluated at our guess of the true parameter vector. It can be further shown asymptotically (at first-order) that the expected value of the score evaluated at the true parameter vector, $E_{\bm{y}_\mathcal{D}}[\nabla_{\bm{\theta}}l_{Tot}(\bm{\theta}_o)]$, is zero \cite{pawitan2001all}, which is consistent with the fact that the MLE is asymptotically non-biased.
+%; regardless of which parameter vector makes the score zero for any given dataset, the score will be zero for the true parameter vector on average. Combing this with the definition of the FIM and the common decomp identity we have;
+This expectation implies that the diagonal entries of the FIM are not just the second moments of the score, but the second central moments about its expected value, because
+\begin{align}
+\begin{aligned}
+\text{Var}(\nabla_{\bm{\theta}}l_{Tot}(\bm{\theta}_o)) &= \text{diag}\{E_{\bm{y}_\mathcal{D}} [\nabla_{\bm{\theta}} l_{Tot}(\bm{\theta}_o) \cdot \nabla_{\bm{\theta}} l_{Tot}(\bm{\theta}_o)^T ]\} - E_{\bm{y}_\mathcal{D}}[\nabla_{\bm{\theta}}l_{Tot}(\bm{\theta}_o)]^2,\\ &= \text{diag}\{I_{Tot}(\mathcal{D},\bm{\theta}_o)\} - \bm{0}.
+\end{aligned}
+\label{eq:fim_var_score}
+\end{align}
+As the root of the score function fully defines the MLE, we should expect its variability to be strongly connected to the variability of the MLE estimate; in this case the variances are inversely related. If the variability of the score is large over multiple realizations of the experimental design, it implies that the estimate is heavily constrained by the design to fall near its expected true value. This scenario is depicted in Figure \ref{fig:fim_diagram} where, for the optimal design on the left, the intercepts of the individual score functions with the (blue) vertical line through the true parameter value, $\bm{\theta}_o$, exhibit large variability when the score functions' roots, $\hat{\bm{\theta}}$s, cluster around the true value. For the sub-optimal dataset on the right, the score function's value taken at the true parameter exhibits less variability and the estimates are therefore more variable.
+%is strongly influenced by the data observed in a given realization of the design. This suggests that the estimate is very sensitive to the specific observations taken, and that the observations provide useful information for constraining the fitted parameter values, reducing the estimate's overall variability. 
+%This is an intuitive leap, and a detailed connection between the score and estimate variability is made formal in the full proof (cite).
+
+%This means that the FIM is equivalent to the MSE of the observed score about its expected value, providing some intuition for why the FIM is related to the MSE of the actual estimates. 
+
+Intuition for the FIM can be developed further by expressing the FIM in an alternative form in terms of the log-likelihood's second derivatives. For an individual independent observation it can be shown that \cite{seber2003nonlinear}
+\begin{align}
+I_i(\bm{x}_j,\bm{\theta}_o) =  E_{Y_{i,j}} [\nabla_{\bm{\theta}} l_i(\bm{\theta}_o;y_{i,j},\bm{x}_j) \cdot \nabla_{\bm{\theta}} l_i(\bm{\theta}_o;y_{i,j},\bm{x}_j)^T ] =-E_{Y_{i,j}}[H_{\bm{\theta}}(l_i(\bm{\theta}_o;y_{i,j},\bm{x}_j))].
+\label{eq:fim_hess}
+\end{align}
+Here $H_{\bm{\theta}}(.)$ is the Hessian operator with respect the parameter vector, such that the latter term above is the matrix of expected values of the second parametric derivatives of the log-likelihood. These two definitions of the FIM are equivalent under mild regularity conditions; to understand why, it is helpful to consider the single dimensional case. For a single observation $y$ and a single parameter $\theta$; the sampling probability is $p(y|\theta)$ and the log-likelihood is $l(\theta;y)=\log(p(y|\theta))$. Under mild regularity conditions, it follows from the identity $\int p(y|\theta)dy=1$ that $\int \frac{d}{d\theta}p(y|\theta)dy=0$ and $\int \frac{d^2}{d\theta^2}p(y|\theta)dy=0$ also hold. It then follows that \cite{lehmann2004elements}
+\begin{align}
+\begin{aligned}
+E\left[\frac{d^2}{d\theta^2}l(\theta;y)\right] &= E\left[\frac{\frac{d^2}{d\theta^2}p(y|\theta)}{p(y|\theta)}\right] - E\left[\left(\frac{\frac{d}{d\theta}p(y|\theta)}{p(y|\theta)}\right)^2\right],\\
+&= \int \frac{d^2}{d\theta^2}p(y|\theta) dy- \int \frac{\left(\frac{d}{d\theta}p(y|\theta)\right)^2}{p(y|\theta)} dy,\\
+&= 0 - \int \left(\frac{d}{d\theta}l(\theta;y)\right)^2p(y|\theta) dy,\\
+&= -E\left[\left(\frac{d}{d\theta}l(\theta;y)\right)^2\right].
+\label{eq:1d_hess}
+\end{aligned}
+\end{align}
+
+This result helps us to link the variance of the parameter estimate with the FIM -- defined as the variance of the score. To see this, note that while $E\left[\frac{d^2}{d\theta^2}l(\theta;y)\right]$ is a measure of the curvature of the log-likelihood, it is also the expected slope of the score function. This is shown in Figure \ref{fig:fim_diagram} where on the left, for the optimal design, the log-likelihood exhibits significant curvature around the optima; therefore the slope of the score, shown below, is very steep. On the right, the sub-optimal design has less curvature around the optima and therefore exhibits shallow slopes in the score below. It follows from the previous paragraph that, for the optimal design, given the diagonal entries of the FIM are large, the variance of the score's intercept with the vertical line at the true parameter value will be large. This also implies that the expected slope of those same score functions will be steep. With steep average slopes, the roots of the score functions will have a smaller variability. As the score's root is the MLE estimate, this implies the MLE has a lower variability in the optimal case. The situation is reversed for the sub-optimal design, where the low variability in the score's value at the true parameter and the score's shallow average slope allow the estimates to vary widely under multiple realizations of the design. These results also hold for multiple parameters and provide some intuition for connecting the FIM to the MLE's variability.
+%In this relation it can be seen that when the expected curvature of the likelihood for a given design is large, the variability of the MLE will be small. This makes intuitive sense because if the log-likelihood exhibits significant curvature near its optima, it will result in a `pointy' optimization surface where small steps away from the optima in parameter space result in large decreases in the objective.
+%BPI, figure for point blunt, top bottom plot, top plot with 'true' log-likelihood (infinite data) and various realized loglikelihoods (as quadratics), bottom plot with their corresponding scores, link is between the variance in the value of the realized scores at the true param, and the shape of the curvature of the loglikelihood in the top figure.
+%On the other hand, when the curvature of the log-likelihood is small, the parameter estimate can exhibit wider variations from the optima with relatively little penalty in the objective. This implies that designs with large curvatures are less likely to allow random sampling errors to perturb the estimate significantly away from the expected true value.
+
+As previously noted, we do not know the true value, $\bm{\theta}_o$, at which to take the asymptotic approximation and at which to evaluate the FIM. This means that any asymptotic results are inherently local to our nominal parameter vector, $\bar{\bm{\theta}}$. In practice initial estimates for $\bar{\bm{\theta}}$ can come from the available literature or from the MLE fit to some initial data. As the underlying model (i.e. $\bm{f}_i(.)$) must be sufficiently smooth, we can also expect asymptotic measures to hold approximately for parameter values near to the nominal vector. Other strategies have been proposed for dealing with the local nature of the FIM computed at the nominal parameter value $\bar{\bm{\theta}}$. Perhaps the most common approach is to implement optimal design in an iterative fashion, with each batch of optimized experiments adding to the collected data, improving the parameter estimates for the next round \cite{atkinson1992optimum}. In this case even though the designs are optimized for a local objective, the parameter estimates tend to become more accurate after each iteration. This accuracy is ensured by the increasing sample size, so even if the initial designs were erroneous and sub-optimal, as the estimates improve, so will the optimality of the iterative designs over the course of the experiment. However, some experimental contexts are not suitable for iterative design. In these case other strategies exist including Bayesian averaging over a parametric prior distribution or min-max optimization -- where the design is optimized for a parameter vector that has the worst estimation performance \cite{atkinson1992optimum,fedorov2010optimal}. In some cases, the local analysis alone can be useful if it is used to qualitatively explore optimal design structure under various parametric scenarios within the plausible parameter space; this has been done in some parts of this thesis.
+
+%In cases where there exists no reasonable starting estimate, the asymptotic local measures can still be useful for exploring various scenarios within the plausible parameter space.
+%BPI: add ref to global sensitivity tools here
+%Asymptotic measures can also be used within a Bayesian framework to average results over a prior \cite{atkinson1992optimum}, however this work is outside the scope of this thesis.
+
+Computing the derivatives and expectation required for the FIM for an arbitrary model may seem daunting. However, this derivation can be done quite simply by observing the following application of the chain rule \cite{fedorov2013optimal}:
+\begin{align}
+\begin{aligned}
+\nabla_{\bm{\theta}} l_i(\bm{\theta};y_{i,j},\bm{x}_j) =& \nabla_{\bm{\theta}}  \log(p_i(y_{i,j}|\bm{\eta}_{i,j}{=}\bm{f}_i(\bm{x}_j,\bm{\theta}) )), \\
+&\nabla_{\bm{\theta}} \bm{f}_i(\bm{x}_j,\bm{\theta}) \cdot \nabla_{\bm{\eta}_{i,j}} \log(p_i(y_{i,j}|\bm{\eta}_{i,j})).
+\end{aligned}
+\label{eq:chain_rule}
+\end{align}
+The above decomposition makes use of the fact that the sampling statistics, $\bm{\eta}_{i,j}$, of the observation distribution, $p_i(.)$, are directly computed by the deterministic model component such that $\bm{\eta}_{i,j}=\bm{f}_i(\bm{x}_j,\bm{\theta})$. The score function can therefore be decomposed into the deterministic model's parametric sensitivity and derivative of the log-probability of the observation with respect to the sampling statistics $\bm{\eta}_{i,j}$ \cite{fedorov2013optimal}. As the model sensitivity does not depend on the random observation values, $Y_{i,j}$, this simplifies the computation of the Fisher information matrix at each observation so that we have \cite{fedorov2013optimal}
+\begin{align}
+\begin{aligned}
+I_i(\bm{x}_j,\bm{\theta}) &=  E_{Y_{i,j}} [ \nabla_{\bm{\theta}} \bm{f}_i(\bm{x}_j,\bm{\theta}) \nabla_{\bm{\eta}_{i,j}} \log(p_i(y_{i,j}|\bm{\eta}_{i,j})) \cdot \nabla_{\bm{\eta}_{i,j}}\log(p_i(y_{i,j}|\bm{\eta}_{i,j}))^T \nabla_{\bm{\theta}} \bm{f}_i(\bm{x}_j,\bm{\theta})^T ],\\
+%&=   \nabla_{\bm{\theta}} \bm{f}_i(\bm{x}_j,\bm{\theta}) E_{y_{i,j}} [\nabla_{\bm{\eta_i}} \log(p_i(y_{i,j}|\bm{\eta_i})) \cdot  \nabla_{\bm{\eta_i}}\log(p_i(y_{i,j}|\bm{\eta_i}))^T] \nabla_{\bm{\theta}} \bm{f}_i(\bm{x}_j,\bm{\theta})^T  \\
+&=   \nabla_{\bm{\theta}} \bm{f}_i(\bm{x}_j,\bm{\theta})~ \Psi(\bm{\eta}_{i,j}{=}\bm{f}_i(\bm{x}_j,\bm{\theta}))~\nabla_{\bm{\theta}} \bm{f}_i(\bm{x}_j,\bm{\theta})^T.
+\end{aligned}
+\label{eq:element_fim}
+\end{align}
+Here $\Psi(\bm{\eta}_{i,j}{=}\bm{f}_i(\bm{x}_j,\bm{\theta}))$ is defined as
+\begin{align}
+\Psi(\bm{\eta}_{i,j}{=}\bm{f}_i(\bm{x}_j,\bm{\theta})) = E_{Y_{i,j}} [\nabla_{\bm{\eta}_{i,j}} \log(p_i(y_{i,j}|\bm{\eta}_{i,j})) \cdot  \nabla_{\bm{\eta}_{i,j}} \log(p_i(y_{i,j}|\bm{\eta}_{i,j}))^T].
+\label{eq:psi_fim}
+\end{align}
+This expectation is effectively just the Fisher information of a standard parametric distribution, such as the normal, Poisson etc., with respect to its sampling statistics. We follow Fedorov in referring to these matrices as elemental FIMs of the given distribution \cite{fedorov2013optimal}. These elemental FIMs have been computed for the vast majority of common one and two parameter distributions for which the expectation is analytically tractable. A good reference can be found in Fedorov's recent book \cite{fedorov2013optimal}. Therefore, computing the Fisher information for the overall experimental design, decomposes into computing a parametric sensitivity vector for each observation point, $\nabla_{\bm{\theta}} \bm{f}_i(\bm{x}_j,\bm{\theta})$, and matrix multiplying it with the observation distribution's elemental FIM; $\Psi(\bm{\eta}_{i,j}{=}\bm{f}_i(\bm{x}_j,\bm{\theta}))$. The formula for the elemental FIM for common parametric distributions is easily looked-up and computed from the predicted values of $\bm{\eta}_{i,j}$. The individual FIM's for each observation are then summed to produce the total FIM for the experiment. The total Fisher information matrix can be used to quantify the expected parameter estimate covariance for the given design at the nominal parameter values, $\bar{\bm{\theta}}$.
+
+%Fisher originally derived results based on the Fisher information matrix to quantify the variability of parameter estimates, however it was later shown by Cramer and Rao that the inverse of the Fisher information matrix is also the lower bound for the variance of 
+
+%Wald intervals and connection to FIM
+%Without using higher order methods which are significantly more complicated (cite), approximating the bias, which is relevant for smaller sample sizes, generally requires simulation-based approximations via Monte Carlo methods. 
+% Change ref to background in package chapter the nonlinear design book cite
+
+% M J Box paper
+% MSE, BIAS 
+% JBS Haldane paper
+
+\subsection{Scalar Objectives for Optimizing Designs}
+
+%\textbf{Here we will start by discussing scalar objective functions computed from the FIM (i.e. alphabetic optimality criteria). We can mention how for some problems the optimization is convex if we optimize a relaxed design. We can mention some existing algorithms for design (Fedorov exchange algorithm) and the various trade-offs in posing the problem in convex or non-linear ways. We will especially mention tradeoffs in generating an exact design via optimization vs generating a relaxed design and rounding it.}
+
+The Fisher information matrix captures approximate information about the expected distribution of the MLE estimate given a specified design. However, other than in the single parameter case, the Fisher information is matrix-valued which makes it unsuitable for use as an optimization objective. In order to construct an optimization problem for selecting an optimal design, we need a scalar function, $\Psi(.)$, of the FIM that can be maximized:
+\begin{align}
+\max_{\mathcal{D}} \Psi( I_{Tot}(\mathcal{D},\bar{\bm{\theta}}) ).
+\label{eq:fim_hess}
+\end{align}
+The most common scalar objective in practice is the determinant of the Fisher information matrix \cite{atkinson1992optimum,fedorov2010optimal}. This is equivalent to minimizing the determinant of the expected covariance matrix of the parameter estimates. Optimizing a design subject to this objective is known as finding a D-optimal design \cite{atkinson1992optimum}. The determinant of a covariance matrix is referred to as the generalized variance of the underlying random vector, and as such the D-optimal design minimizes the generalized variance of the MLE estimate \cite{atkinson1992optimum}. The D-optimal design is commonly used because it has a number of useful properties, including that it is simple to compute, it can be formulated as a convex objective and D-optimal designs are invariant under re-parameterization \cite{atkinson1992optimum,fedorov2010optimal}. As such, D-optimal designs are the main designs studied in this work. Other than D-optimal designs, there exist a number of other scalar design criteria, these are sometime referred to as the alphabetic optimality criteria because they are generally named using single letters; for example, A-optimal, c-optimal, I-optimal etc. \cite{atkinson1992optimum}. 
+
+%Ds objective, A objective, add them?
+To find an optimal design, $\mathcal{D}$, we seek to find the optimal support points $\bm{x}_j\in\mathcal{X}$ and optimal replicate counts $\beta_{i,j}\in\mathcal{B}$.
+Using a scalar objective, the overall optimization problem can be defined as
+\begin{align}
+\begin{aligned}
+\max_{\mathcal{D}}~&\Psi(I_{Tot}(\mathcal{D},\bar{\bm{\theta}})),\\
+I_{Tot}(\mathcal{D},\bar{\bm{\theta}}) &= \sum_j^N \sum_i^M \beta_{i,j} I_i(\bm{x}_j,\bar{\bm{\theta}}),\\
+\mathcal{D}&=\{\mathcal{X},\mathcal{B}\}.
+%\label{eq:tot_fim}
+\end{aligned}
+\end{align}
+This optimization is difficult for a number of reasons. It is non-linear in the support points, $\bm{x}_j$. It is also an integer programming problem because of the integer restrictions on $\beta_{i,j}$. Also, the optimal number of support points, $N$, is not generally known. These computational difficulties are already layered on top of those required to compute the FIM, as the FIM also requires computing sensitivities, which can be difficult for certain models.
+
+A common approach for reducing the computational difficulty of optimal design is to relax the integer constraint such that a continuous weighting, $\xi_{i,j}$, over the input-observation pairs is optimized \cite{atkinson1992optimum}. In this relaxed formulation, each $\xi_{i,j}$ replaces the corresponding $\beta_{i,j}$, however the $\xi_{i,j}$ have non-negative real-values which are constrained so that $0<\xi_{i,j}<1$ and $1=\sum_i^M \sum_j^N \xi{i,j}$. For a relaxed design the replicate weights, $\xi_{i,j}$, are grouped in the weight set such that $\xi_{i,j}\in\mathcal{Z}$. A relaxed design, $\mathcal{D}_R$, is then defined by the support points and weight set such that 
+$\mathcal{D}_R=\{\mathcal{X},\mathcal{Z}\}$. The relaxed optimization problem can then be written as
+\begin{align}
+\begin{aligned}
+\max_{\mathcal{D}_R}~&\Psi(I_{Tot}(\mathcal{D}_R,\bar{\bm{\theta}})),\\
+I_{Tot}(\mathcal{D}_R,\bar{\bm{\theta}}) &= \sum_j^N \sum_i^M \xi_{i,j} I_i(\bm{x}_j,\bar{\bm{\theta}}),\\
+\mathcal{D}_R&=\{\mathcal{X},\mathcal{Z}\}.
+%\label{eq:tot_fim}
+\end{aligned}
+\end{align}
+An exact design, $\mathcal{D}$, specified using integer replicate allocations, $\beta_{i,j}$, can be converted to a relaxed design, $\mathcal{D}$, by dividing the replicate integers by the total sample size: $\beta_{i,j}/N_{Tot}=\xi_{i,j}$. The total FIMs, $I_{Tot}$, of the two design representations are therefore also related by the sample size so that $I_{Tot}(\mathcal{D},\bar{\bm{\theta}})/N_{Tot}=I_{Tot}(\mathcal{D}_R,\bar{\bm{\theta}})$. Given these relations, the relaxed formulation is effectively normalized so that it does not depend on the overall sample size, $N_{Tot}$. To convert a relaxed design, $\mathcal{D}_R$, to an implementable exact design, $\mathcal{D}$, with integer replicate allocations, a sample size is selected and a rounding procedure is then applied to generate $\beta_{i,j}$ from the weights $\xi_{i,j}$. Simple rounding or specialized apportionment methods can be used for this conversion \cite{pukelsheim1992efficient,wilhelm1996obtain,imhof2001efficiencies}. Due to the computational advantages, the relaxed form of the design problem is used for optimization throughout this thesis. 
+ 
+After solving the full design optimization problem, or the relaxed approximation to it, the research will achieve an optimal design with a specified list of support points and replicate allocations. This design will be optimal in a mathematical sense, but only conditionally for the given model structure, nominal parameter values, observation distributions and experimental constraints the research has specified. It is important to remember that optimal designs are generated under these strong assumptions. This means that other sources of uncertainty about model structure and alternative sources of variability are not necessarily hedged for in the optimized design. The optimal design can therefore serve as an idealized guide for a given system, however the design should be combined with good experimental judgment when implementing the prescribed measurements in practice.
+
+
+%When addressing the relaxed version of the problem, 
+%mention the GET and what it appleis (convex objective and relaxed weights)
+%local, iterative, bayesian, min-max
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%An optimized design with a large sample size will desensitize the the estimate to the sampling error, concentrating the estimate's distribution near the true value.
+
+%Here there are $N_y$ observation variables, indexed by $j$, and $N_x$ support points $\bm{x}_i$, indexed by $i$. The FIM at a given input point, $\bm{x}_i$, for the $j$th observation variable $y_j$ is $\mathcal{I}_j(\bm{x}_i)$. The weights $\beta_{ij}$ correspond to the support point $\bm{x}_i$ and the observation variable $y_j$. The collection of weights, $\beta_{ij}$,
+
+%Connection to cramer rao lower bound Fisher derived the fim as an approximate to an estimators variance, Cramer and Rao later showed that creates a lower bound for teh variance of an unbiased estimator, this is less useful in thinking about it as a method for experimental design
+
+ %The MSE can be  The MSE, covariance and bias each contain useful and intuitive information about parameter estimation error. 
+ %However, these metric can be approximated, either asymptotically or through simulation at a candidate point (i.e. an guess or estimate) for the true parameter vector. The \texttt{evaluate()} function provides both types of methods for computing these metrics for a given design, given a nominal true value.
+
+%The \texttt{evalutate()} method implements a parametric Monte Carlo algorithm for approximating the MSE, covariance and bias terms. In this method, a 'true' nominal parameter vector is used to simulate a large number of datasets corresponding to the candidate design. These datasets are then each fit independently using maximum likelihood. The resulting set of estimated parameter vectors are then used to compute the MSE, covariance and bias empirically, using the nominal parameter value as a stand-in for the unknown true value. This then provides an approximation for the parameter accuracy metrics for the given design. The Monte Carlo approximation is time consuming and the sample number used may need to be tuned to the design and model begin evaluated in order to achieve stable approximations, as the algorithm necessarily is non-deterministic. These considerations make the Monte Carlo approach unsuitable for use in the \texttt{Design} optimization, however they are useful benchmarks to assess the suitability of asymptotically derived designs at small sample size. The Monte Carlo metrics are also valuable for comparing amongst several design candidates, allowing the user to accurately differentiate between subtle trade-offs in bias and variance components of parameter error. 
+
+% \paragraph{Confidence Intervals}
+
+% likelihood-based intervals \cite{seber2003nonlinear,bates1988nonlinear} (cite check). (While both likelihood-based and Wald intervals --computed from the FIM-- have asymptotic justifications, likelihood-based intervals require observed data where as Wald intervals do not \cite{seber2003nonlinear,bates1988nonlinear} (cite check).)(i.e. if the experiment was repeated 100 times, 95 of the computed estimates would have a smaller difference)
+
+%Asymptotic computation of the parameter accuracy metrics is done for a specific fitting method. Here we focus on the maximum likelihood estimate, which is the fitting method implemented in the \texttt{fit()} function of the \texttt{Model} class. 
+
+% \paragraph{Asymptotic Properties}
+
+
+% Cite paper by JBS Haldane on higher order sampling distributions in paranthetical (ask brian about story/book he got it from)
+
+% The goal in experimental design is to evaulate a designs expected performance before the experiment is even run.
+
+% The full bayesian integral is set up as follows
+% \begin{align}
+% \begin{aligned}
+% \int math stuff
+% \end{aligned}
+% \label{eq:full_objective}
+% \end{align}
+% (this doesn't even get into model uncertainty or input settings errors)
+
+% In practice this is intractable for all but the simplist models, to simplify there are several options.
+
+% Parameteter integral can be replaced by a point estimate, an initial guess essentially. The whole procedure can also be applied iteratively, where the total numbe of samples are divided up in the hopes that after each round of expeirmention the parameter fit will improve, providing a more accurate starting point for the next round of optimization (no proofs are knonw to the authour guaranteeing that this process will always converge even for the 
+
+%\paragraph{Fisher Information}
+
+%\paragraph{Approximate vs Exact Designs}
+
+
+\section{Package Workflow and Definitions}
 
 The NLOED package is written in Python 3 and can be used in Python scripts or interactively in the interpreter. The package consists primarily of two core classes; the \texttt{Model} class and the \texttt{Design} class. The \texttt{Model} class encodes information about model structure, observation distributions, and model-specific functions such as those used for fitting, simulation and model analysis. The \texttt{Design} class accepts models and other design information and can be used to optimize and output experimental designs. 
 

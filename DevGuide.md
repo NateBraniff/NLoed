@@ -63,7 +63,7 @@ dependencies and do a local install of the package for development.
         exec "$SHELL
         ```
 
-2. **Clone Git Repo Into the Development Folder**
+2. **Clone Git Repo into the Development Folder**
     You need to create a folder to contain the package files. You can do this in the file manager or
     from the commandline, after which Git is used to clone the NLoed repository.
     * Open Terminal
@@ -215,22 +215,22 @@ Sphinx will already be installed along with the other development dependencies f
     Sphinx is used to extract docstrings automatically from the NLoed source code. Sphinx can then generate
     a latex project that can be compiled into a pdf listing all of the class function and call structures
     documented in the NLoed source code. The exact content of the resulting document is controlled by
-    the .rst files in docs/nloed_sphinx/source. The docs folder also contains other latex projects for
+    the .rst files in docs/latex_sphinx_manual/source. The docs folder also contains other latex projects for
     NLoed's other documentation. 
-    * The cloned NLoed repo should be able to run Sphinx by default. To (re)make the Sphinx latex project after any updates you can run in the nloed_sphinx directory:
+    * The cloned NLoed repo should be able to run Sphinx by default. To (re)make the Sphinx latex project after any updates you can run in the latex_sphinx_manual directory:
         ```sh
         make latex
         ```
         You need to run this after updating any docstrings or making changes to the .rst files.
     * (Optional) If you've already made the latex project once (or you've cloned the repo and are
         unsure of the Sphinx latex project status, you can run the following command to clean up the latex
-        buid (it must be run in the nloed_sphinx directory):
+        buid (it must be run in the latex_sphinx_manual directory):
         ```sh
         make latex
         ```
     * (Optional) If you add new modules to the NLoed project you will need to re-run the autodoc extension of Sphinx so that it can find the new code and docstrings. This will modify both nloed.rst and modules.rest (although the later isn't used by default). To do this run in the repo's root directory:
         ```sh
-        $ sphinx-apidoc -o docs/nloed_sphinx/source nloed
+        $ sphinx-apidoc -o docs/latex_sphinx_manual/source nloed
         ```
 
 2. **Linking and Compiling in Overleaf**

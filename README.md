@@ -68,7 +68,7 @@ pip -V
 ```
 This should print out a similar version number as the one python did.
 
-### How do I get the Right Version of Python/Pip Installed?
+### How do I get the right version of Python/Pip Installed?
 If you don't have the right version of python on your system, you will need install it before
 installed NLoed. For those unfamiliar with Python, here are some helpful pointers depending on 
 your OS:
@@ -128,7 +128,7 @@ versions and dependencies. See the [pyenv Github](https://github.com/pyenv/pyenv
     echo -e 'if command -v pyenv 1>/dev/null 2>&1; then\n  eval "$(pyenv init -)"\nfi' >> ~/.bash_profile
     exec "$SHELL"
     ```
-    b) The auto-installer script (https://github.com/pyenv/pyenv-installer):..
+    b) The [auto-installer script]((https://github.com/pyenv/pyenv-installer)):..
     ```sh
     curl https://pyenv.run | bash
     ```
@@ -170,7 +170,7 @@ Recent releases of Ubuntu should come with a version of Python 3.
     libreadline-dev libsqlite3-dev wget curl llvm libncurses5-dev libncursesw5-dev \
     xz-utils tk-dev libffi-dev liblzma-dev python-openssl git
     ```
-* Now use the auto-installer script (https://github.com/pyenv/pyenv-installer) and restart the shell:
+* Now use the [auto-installer script](https://github.com/pyenv/pyenv-installer) and restart the shell:
     ```sh
     curl https://pyenv.run | bash
     exec "$SHELL"

@@ -74,7 +74,7 @@
 
 
 \title{NLoed}
-\date{Jan 20, 2021}
+\date{Jan 22, 2021}
 \release{0.0.1}
 \author{Nathan Braniff}
 \newcommand{\sphinxlogo}{\vbox{}}
@@ -1188,27 +1188,52 @@ list
 
 \end{fulllineitems}
 
-\index{\_\_creategrid() (nloed.model.Model method)@\spxentry{\_\_creategrid()}\spxextra{nloed.model.Model method}}
+\index{\_\_create\_grid() (nloed.model.Model method)@\spxentry{\_\_create\_grid()}\spxextra{nloed.model.Model method}}
 
 \begin{fulllineitems}
-\phantomsection\label{\detokenize{nloed:nloed.model.Model.__creategrid}}\pysiglinewithargsret{\sphinxbfcode{\sphinxupquote{\_\_creategrid}}}{\emph{\DUrole{n}{input\_candidate\_list}}}{}
+\phantomsection\label{\detokenize{nloed:nloed.model.Model.__create_grid}}\pysiglinewithargsret{\sphinxbfcode{\sphinxupquote{\_\_create\_grid}}}{\emph{\DUrole{n}{input\_candidate\_list}}}{}
+A private helper function to create a grid of candidate parameter points
+
+This fucntion creates a grid of candidate parameter points by permuting a lits of candidate
+points. This is used for an a crude initial parmeter search prior to maximum likelihood
+optimization by the Model.fit function. This function uses recursion to permute the candidate
+grid.
+\begin{quote}\begin{description}
+\item[{Parameters}] \leavevmode
+\sphinxstyleliteralstrong{\sphinxupquote{input\_candidate\_list}} (\sphinxstyleliteralemphasis{\sphinxupquote{list of array\sphinxhyphen{}likes}}) \textendash{} A list, the same length as the model’s
+parameter vector, each element is an array\sphinxhyphen{}like vector of candidate parameter
+values for the given parameter.
+
+\item[{Returns}] \leavevmode
+The return is a list, the same length as the number of permutations of
+the candidate paramter points passed, each element of the list contains a Numpy parameter
+vector with a unique permutation of the candidate points.
+
+\item[{Return type}] \leavevmode
+list of arrays
+
+\end{description}\end{quote}
+
 \end{fulllineitems}
 
-\index{\_progress\_bar() (nloed.model.Model method)@\spxentry{\_progress\_bar()}\spxextra{nloed.model.Model method}}
+\index{\_\_progress\_bar() (nloed.model.Model method)@\spxentry{\_\_progress\_bar()}\spxextra{nloed.model.Model method}}
 
 \begin{fulllineitems}
-\phantomsection\label{\detokenize{nloed:nloed.model.Model._progress_bar}}\pysiglinewithargsret{\sphinxbfcode{\sphinxupquote{\_progress\_bar}}}{\emph{\DUrole{n}{iteration}}, \emph{\DUrole{n}{total}}, \emph{\DUrole{n}{prefix}\DUrole{o}{=}\DUrole{default_value}{\textquotesingle{}\textquotesingle{}}}}{}
-Helper function to print progress bar in a looped process
+\phantomsection\label{\detokenize{nloed:nloed.model.Model.__progress_bar}}\pysiglinewithargsret{\sphinxbfcode{\sphinxupquote{\_\_progress\_bar}}}{\emph{\DUrole{n}{iteration}}, \emph{\DUrole{n}{total}}, \emph{\DUrole{n}{prefix}\DUrole{o}{=}\DUrole{default_value}{\textquotesingle{}\textquotesingle{}}}}{}
+A private helper function to print a progress bar in a looped process
+
+This fucntion prints or update a progress bar on the commandline output indicating, the
+current progress through a loop.
 \begin{quote}\begin{description}
 \item[{Parameters}] \leavevmode\begin{itemize}
 \item {} 
-\sphinxstyleliteralstrong{\sphinxupquote{iteration}} \textendash{} current iteration in the process
+\sphinxstyleliteralstrong{\sphinxupquote{iteration}} (\sphinxstyleliteralemphasis{\sphinxupquote{integer}}) \textendash{} Current iteration in the process
 
 \item {} 
-\sphinxstyleliteralstrong{\sphinxupquote{total}} \textendash{} total iterations in the process
+\sphinxstyleliteralstrong{\sphinxupquote{total}} (\sphinxstyleliteralemphasis{\sphinxupquote{integer}}) \textendash{} Total number of iterations in the process
 
 \item {} 
-\sphinxstyleliteralstrong{\sphinxupquote{prefix}} \textendash{} prefix string to name process
+\sphinxstyleliteralstrong{\sphinxupquote{prefix}} (\sphinxstyleliteralemphasis{\sphinxupquote{string}}) \textendash{} A prefix string to name the process
 
 \end{itemize}
 
@@ -1228,12 +1253,232 @@ Helper function to print progress bar in a looped process
 \phantomsection\label{\detokenize{nloed:nloed.design.Design}}\pysiglinewithargsret{\sphinxbfcode{\sphinxupquote{class }}\sphinxcode{\sphinxupquote{nloed.design.}}\sphinxbfcode{\sphinxupquote{Design}}}{\emph{\DUrole{n}{models}}, \emph{\DUrole{n}{parameters}}, \emph{\DUrole{n}{objective}}, \emph{\DUrole{n}{discrete\_inputs}\DUrole{o}{=}\DUrole{default_value}{None}}, \emph{\DUrole{n}{continuous\_inputs}\DUrole{o}{=}\DUrole{default_value}{None}}, \emph{\DUrole{n}{observ\_groups}\DUrole{o}{=}\DUrole{default_value}{None}}, \emph{\DUrole{n}{fixed\_design}\DUrole{o}{=}\DUrole{default_value}{None}}, \emph{\DUrole{n}{options}\DUrole{o}{=}\DUrole{default_value}{\{\}}}}{}
 Bases: \sphinxcode{\sphinxupquote{object}}
 
-A class for experimental designs in the NLoed package
+The NLoed Design class formulates a design optimization problem and generates an optimized
+relaxed experimental design.
+
+This class accepts a set of NLoed model instances as well as the users specifications of their
+experimental requirments. This information is used to formulate the
+experimental design problem as a non\sphinxhyphen{}linear programming problem that is passable to the IPOPT
+solver via Casadi’s interface.
+
+During construction, optimization problem is structured and passed to IPOPT. The problem solution
+is then extracted and stored within the model object. This solution represents a relaxed solution
+to the design problem and has real valued weights representing the number of samples taken in
+various input conditions. The classes user\sphinxhyphen{}callable function can be used to round the relaxed
+solution to an exact design with a specified sample size.
+\index{num\_models (nloed.design.Design attribute)@\spxentry{num\_models}\spxextra{nloed.design.Design attribute}}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{nloed:nloed.design.Design.num_models}}\pysigline{\sphinxbfcode{\sphinxupquote{num\_models}}}
+The number of models for which the design was optimized, generally 1.
+\begin{quote}\begin{description}
+\item[{Type}] \leavevmode
+integer
+
+\end{description}\end{quote}
+
+\end{fulllineitems}
+
+\index{input\_dim (nloed.design.Design attribute)@\spxentry{input\_dim}\spxextra{nloed.design.Design attribute}}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{nloed:nloed.design.Design.input_dim}}\pysigline{\sphinxbfcode{\sphinxupquote{input\_dim}}}
+The dimensions of the model input, this must be consistent across all
+of the models passed.
+\begin{quote}\begin{description}
+\item[{Type}] \leavevmode
+integer
+
+\end{description}\end{quote}
+
+\end{fulllineitems}
+
+\index{observ\_dim (nloed.design.Design attribute)@\spxentry{observ\_dim}\spxextra{nloed.design.Design attribute}}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{nloed:nloed.design.Design.observ_dim}}\pysigline{\sphinxbfcode{\sphinxupquote{observ\_dim}}}
+The number of observation variables that each model has, all models
+must have the same observation variables.
+\begin{quote}\begin{description}
+\item[{Type}] \leavevmode
+integer
+
+\end{description}\end{quote}
+
+\end{fulllineitems}
+
+\index{input\_name\_list (nloed.design.Design attribute)@\spxentry{input\_name\_list}\spxextra{nloed.design.Design attribute}}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{nloed:nloed.design.Design.input_name_list}}\pysigline{\sphinxbfcode{\sphinxupquote{input\_name\_list}}}
+A list of names for the model inputs, these must be shared
+by all of the passed models.
+\begin{quote}\begin{description}
+\item[{Type}] \leavevmode
+list of strings
+
+\end{description}\end{quote}
+
+\end{fulllineitems}
+
+\index{observ\_name\_list (nloed.design.Design attribute)@\spxentry{observ\_name\_list}\spxextra{nloed.design.Design attribute}}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{nloed:nloed.design.Design.observ_name_list}}\pysigline{\sphinxbfcode{\sphinxupquote{observ\_name\_list}}}
+Alist of names for the model observation variables, these
+must match across all models passed.
+\begin{quote}\begin{description}
+\item[{Type}] \leavevmode
+list of strings
+
+\end{description}\end{quote}
+
+\end{fulllineitems}
+
+\index{model\_list (nloed.design.Design attribute)@\spxentry{model\_list}\spxextra{nloed.design.Design attribute}}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{nloed:nloed.design.Design.model_list}}\pysigline{\sphinxbfcode{\sphinxupquote{model\_list}}}
+A list of the NLoed Model instances passed to the design
+constructor.
+\begin{quote}\begin{description}
+\item[{Type}] \leavevmode
+list of models
+
+\end{description}\end{quote}
+
+\end{fulllineitems}
+
+\index{param\_list (nloed.design.Design attribute)@\spxentry{param\_list}\spxextra{nloed.design.Design attribute}}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{nloed:nloed.design.Design.param_list}}\pysigline{\sphinxbfcode{\sphinxupquote{param\_list}}}
+A list of the nominal parameter values at which the design
+is to be optimized.
+\begin{quote}\begin{description}
+\item[{Type}] \leavevmode
+list of array\sphinxhyphen{}like
+
+\end{description}\end{quote}
+
+\end{fulllineitems}
+
+\index{objective\_list (nloed.design.Design attribute)@\spxentry{objective\_list}\spxextra{nloed.design.Design attribute}}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{nloed:nloed.design.Design.objective_list}}\pysigline{\sphinxbfcode{\sphinxupquote{objective\_list}}}
+A list of the objectives which are to be optimized (as
+a weighted combination).
+\begin{quote}\begin{description}
+\item[{Type}] \leavevmode
+list of strings
+
+\end{description}\end{quote}
+
+\end{fulllineitems}
+
+\index{approximate\_design (nloed.design.Design attribute)@\spxentry{approximate\_design}\spxextra{nloed.design.Design attribute}}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{nloed:nloed.design.Design.approximate_design}}\pysigline{\sphinxbfcode{\sphinxupquote{approximate\_design}}}
+A dataframe containing the optimized relaxed design returned
+by IPOPT.
+\begin{quote}\begin{description}
+\item[{Type}] \leavevmode
+dataframe
+
+\end{description}\end{quote}
+
+\end{fulllineitems}
+
 \index{\_\_init\_\_() (nloed.design.Design method)@\spxentry{\_\_init\_\_()}\spxextra{nloed.design.Design method}}
 
 \begin{fulllineitems}
 \phantomsection\label{\detokenize{nloed:nloed.design.Design.__init__}}\pysiglinewithargsret{\sphinxbfcode{\sphinxupquote{\_\_init\_\_}}}{\emph{\DUrole{n}{models}}, \emph{\DUrole{n}{parameters}}, \emph{\DUrole{n}{objective}}, \emph{\DUrole{n}{discrete\_inputs}\DUrole{o}{=}\DUrole{default_value}{None}}, \emph{\DUrole{n}{continuous\_inputs}\DUrole{o}{=}\DUrole{default_value}{None}}, \emph{\DUrole{n}{observ\_groups}\DUrole{o}{=}\DUrole{default_value}{None}}, \emph{\DUrole{n}{fixed\_design}\DUrole{o}{=}\DUrole{default_value}{None}}, \emph{\DUrole{n}{options}\DUrole{o}{=}\DUrole{default_value}{\{\}}}}{}
-Design constructor docstring
+The class constructor for NLoed’s Design class.
+
+This function accepts an NLoed Model instance as well as experimental specifications such as the
+nominal parameter values, the objective, input constraints and format, observation groupings
+and past design information passed by the user. This information specifies the objectives
+constraints the user has for their desired experiment. During construction a Casadi
+symbolic structure is created for the overall design objective. This symbol is used to call
+IPOPT via Casadi’s optimization interface. After IPOPT optimization is complete, the constructor
+function parses the returned solution into a dataframe which is stored as a class attribute.
+\begin{quote}\begin{description}
+\item[{Parameters}] \leavevmode\begin{itemize}
+\item {} 
+\sphinxstyleliteralstrong{\sphinxupquote{models}} (\sphinxstyleliteralemphasis{\sphinxupquote{list of models}}) \textendash{} A list of NLoed model isntances for which an optimize design is
+desired.
+
+\item {} 
+\sphinxstyleliteralstrong{\sphinxupquote{parameters}} (\sphinxstyleliteralemphasis{\sphinxupquote{list of array\sphinxhyphen{}like}}) \textendash{} A list of the nominal parameter values at which the
+design should be optimized.
+
+\item {} 
+\sphinxstyleliteralstrong{\sphinxupquote{objective}} (\sphinxstyleliteralemphasis{\sphinxupquote{list of strings}}) \textendash{} A list of string names for the objectives to be used for
+design optimization. Multiple objectives are combined as a weighted combination.
+
+\item {} 
+\sphinxstyleliteralstrong{\sphinxupquote{discrete\_inputs}} (\sphinxstyleliteralemphasis{\sphinxupquote{dictionary}}\sphinxstyleliteralemphasis{\sphinxupquote{, }}\sphinxstyleliteralemphasis{\sphinxupquote{conditionally optional}}) \textendash{} 
+A dictionary indicating which
+model inputs, if any, should be handled discretly. Discret input values are
+fixed within the optimizatio call, according to the discretization chosen. Inputs
+are selected based on adjusting the sampling weights over the discrete grid of values.
+The exact method used for discretization can also be specified in this structure.
+
+NOTE\textendash{} need examples
+
+
+\item {} 
+\sphinxstyleliteralstrong{\sphinxupquote{continuous\_inputs}} (\sphinxstyleliteralemphasis{\sphinxupquote{dictionary}}\sphinxstyleliteralemphasis{\sphinxupquote{, }}\sphinxstyleliteralemphasis{\sphinxupquote{conditionally optional}}) \textendash{} 
+A dictionary indicating which
+model inputs, if any, should be handled continuously. Continuous inputs are treated
+as optimization variables within the optimization call, and can be adjusted as real
+values within their boundaries. The user needs to specify the number of unique possible
+continuous levels that each input can take within the overall design. The continuous
+bounds and number of unique levels for each continuous input can also be specified in
+this structure.
+
+NOTE\textendash{} need examples
+
+
+\item {} 
+\sphinxstyleliteralstrong{\sphinxupquote{observ\_groups}} (\sphinxstyleliteralemphasis{\sphinxupquote{list of list of strings}}) \textendash{} A list of lists, the outer list consists of
+an entry for each grouping of observation variables that must be sampled together.
+Each inner list contains the string names of the observation variables that are sampled
+together in each group.
+
+\item {} 
+\sphinxstyleliteralstrong{\sphinxupquote{fixed\_design}} (\sphinxstyleliteralemphasis{\sphinxupquote{dictionary}}) \textendash{} 
+A dictionary specifiying the structure of any fixed aspects
+of the experimental design, or past experimental designs on which the new design
+should be conditioned. This dictionary specifies both the fixed design structure and
+its expected sampleing weight relative to the new design.
+
+NOTE\textendash{} need examples
+
+
+\item {} 
+\sphinxstyleliteralstrong{\sphinxupquote{options}} (\sphinxstyleliteralemphasis{\sphinxupquote{dict}}\sphinxstyleliteralemphasis{\sphinxupquote{, }}\sphinxstyleliteralemphasis{\sphinxupquote{optional}}) \textendash{} 
+A dictionary of user\sphinxhyphen{}defined options, possible key\sphinxhyphen{}value pairs
+include:
+
+”LockWeights” \textendash{}
+Purpose:
+Type: ,
+Default Value: ,
+Possible Values:
+
+”NumGridPoints” \textendash{}
+Purpose:
+Type: ,
+Default Value: ,
+Possible Values:
+
+
+\end{itemize}
+
+\end{description}\end{quote}
 
 \end{fulllineitems}
 
@@ -1241,8 +1486,21 @@ Design constructor docstring
 
 \begin{fulllineitems}
 \phantomsection\label{\detokenize{nloed:nloed.design.Design.round}}\pysiglinewithargsret{\sphinxbfcode{\sphinxupquote{round}}}{\emph{\DUrole{n}{sample\_size}}, \emph{\DUrole{n}{options}\DUrole{o}{=}\DUrole{default_value}{\{\}}}}{}
+A function
+
 This function
-Args:
+\begin{quote}\begin{description}
+\item[{Parameters}] \leavevmode\begin{itemize}
+\item {} 
+\sphinxstyleliteralstrong{\sphinxupquote{sample\_size}} (\sphinxstyleliteralemphasis{\sphinxupquote{integer}}) \textendash{} 
+
+\item {} 
+\sphinxstyleliteralstrong{\sphinxupquote{options}} (\sphinxstyleliteralemphasis{\sphinxupquote{dictionary}}) \textendash{} 
+
+\end{itemize}
+
+\end{description}\end{quote}
+
 Return:
 
 \end{fulllineitems}
@@ -1251,8 +1509,14 @@ Return:
 
 \begin{fulllineitems}
 \phantomsection\label{\detokenize{nloed:nloed.design.Design.relaxed}}\pysiglinewithargsret{\sphinxbfcode{\sphinxupquote{relaxed}}}{\emph{\DUrole{n}{options}\DUrole{o}{=}\DUrole{default_value}{\{\}}}}{}
-This function
-Args:
+A function to return the relaxed design dataframe, containing the real\sphinxhyphen{}valued sampling
+weights.
+\begin{quote}\begin{description}
+\item[{Parameters}] \leavevmode
+\sphinxstyleliteralstrong{\sphinxupquote{(}}\sphinxstyleliteralstrong{\sphinxupquote{)}} (\sphinxstyleliteralemphasis{\sphinxupquote{options}}) \textendash{} 
+
+\end{description}\end{quote}
+
 Return:
 
 \end{fulllineitems}
@@ -1261,58 +1525,188 @@ Return:
 
 \begin{fulllineitems}
 \phantomsection\label{\detokenize{nloed:nloed.design.Design.power}}\pysiglinewithargsret{\sphinxbfcode{\sphinxupquote{power}}}{\emph{\DUrole{n}{sample\_size}}, \emph{\DUrole{n}{options}\DUrole{o}{=}\DUrole{default_value}{\{\}}}}{}
+A function to
+
 This function
-Args:
+\begin{quote}\begin{description}
+\item[{Parameters}] \leavevmode\begin{itemize}
+\item {} 
+\sphinxstyleliteralstrong{\sphinxupquote{sample\_size}} (\sphinxstyleliteralemphasis{\sphinxupquote{integer}}) \textendash{} 
+
+\item {} 
+\sphinxstyleliteralstrong{\sphinxupquote{options}} (\sphinxstyleliteralemphasis{\sphinxupquote{dictionary}}) \textendash{} 
+
+\end{itemize}
+
+\end{description}\end{quote}
+
 Return:
 
 \end{fulllineitems}
 
-\index{\_optim\_settup() (nloed.design.Design method)@\spxentry{\_optim\_settup()}\spxextra{nloed.design.Design method}}
+\index{\_\_optim\_settup() (nloed.design.Design method)@\spxentry{\_\_optim\_settup()}\spxextra{nloed.design.Design method}}
 
 \begin{fulllineitems}
-\phantomsection\label{\detokenize{nloed:nloed.design.Design._optim_settup}}\pysiglinewithargsret{\sphinxbfcode{\sphinxupquote{\_optim\_settup}}}{\emph{\DUrole{n}{fim\_list}}, \emph{\DUrole{n}{continuous\_symbol\_list}}, \emph{\DUrole{n}{continuous\_lowerbounds}}, \emph{\DUrole{n}{continuous\_upperbounds}}, \emph{\DUrole{n}{continuous\_init}}, \emph{\DUrole{n}{weight\_symbol\_list}}, \emph{\DUrole{n}{weight\_sum}}, \emph{\DUrole{n}{weight\_init}}, \emph{\DUrole{n}{options}}}{}
-\end{fulllineitems}
+\phantomsection\label{\detokenize{nloed:nloed.design.Design.__optim_settup}}\pysiglinewithargsret{\sphinxbfcode{\sphinxupquote{\_\_optim\_settup}}}{\emph{\DUrole{n}{fim\_list}}, \emph{\DUrole{n}{continuous\_symbol\_list}}, \emph{\DUrole{n}{continuous\_lowerbounds}}, \emph{\DUrole{n}{continuous\_upperbounds}}, \emph{\DUrole{n}{continuous\_init}}, \emph{\DUrole{n}{weight\_symbol\_list}}, \emph{\DUrole{n}{weight\_sum}}, \emph{\DUrole{n}{weight\_init}}, \emph{\DUrole{n}{options}}}{}
+A function to
 
-\index{\_weighting\_settup() (nloed.design.Design method)@\spxentry{\_weighting\_settup()}\spxextra{nloed.design.Design method}}
-
-\begin{fulllineitems}
-\phantomsection\label{\detokenize{nloed:nloed.design.Design._weighting_settup}}\pysiglinewithargsret{\sphinxbfcode{\sphinxupquote{\_weighting\_settup}}}{\emph{\DUrole{n}{discrete\_input\_names}}, \emph{\DUrole{n}{discrete\_input\_grid}}, \emph{\DUrole{n}{continuous\_input\_names}}, \emph{\DUrole{n}{continuous\_symbol\_archetypes}}, \emph{\DUrole{n}{fixed\_design}}, \emph{\DUrole{n}{options}}}{}
-\end{fulllineitems}
-
-\index{\_discrete\_settup() (nloed.design.Design method)@\spxentry{\_discrete\_settup()}\spxextra{nloed.design.Design method}}
-
-\begin{fulllineitems}
-\phantomsection\label{\detokenize{nloed:nloed.design.Design._discrete_settup}}\pysiglinewithargsret{\sphinxbfcode{\sphinxupquote{\_discrete\_settup}}}{\emph{\DUrole{n}{discrete\_inputs}}, \emph{\DUrole{n}{options}}}{}
 This function
-Args:
+\begin{quote}\begin{description}
+\item[{Parameters}] \leavevmode\begin{itemize}
+\item {} 
+\sphinxstyleliteralstrong{\sphinxupquote{fim\_list}} \textendash{} 
+
+\item {} 
+\sphinxstyleliteralstrong{\sphinxupquote{(}}\sphinxstyleliteralstrong{\sphinxupquote{)}} (\sphinxstyleliteralemphasis{\sphinxupquote{weight\_init}}) \textendash{} 
+
+\item {} 
+\sphinxstyleliteralstrong{\sphinxupquote{(}}\sphinxstyleliteralstrong{\sphinxupquote{)}} \textendash{} 
+
+\item {} 
+\sphinxstyleliteralstrong{\sphinxupquote{(}}\sphinxstyleliteralstrong{\sphinxupquote{)}} \textendash{} 
+
+\item {} 
+\sphinxstyleliteralstrong{\sphinxupquote{(}}\sphinxstyleliteralstrong{\sphinxupquote{)}} \textendash{} 
+
+\item {} 
+\sphinxstyleliteralstrong{\sphinxupquote{(}}\sphinxstyleliteralstrong{\sphinxupquote{)}} \textendash{} 
+
+\item {} 
+\sphinxstyleliteralstrong{\sphinxupquote{(}}\sphinxstyleliteralstrong{\sphinxupquote{)}} \textendash{} 
+
+\item {} 
+\sphinxstyleliteralstrong{\sphinxupquote{(}}\sphinxstyleliteralstrong{\sphinxupquote{)}} \textendash{} 
+
+\item {} 
+\sphinxstyleliteralstrong{\sphinxupquote{options}} \textendash{} 
+
+\end{itemize}
+
+\end{description}\end{quote}
+
 Return:
 
 \end{fulllineitems}
 
-\index{\_continuous\_settup() (nloed.design.Design method)@\spxentry{\_continuous\_settup()}\spxextra{nloed.design.Design method}}
+\index{\_\_weighting\_settup() (nloed.design.Design method)@\spxentry{\_\_weighting\_settup()}\spxextra{nloed.design.Design method}}
 
 \begin{fulllineitems}
-\phantomsection\label{\detokenize{nloed:nloed.design.Design._continuous_settup}}\pysiglinewithargsret{\sphinxbfcode{\sphinxupquote{\_continuous\_settup}}}{\emph{\DUrole{n}{continuous\_inputs}}, \emph{\DUrole{n}{options}}}{}
+\phantomsection\label{\detokenize{nloed:nloed.design.Design.__weighting_settup}}\pysiglinewithargsret{\sphinxbfcode{\sphinxupquote{\_\_weighting\_settup}}}{\emph{\DUrole{n}{discrete\_input\_names}}, \emph{\DUrole{n}{discrete\_input\_grid}}, \emph{\DUrole{n}{continuous\_input\_names}}, \emph{\DUrole{n}{continuous\_symbol\_archetypes}}, \emph{\DUrole{n}{fixed\_design}}, \emph{\DUrole{n}{options}}}{}
+A function to
+
 This function
-Args:
+\begin{quote}\begin{description}
+\item[{Parameters}] \leavevmode\begin{itemize}
+\item {} 
+\sphinxstyleliteralstrong{\sphinxupquote{(}}\sphinxstyleliteralstrong{\sphinxupquote{)}} (\sphinxstyleliteralemphasis{\sphinxupquote{options}}) \textendash{} 
+
+\item {} 
+\sphinxstyleliteralstrong{\sphinxupquote{(}}\sphinxstyleliteralstrong{\sphinxupquote{)}} \textendash{} 
+
+\item {} 
+\sphinxstyleliteralstrong{\sphinxupquote{(}}\sphinxstyleliteralstrong{\sphinxupquote{)}} \textendash{} 
+
+\item {} 
+\sphinxstyleliteralstrong{\sphinxupquote{(}}\sphinxstyleliteralstrong{\sphinxupquote{)}} \textendash{} 
+
+\item {} 
+\sphinxstyleliteralstrong{\sphinxupquote{(}}\sphinxstyleliteralstrong{\sphinxupquote{)}} \textendash{} 
+
+\item {} 
+\sphinxstyleliteralstrong{\sphinxupquote{(}}\sphinxstyleliteralstrong{\sphinxupquote{)}} \textendash{} 
+
+\end{itemize}
+
+\end{description}\end{quote}
+
 Return:
 
 \end{fulllineitems}
 
-\index{\_create\_grid() (nloed.design.Design method)@\spxentry{\_create\_grid()}\spxextra{nloed.design.Design method}}
+\index{\_\_discrete\_settup() (nloed.design.Design method)@\spxentry{\_\_discrete\_settup()}\spxextra{nloed.design.Design method}}
 
 \begin{fulllineitems}
-\phantomsection\label{\detokenize{nloed:nloed.design.Design._create_grid}}\pysiglinewithargsret{\sphinxbfcode{\sphinxupquote{\_create\_grid}}}{\emph{\DUrole{n}{input\_names}}, \emph{\DUrole{n}{input\_candidates}}, \emph{\DUrole{n}{constraints}}}{}
+\phantomsection\label{\detokenize{nloed:nloed.design.Design.__discrete_settup}}\pysiglinewithargsret{\sphinxbfcode{\sphinxupquote{\_\_discrete\_settup}}}{\emph{\DUrole{n}{discrete\_inputs}}, \emph{\DUrole{n}{options}}}{}
+A function to
+
 This function
-Args:
+\begin{quote}\begin{description}
+\item[{Parameters}] \leavevmode\begin{itemize}
+\item {} 
+\sphinxstyleliteralstrong{\sphinxupquote{(}}\sphinxstyleliteralstrong{\sphinxupquote{)}} (\sphinxstyleliteralemphasis{\sphinxupquote{options}}) \textendash{} 
+
+\item {} 
+\sphinxstyleliteralstrong{\sphinxupquote{(}}\sphinxstyleliteralstrong{\sphinxupquote{)}} \textendash{} 
+
+\end{itemize}
+
+\end{description}\end{quote}
+
 Return:
 
 \end{fulllineitems}
 
-\index{\_sort\_inputs() (nloed.design.Design method)@\spxentry{\_sort\_inputs()}\spxextra{nloed.design.Design method}}
+\index{\_\_continuous\_settup() (nloed.design.Design method)@\spxentry{\_\_continuous\_settup()}\spxextra{nloed.design.Design method}}
 
 \begin{fulllineitems}
-\phantomsection\label{\detokenize{nloed:nloed.design.Design._sort_inputs}}\pysiglinewithargsret{\sphinxbfcode{\sphinxupquote{\_sort\_inputs}}}{\emph{\DUrole{n}{newrow}}, \emph{\DUrole{n}{rows}}, \emph{\DUrole{n}{rowpntr}\DUrole{o}{=}\DUrole{default_value}{0}}, \emph{\DUrole{n}{colpntr}\DUrole{o}{=}\DUrole{default_value}{0}}}{}
+\phantomsection\label{\detokenize{nloed:nloed.design.Design.__continuous_settup}}\pysiglinewithargsret{\sphinxbfcode{\sphinxupquote{\_\_continuous\_settup}}}{\emph{\DUrole{n}{continuous\_inputs}}, \emph{\DUrole{n}{options}}}{}
+A function to
+
+This function
+\begin{quote}\begin{description}
+\item[{Parameters}] \leavevmode\begin{itemize}
+\item {} 
+\sphinxstyleliteralstrong{\sphinxupquote{(}}\sphinxstyleliteralstrong{\sphinxupquote{)}} (\sphinxstyleliteralemphasis{\sphinxupquote{options}}) \textendash{} 
+
+\item {} 
+\sphinxstyleliteralstrong{\sphinxupquote{(}}\sphinxstyleliteralstrong{\sphinxupquote{)}} \textendash{} 
+
+\end{itemize}
+
+\end{description}\end{quote}
+
+Return:
+
+\end{fulllineitems}
+
+\index{\_\_create\_grid() (nloed.design.Design method)@\spxentry{\_\_create\_grid()}\spxextra{nloed.design.Design method}}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{nloed:nloed.design.Design.__create_grid}}\pysiglinewithargsret{\sphinxbfcode{\sphinxupquote{\_\_create\_grid}}}{\emph{\DUrole{n}{input\_names}}, \emph{\DUrole{n}{input\_candidates}}, \emph{\DUrole{n}{constraints}}}{}
+A function to
+
+This function
+\begin{quote}\begin{description}
+\item[{Parameters}] \leavevmode\begin{itemize}
+\item {} 
+\sphinxstyleliteralstrong{\sphinxupquote{(}}\sphinxstyleliteralstrong{\sphinxupquote{)}} (\sphinxstyleliteralemphasis{\sphinxupquote{constraints}}) \textendash{} 
+
+\item {} 
+\sphinxstyleliteralstrong{\sphinxupquote{(}}\sphinxstyleliteralstrong{\sphinxupquote{)}} \textendash{} 
+
+\item {} 
+\sphinxstyleliteralstrong{\sphinxupquote{(}}\sphinxstyleliteralstrong{\sphinxupquote{)}} \textendash{} 
+
+\end{itemize}
+
+\end{description}\end{quote}
+
+Return:
+
+\end{fulllineitems}
+
+\index{\_\_sort\_inputs() (nloed.design.Design method)@\spxentry{\_\_sort\_inputs()}\spxextra{nloed.design.Design method}}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{nloed:nloed.design.Design.__sort_inputs}}\pysiglinewithargsret{\sphinxbfcode{\sphinxupquote{\_\_sort\_inputs}}}{\emph{\DUrole{n}{newrow}}, \emph{\DUrole{n}{rows}}, \emph{\DUrole{n}{rowpntr}\DUrole{o}{=}\DUrole{default_value}{0}}, \emph{\DUrole{n}{colpntr}\DUrole{o}{=}\DUrole{default_value}{0}}}{}
+A function to
+
+This function
+
+Args:
+
+Return:
+
 \end{fulllineitems}
 
 
