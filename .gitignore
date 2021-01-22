@@ -8,8 +8,10 @@
 
 #RELEASE
 #source distribution (sdist) files
-/distribution
+/dist/*
+/dist
 #wheels build files
+/build/*
 /build
 
 #DEVELOPMENT
@@ -24,12 +26,4 @@
 #ignore tox 
 /.tox/*
 /.tox
-
-/docs/source/
-/docs/source/*
-/docs/build/
-/docs/build/*
-/docs/Makefile
-/docs/make.bat
-
 

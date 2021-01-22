@@ -2,24 +2,23 @@
 Nonlinear Optimal Experimental Design
  
 ## Description
-NLoed (suggested pronounciation; "en-load") is an open source Python package for building and 
+NLoed (suggested pronounciation: "en-load") is an open source Python package for building and 
 optimizing experimental designs for non-linear models, with a specific emphasis on applications in systems 
 biology. The package is primarily focused on generating optimal designs for improved parameter estimation
-using a relaxed formulation of the design optimization problem.
+using a relaxed formulation of the design optimization problem. Objectives in NLoed are primarily based
+on the expected Fisher information matrix.
 
 NLoed is built on top of Casadi, an optimal control prototyping framework, and users construct their models using Casadi's symbolic classes. Casadi's symbolic interface allows the user to encode a wide variety of nonlinear mathematical structures into their NLoed model. NLoed supports both static and dynamic nonlinear models including systems of nonlinear differential equations. Casadi also provides a number of numerical
 tools such as automatic differentiation and interfaces to nonlinear programming solvers, such as IPOPT,
 which greatly improve NLoed's performance.
 
-
-In addition to design, NLoed provides a number of useful model building tools including functions for maximum likelihood fitting, sensitivity analysis, data simulation, asymptotic and profile likelihoods, graphical identifiability diagnostics and quantification of prediction uncertainty. These tools, in conjunction with NLoed's core optimal design functionality, aim to provide a complete model building framework, enabling model construction, experimental design, model fitting and diagnostics to all be done within NLoed. This makes NLoed ideal for model builders heading into the lab or for those who wish to study model identifiability via simulation studies.
+In addition to design, NLoed provides a number of useful model-building tools including functions for maximum likelihood fitting, sensitivity analysis, data simulation, asymptotic and profile likelihoods, graphical identifiability diagnostics and quantification of prediction uncertainty. These tools, in conjunction with NLoed's core optimal design functionality, aim to provide a complete model building framework, enabling model construction, experimental design, model fitting and diagnostics to all be done within NLoed. This makes NLoed ideal for model builders heading into the lab or for those who wish to study model identifiability via simulation studies.
 
 ## Disclaimer
 NLoed is still under development. A reasonable effort has been made to create a stable
 functional interface and to test the current release however, users should  proceed with reasonable 
 caution in writing code for publication or in developing other numerical tools using NLoed. The interface may be subject to change, especially in advance of the first non-beta (i.e. beta realeases are any that preceed version 1.0. Also, the authours make no guarantee for the absolute exahuastic correctness of all numerical routines implemented in NLoed (or its dependencies), and some reasonable testing of the package with the user's specific model, as well as some understanding of general OED theory are recommended when using the packag (especiall before version 1.0). If you identify any bugs or numerical issues, please submit them
 to the authours on Github, your error tickets are greatly appreciated! :) 
-
 
 ## Installation
 NLoed is available on PyPI, so you can just use pip to install it!
@@ -38,7 +37,6 @@ python
 After this it's a good idea to try some of the examples on Github.
 
 ### Do I have Python installed?
-
 If you've never used python or pip before, you may want to check a few things first before trying to
  install NLoed.
 First make sure you have python installed, its on your path, and the python version is appropriate.
@@ -53,10 +51,9 @@ pip -V
 ```
 This should print out a similar version number as the one python did.
 
-### How do I get the Python/Pip installed?
-
-If you don't have the right version of python on your system, you will need to do some
-troubleshooting. For those unfamiliar with Python, here are some helpful pointers depending on 
+### How do I get the Right Version of Python/Pip installed?
+If you don't have the right version of python on your system, you will need install it before
+installed NLoed. For those unfamiliar with Python, here are some helpful pointers depending on 
 your OS:
 
 #### OSX
@@ -72,28 +69,23 @@ This is useful if you aren't doing much with Python other than NLoed, but it is 
     ```sh
     xcode-select --install
     ```
-
 * Install Homebrew, its a package manager for installing software on Macs:
     ```sh
     /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
     ```
-
 * Check Homebrew is installed properly:
     ```sh
     brew --version
     [should print out a version number]
     ```
-
 * Install Python 3 with:
     ```sh
     brew install python3
     ```
-
 * Check python 3 is installed with:
     ```sh
     python3 -V
     ```
-
 * As the command 'python' points to the native 2.7 installed by default on your Mac, you will
 now need to use 'python3' to start the newer version installed with Homebrew. To install NLoed on
 your python 3 installation specifically, run:
@@ -107,46 +99,36 @@ This method is better if you are going to do a lot of work in Python and want to
 versions and dependencies.
 
 * Make sure Homebrew is installed as above.
-
 * Run the following to install some needed dependencies;
     ```sh
     brew install openssl readline sqlite3 xz zlib
     ```
-
 * Install pyenv either with  
-    a) Homebrew itself:
+    a) Homebrew itself (with some changes to .bashrc and a shell restart):
     ```sh
     brew install pyenv
+    echo -e 'if command -v pyenv 1>/dev/null 2>&1; then\n  eval "$(pyenv init -)"\nfi' >> ~/.bash_profile
+    exec "$SHELL"
     ```
     b) The auto-installer script (https://github.com/pyenv/pyenv-installer):..
     ```sh
     curl https://pyenv.run | bash
     ```
-
-* Run the following to set up your shell environment:
-    ```sh
-    echo -e 'if command -v pyenv 1>/dev/null 2>&1; then\n  eval "$(pyenv init -)"\nfi' >> ~/.bash_profile
-    exec "$SHELL"
-    ```
-
 * Check pyenv is installed correctly:
     ```sh
     pyenv versions
     [prints out some version, likely just 'system']
     ```
-
 * Install a version of python greater than 3.6.1, for example:
     ```sh
     pyenv install 3.7.0
     ```
-
 * You then need to make this new version active, the easiest way to do it is to make it the global default by running:
     ```sh
     pyenv global 3.7.0
     ```
     Note the version number here should be the same one you installed in the previous step.
     Check you the pyenv documentation for more options for managing versions, it is very flexible.
-
 *   Finally install the NLoed package on the new pyenv version by running:
     ```sh
     pip install nloed
@@ -154,55 +136,42 @@ versions and dependencies.
 
 #### Linux (Ubuntu/Debian)
 Recent releases of Ubuntu should come with a version of Python 3.
-
 * To check the version of Python 3 installed, in the terminal run:
     ```sh
     python3 -V
     ```
     This will print the version of the current Python 3 installation.
-
 * If the version printed above is greater than or equal to 3.6.1, you are good to go. Install NLoed by running the following:
     ```sh
     pip3 install nloed
     ```
     Note, the OS has your Python 3 install and corresponding pip command aliased to 'python3' and 'pip3' to avoid confusion with any Python 2 installations on the same system. Use these commands going forward.
-
 * If the version printed in the first step is less than 3.6.1, you will need to install an newer version of Python 3. The easiest way to do this is likely using pyenv. To install pyenv, first get the depenencies by running:
     ```sh
     sudo apt-get install -y build-essential libssl-dev zlib1g-dev libbz2-dev \
     libreadline-dev libsqlite3-dev wget curl llvm libncurses5-dev libncursesw5-dev \
     xz-utils tk-dev libffi-dev liblzma-dev python-openssl git
     ```
-
-* Now use the auto-installer script (https://github.com/pyenv/pyenv-installer):
+* Now use the auto-installer script (https://github.com/pyenv/pyenv-installer) and restart the shell:
     ```sh
     curl https://pyenv.run | bash
-    ```
-
-* Run the following to set up your shell environment:
-    ```sh
-    echo -e 'if command -v pyenv 1>/dev/null 2>&1; then\n  eval "$(pyenv init -)"\nfi' >> ~/.bash_profile
     exec "$SHELL"
     ```
-
 * Check pyenv is installed correctly:
     ```sh
     pyenv versions
     [prints out some version, likely just 'system']
     ```
-
 * Install a version of python greater than 3.6.1, for example:
     ```sh
     pyenv install 3.7.0
     ```
-
 * You then need to make this new version active, the easiest way to do it is to make it the global default by running:
     ```sh
     pyenv global 3.7.0
     ```
     Note the version number here should be the same one you installed in the previous step.
     Check you the pyenv documentation for more options for managing versions, it is very flexible.
-
 *   Finally install the NLoed package on the new pyenv version by running:
     ```sh
     pip install nloed
@@ -211,11 +180,9 @@ Recent releases of Ubuntu should come with a version of Python 3.
 #### Windows
 If you are using Windows 10, its likely you do not have Python available in the command prompt by default.
 
-* Go to https://www.python.org/downloads/windows/ and download the desired version's installer.
-
+* Go to https://www.python.org/downloads/windows/ and download the desired Python version's installer.
 * Run the installer .exe and follow its prompts. Make sure you check the box 'Add Python 3.X to Path' so that the installed Python version will be available from the command prompt. This option is on the first page of the installer.
-
-* Once the install is complete, open the command prompt and install NLoed with pip with:
+* Once the install is complete, open the command prompt and install NLoed with pip by running:
     ```sh
     pip install nloed
     ```
@@ -258,7 +225,9 @@ NLoed is maintained by the Ingalls Lab, in the Department of Applied Math, at th
 
 Inquiries about contributions and usage can be directed to Brian Ingalls at bingalls[at]uwaterloo.ca 
 
-Issue ticket submission and general discussion can be done through Github.
+A detailed guide to setting a development environment for NLoed can be found in DevGuide.md on Github
+
+Issues and feature suggestions can be submitted through Github.
 
 ## Credits
 NLoed was written by Nathan Braniff and Brian Ingalls.
@@ -268,4 +237,4 @@ Special thanks to:
 * Zixuan Liu and Taylor Pearce for testing some experimental designs generated by NLoed in the wetlab
 
 ## License
-This software is released under the GNU Lesser Public Liscence V3+
+This software is released under the GNU Lesser Public Liscence V3
