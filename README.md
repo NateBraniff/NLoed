@@ -1,5 +1,6 @@
 ![NLoed_Logo](/NLoed_Logo.png)
 
+# NLoed
 A Python package for nonlinear optimal experimental design.
  
 * **[Description](#description)**
@@ -24,8 +25,8 @@ biology. The package is primarily focused on generating optimal designs for impr
 using a relaxed formulation of the design optimization problem. Objectives in NLoed are primarily based
 on the expected Fisher information matrix.
 
-NLoed is built on top of Casadi, an optimal control prototyping framework, and users construct their models using Casadi's symbolic classes. Casadi's symbolic interface allows the user to encode a wide variety of nonlinear mathematical structures into their NLoed model. NLoed supports both static and dynamic nonlinear models including systems of nonlinear differential equations. Casadi also provides a number of numerical
-tools such as automatic differentiation and interfaces to nonlinear programming solvers, such as IPOPT,
+NLoed is built on top of [Casadi](https://web.casadi.org/), an optimal control prototyping framework, and users construct their models using Casadi's symbolic classes. Casadi's symbolic interface allows the user to encode a wide variety of nonlinear mathematical structures into their NLoed model. NLoed supports both static and dynamic nonlinear models including systems of nonlinear differential equations. Casadi also provides a number of numerical
+tools such as automatic differentiation and interfaces to nonlinear programming solvers, such as [IPOPT](https://github.com/coin-or/Ipopt),
 which greatly improve NLoed's performance.
 
 In addition to design, NLoed provides a number of useful model-building tools including functions for maximum likelihood fitting, sensitivity analysis, data simulation, asymptotic and profile likelihoods, graphical identifiability diagnostics and quantification of prediction uncertainty. These tools, in conjunction with NLoed's core optimal design functionality, aim to provide a complete model building framework, enabling model construction, experimental design, model fitting and diagnostics to all be done within NLoed. This makes NLoed ideal for model builders heading into the lab or for those who wish to study model identifiability via simulation studies.
@@ -37,7 +38,7 @@ caution in writing code for publication or in developing other numerical tools u
 to the authours on Github, your error tickets are greatly appreciated! :) 
 
 ## Installation
-NLoed is available on PyPI, so you can just use pip to install it!
+NLoed is available on [PyPI](https://pypi.org/), so you can just use pip to install it!
 To install with pip, run:
 ```sh
 pip install nloed
@@ -80,7 +81,7 @@ There are two simple options for getting Python >3.6.1 on your Mac:
 
 ##### Use Homebrew
 This is useful if you aren't doing much with Python other than NLoed, but it is a bit less flexible.
-See the Homebrew website for details (https://brew.sh/).
+See the [Homebrew website](https://brew.sh/) for details .
 
 * Make sure Xcode dependencies are installed (Homebrew needs these to do stuff):  
     ```sh
@@ -113,7 +114,7 @@ your python 3 installation specifically, run:
 
 ##### Use Pyenv
 This method is better if you are going to do a lot of work in Python and want to organize many 
-versions and dependencies. See the pyenv Github for more details (https://github.com/pyenv/pyenv).
+versions and dependencies. See the [pyenv Github](https://github.com/pyenv/pyenv) for more details.
 
 * Make sure Homebrew is installed as above.
 * Run the following to install some needed dependencies;
@@ -238,9 +239,9 @@ size.
 Further examples can be found in the \example folder on NLoed's Github. A full description of the OED background, NLoed's use cases and function call formats can be found in the \docs folder on Github.
 
 ## Contributing
-NLoed is maintained by the Ingalls Lab, in the Department of Applied Math, at the University of Waterloo.
+NLoed is maintained by the [Ingalls Lab](https://uwaterloo.ca/scholar/bingalls/), in the Department of Applied Math, at the University of Waterloo.
 
-Inquiries about contributions and usage can be directed to Brian Ingalls at bingalls[at]uwaterloo.ca 
+Inquiries about contributions and usage can be directed to [Brian Ingalls](https://uwaterloo.ca/applied-mathematics/people-profiles/brian-ingalls) at bingalls[at]uwaterloo.ca 
 
 A detailed guide to setting a development environment for NLoed can be found in DevGuide.md on Github
 

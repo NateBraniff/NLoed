@@ -4,7 +4,7 @@ This document summarizes the environment setup and some of the installation step
 to development of the NLoed package. This guide is for UNIX-based operating systems, specifically
 OSX or Ubuntu-like Linux distrobutions.
 
-If you have a Windows machine you can attempt to follow this guide very roughly using tools like pyenv-win, however it may be easier to install something like VirtualBox and the latest Ubuntu release and do the development on a virtual machine.
+If you have a Windows machine you can attempt to follow this guide very roughly using tools like [pyenv-win](https://github.com/pyenv-win/pyenv-win), however it may be easier to install something like VirtualBox and the latest Ubuntu release and do the development on a virtual machine.
 
 ## The Development Environment
 
@@ -13,7 +13,7 @@ dependencies and do a local install of the package for development.
 
 1. **Install Pyenv and Pyenv-virtualenv**
     It's recommended that you use a virtual environment for development to keep dependencies and versions
-    well organized. There are a few options here, in this guide we focus on using pyenv-virtualenv:
+    well organized. There are a few options here, in this guide we focus on using [pyenv](https://github.com/pyenv/pyenv) and [pyenv-virtualenv](https://github.com/pyenv/pyenv-virtualenv):
 
     *OSX*
     * Install Xcode dependencies:
@@ -140,7 +140,7 @@ It is also a good idea to tag all releases to PyPI on the Github repo.
         ```
 
 3. **Uploading to PyPI using Twine**
-    PyPI is the repository where pip installs packages from. Twine is the tool used to upload python
+    PyPI is the repository where pip installs packages from. [Twine](https://twine.readthedocs.io/en/latest/) is the tool used to upload python
     packages to the repository. In order to update the NLoed package on PyPI the user must have the 
     appropriate credentials (i.e. password or key). PyPI also maintains a test repository for experimenting
     with the packaging process. The standard and test repo are completely indpendent and may not
@@ -165,8 +165,8 @@ It is also a good idea to tag all releases to PyPI on the Github repo.
         releases map to which versions in the git history. See Github docs for details.
 
 ## Testing with Pytest and Tox
-NLoed has been set up to use Pytest for testing the package's classes and functions.
-Tox is used to run the Pytest tests with various python versions and dependencies.
+NLoed has been set up to use [Pytest](https://docs.pytest.org/en/stable/) for testing the package's classes and functions.
+[Tox](https://tox.readthedocs.io/en/latest/) is used to run the Pytest tests with various python versions and dependencies.
 These packages should be installed during the steps outlined above the the requirments.txt file.
 
 1. **Running Pytest**
@@ -205,7 +205,7 @@ These packages should be installed during the steps outlined above the the requi
     * Use pip to install tox and run it from the cloned repo
 
 ## Latex Documentation with Sphinx and Overleaf
-NLoed uses Sphinx to automatically generate its function documentation that describes the package
+NLoed uses [Sphinx](https://www.sphinx-doc.org/en/master/) to automatically generate its function documentation that describes the package
 contents and call structures in detail. Sphinx's output is a latex project which needs to be compiled
 in order to produce a PDF. A number of other latex projects are also included in NLoed's docs folder.
 NLoed's Github repo can be automatically linked to an Overleaf account to compile these latex projects.
