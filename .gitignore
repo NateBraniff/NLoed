@@ -7,7 +7,9 @@
 /.vscode
 
 #RELEASE
-#source distribution (sdist) files
+#build files from packaging
+/build
+#distribution files from packaging
 /dist
 
 #DEVELOPMENT
