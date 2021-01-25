@@ -36,7 +36,7 @@ class Design:
             is to be optimized.
         objective_list (list of strings): A list of the objectives which are to be optimized (as
             a weighted combination).
-        approximate_design (dataframe): A dataframe containing the optimized relaxed design returned
+        relaxed_design (dataframe): A dataframe containing the optimized relaxed design returned
             by IPOPT.
         
     """
@@ -272,7 +272,7 @@ class Design:
         else:
             optim_weights = weight_init
 
-        approximate_design = pd.DataFrame(columns=self.input_name_list+['Variable', 'Weights'])
+        relaxed_design = pd.DataFrame(columns=self.input_name_list+['Variable', 'Weights'])
 
         for i in range(len(optim_weights)):
             weight = optim_weights[i]
@@ -291,22 +291,33 @@ class Design:
                     design_row = cp.deepcopy(design_row_prototype)
                     design_row['Variable'] = obs
                     design_row['Weights'] = design_row['Weights']/len(observ_map)
-                    approximate_design = approximate_design.append(design_row, ignore_index=True)
+                    relaxed_design = relaxed_design.append(design_row, ignore_index=True)
 
-        self.approximate_design = approximate_design
+        self.relaxed_design = relaxed_design
 
 # --------------- Public (user-callable) functions -------------------------------------------------
 
     def round(self, sample_size, options={}):
-        """ A function 
+        """ A function to round the relaxed optimal design produced by NLoed into an exact design with
+        a discrete sample size.
 
-        This function 
+        This function uses a rounding method to discretize the replicate allocation sampling weights.
+        The sampling weights are generated during design optimization in the Design class instantiation.
+        The resulting relaxed design is stored in the Design class instance as an attribute but the
+        design is not implementable because it uses real valued weights to measure replication fractions
+        and has no specific sample size. Rounding methods, the defualt being Adam's apportionment, are
+        used to discretize these weights to create a design with a desired sample size by this function.
+        This function then returns a data frame containg the implementable exact design generated through
+        rounding. Rounding does not always yield a unique design, in these cases this function may
+        make an arbitrary selection amongst competeing potential roundings of the same relaxed design. 
 
         Args:
-            sample_size (integer):
-            options (dictionary):
+            sample_size (integer): An integer indicating the desired sample size the user wants.
+            options (dictionary, optional): A dictionary of user-defined options, possible key-value
+                pairs include:
 
         Return:
+            dataframe: A dataframe is returned containing the exact design with the desired sample size.
 
         """
         default_options = { }
@@ -320,21 +331,21 @@ class Design:
             if not key in options.keys() :
                 options[key] = default_options[key][0]
 
-        l = len(self.approximate_design.index)
+        l = len(self.relaxed_design.index)
         nu = sample_size - l/2
 
-        candidate_design = cp.deepcopy(self.approximate_design)
-        apportion = np.ceil(nu*self.approximate_design['Weights']).to_numpy().astype(int)
+        candidate_design = cp.deepcopy(self.relaxed_design)
+        apportion = np.ceil(nu*self.relaxed_design['Weights']).to_numpy().astype(int)
         candidate_design.drop('Weights',axis=1,inplace=True)
         candidate_design['Replicates'] = apportion
 
         while not sum(candidate_design['Replicates'])==sample_size:
             if sum(candidate_design['Replicates'])<sample_size:
-                thresh = np.divide(candidate_design['Replicates'].to_numpy(),self.approximate_design['Weights'].to_numpy())
+                thresh = np.divide(candidate_design['Replicates'].to_numpy(),self.relaxed_design['Weights'].to_numpy())
                 thresh_set = np.where(thresh == thresh.min())[0]
                 inc = 1
             elif sum(candidate_design['Replicates'])>sample_size:
-                thresh = np.divide(candidate_design['Replicates'].to_numpy()-1,self.approximate_design['Weights'].to_numpy())
+                thresh = np.divide(candidate_design['Replicates'].to_numpy()-1,self.relaxed_design['Weights'].to_numpy())
                 thresh_set = np.where(thresh == thresh.max())[0]
                 inc = -1
 
@@ -353,19 +364,25 @@ class Design:
         """ A function to return the relaxed design dataframe, containing the real-valued sampling
         weights.
 
+        This function returns the archetypal relaxed design as a dataframe.
+        The relaxed design is generally not useful for implementing expeirments but may be of value
+        for checking optimality conditions, for xample with the general equivlance theorem.
+
         Args:
-            options ():
+            options (dictionary, optional): A dictionary of user-defined options, possible key-value
+                pairs include:
 
         Return:
-
+            dataframe: The returned dataframe contains the relaxed design.
         """
         
-        return self.approximate_design
+        return self.relaxed_design
 
     def power(self, sample_size, options={}):
-        """ A function to 
+        """ A function provides comparisons of performance of differing sample size selection for 
+        the rounding of a given relaxed design.
 
-        This function 
+        This function has not been implemented yet.
 
         Args:
             sample_size (integer):
