@@ -435,7 +435,7 @@ class Design:
             options (dictionary, optional): A dictionary of user-defined options, possible key-value
                 pairs include:
 
-        Return:
+        Returns:
             list: The returned object is a list of data structures in the follow order,
                 discrete_input_grid -- a list of dictionaries, each dictionary contains a candidate
                 grid point where the dictionary keys are the discrete input string names and
