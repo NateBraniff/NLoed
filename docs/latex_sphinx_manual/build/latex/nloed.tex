@@ -74,7 +74,7 @@
 
 
 \title{NLoed}
-\date{Jan 22, 2021}
+\date{Jan 26, 2021}
 \release{0.0.1}
 \author{Nathan Braniff}
 \newcommand{\sphinxlogo}{\vbox{}}
@@ -1377,10 +1377,10 @@ list of strings
 
 \end{fulllineitems}
 
-\index{approximate\_design (nloed.design.Design attribute)@\spxentry{approximate\_design}\spxextra{nloed.design.Design attribute}}
+\index{relaxed\_design (nloed.design.Design attribute)@\spxentry{relaxed\_design}\spxextra{nloed.design.Design attribute}}
 
 \begin{fulllineitems}
-\phantomsection\label{\detokenize{nloed:nloed.design.Design.approximate_design}}\pysigline{\sphinxbfcode{\sphinxupquote{approximate\_design}}}
+\phantomsection\label{\detokenize{nloed:nloed.design.Design.relaxed_design}}\pysigline{\sphinxbfcode{\sphinxupquote{relaxed\_design}}}
 A dataframe containing the optimized relaxed design returned
 by IPOPT.
 \begin{quote}\begin{description}
@@ -1486,22 +1486,36 @@ Possible Values:
 
 \begin{fulllineitems}
 \phantomsection\label{\detokenize{nloed:nloed.design.Design.round}}\pysiglinewithargsret{\sphinxbfcode{\sphinxupquote{round}}}{\emph{\DUrole{n}{sample\_size}}, \emph{\DUrole{n}{options}\DUrole{o}{=}\DUrole{default_value}{\{\}}}}{}
-A function
+A function to round the relaxed optimal design produced by NLoed into an exact design with
+a discrete sample size.
 
-This function
+This function uses a rounding method to discretize the replicate allocation sampling weights.
+The sampling weights are generated during design optimization in the Design class instantiation.
+The resulting relaxed design is stored in the Design class instance as an attribute but the
+design is not implementable because it uses real valued weights to measure replication fractions
+and has no specific sample size. Rounding methods, the defualt being Adam’s apportionment, are
+used to discretize these weights to create a design with a desired sample size by this function.
+This function then returns a data frame containg the implementable exact design generated through
+rounding. Rounding does not always yield a unique design, in these cases this function may
+make an arbitrary selection amongst competeing potential roundings of the same relaxed design.
 \begin{quote}\begin{description}
 \item[{Parameters}] \leavevmode\begin{itemize}
 \item {} 
-\sphinxstyleliteralstrong{\sphinxupquote{sample\_size}} (\sphinxstyleliteralemphasis{\sphinxupquote{integer}}) \textendash{} 
+\sphinxstyleliteralstrong{\sphinxupquote{sample\_size}} (\sphinxstyleliteralemphasis{\sphinxupquote{integer}}) \textendash{} An integer indicating the desired sample size the user wants.
 
 \item {} 
-\sphinxstyleliteralstrong{\sphinxupquote{options}} (\sphinxstyleliteralemphasis{\sphinxupquote{dictionary}}) \textendash{} 
+\sphinxstyleliteralstrong{\sphinxupquote{options}} (\sphinxstyleliteralemphasis{\sphinxupquote{dictionary}}\sphinxstyleliteralemphasis{\sphinxupquote{, }}\sphinxstyleliteralemphasis{\sphinxupquote{optional}}) \textendash{} A dictionary of user\sphinxhyphen{}defined options, possible key\sphinxhyphen{}value
+pairs include:
 
 \end{itemize}
 
-\end{description}\end{quote}
+\item[{Returns}] \leavevmode
+A dataframe is returned containing the exact design with the desired sample size.
 
-Return:
+\item[{Return type}] \leavevmode
+dataframe
+
+\end{description}\end{quote}
 
 \end{fulllineitems}
 
@@ -1511,13 +1525,22 @@ Return:
 \phantomsection\label{\detokenize{nloed:nloed.design.Design.relaxed}}\pysiglinewithargsret{\sphinxbfcode{\sphinxupquote{relaxed}}}{\emph{\DUrole{n}{options}\DUrole{o}{=}\DUrole{default_value}{\{\}}}}{}
 A function to return the relaxed design dataframe, containing the real\sphinxhyphen{}valued sampling
 weights.
+
+This function returns the archetypal relaxed design as a dataframe.
+The relaxed design is generally not useful for implementing expeirments but may be of value
+for checking optimality conditions, for xample with the general equivlance theorem.
 \begin{quote}\begin{description}
 \item[{Parameters}] \leavevmode
-\sphinxstyleliteralstrong{\sphinxupquote{(}}\sphinxstyleliteralstrong{\sphinxupquote{)}} (\sphinxstyleliteralemphasis{\sphinxupquote{options}}) \textendash{} 
+\sphinxstyleliteralstrong{\sphinxupquote{options}} (\sphinxstyleliteralemphasis{\sphinxupquote{dictionary}}\sphinxstyleliteralemphasis{\sphinxupquote{, }}\sphinxstyleliteralemphasis{\sphinxupquote{optional}}) \textendash{} A dictionary of user\sphinxhyphen{}defined options, possible key\sphinxhyphen{}value
+pairs include:
+
+\item[{Returns}] \leavevmode
+The returned dataframe contains the relaxed design.
+
+\item[{Return type}] \leavevmode
+dataframe
 
 \end{description}\end{quote}
-
-Return:
 
 \end{fulllineitems}
 
@@ -1525,9 +1548,10 @@ Return:
 
 \begin{fulllineitems}
 \phantomsection\label{\detokenize{nloed:nloed.design.Design.power}}\pysiglinewithargsret{\sphinxbfcode{\sphinxupquote{power}}}{\emph{\DUrole{n}{sample\_size}}, \emph{\DUrole{n}{options}\DUrole{o}{=}\DUrole{default_value}{\{\}}}}{}
-A function to
+A function provides comparisons of performance of differing sample size selection for
+the rounding of a given relaxed design.
 
-This function
+This function has not been implemented yet.
 \begin{quote}\begin{description}
 \item[{Parameters}] \leavevmode\begin{itemize}
 \item {} 
@@ -1544,11 +1568,120 @@ Return:
 
 \end{fulllineitems}
 
+\index{\_\_discrete\_settup() (nloed.design.Design method)@\spxentry{\_\_discrete\_settup()}\spxextra{nloed.design.Design method}}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{nloed:nloed.design.Design.__discrete_settup}}\pysiglinewithargsret{\sphinxbfcode{\sphinxupquote{\_\_discrete\_settup}}}{\emph{\DUrole{n}{discrete\_inputs}}, \emph{\DUrole{n}{options}}}{}
+A private helper function that parses the discrete inputs dictionary.
+
+This private function is used during the NLoed Design class construction.
+
+This function accepts the user\sphinxhyphen{}provided discrete\_inputs dictionary (if one is passed) and
+constructs the grid of candidate inputs for the discrete input subpace of the model inputs.
+Regardless of how the user provides the discrete grid information (i.e. ‘Grid’, ‘Bounds’, or
+‘Candidates”) this function uses that information to construct a list of candidate points
+for the discrete inputs which are used to set up the design optimization problem in later
+stages of the Design constructor.
+\begin{quote}\begin{description}
+\item[{Parameters}] \leavevmode\begin{itemize}
+\item {} 
+\sphinxstyleliteralstrong{\sphinxupquote{discrete\_inputs}} (\sphinxstyleliteralemphasis{\sphinxupquote{dictionary}}) \textendash{} The user provided discrete\_inputs dictionary passed to the
+Design constructor.
+
+\item {} 
+\sphinxstyleliteralstrong{\sphinxupquote{options}} (\sphinxstyleliteralemphasis{\sphinxupquote{dictionary}}\sphinxstyleliteralemphasis{\sphinxupquote{, }}\sphinxstyleliteralemphasis{\sphinxupquote{optional}}) \textendash{} A dictionary of user\sphinxhyphen{}defined options, possible key\sphinxhyphen{}value
+pairs include:
+
+\end{itemize}
+
+\item[{Returns}] \leavevmode
+\begin{description}
+\item[{The return object is a list of data structures in the follow order:}] \leavevmode
+discrete\_input\_grid \textendash{} a list of dictionaries, each dictionary contains a candidate
+grid point where the dictionary keys are the discrete input string names and
+the dictionary values are the candidates input values for that point,
+discrete\_grid\_length \textendash{} The number of candidate grid point (dictionaries) in the
+discrete\_input\_grid list.
+discrete\_input\_names \textendash{} A list of names of the discrete inputs.
+discrete\_input\_num \textendash{} The number of model inputs being handled discretetly.
+
+\end{description}
+
+
+\item[{Return type}] \leavevmode
+list
+
+\end{description}\end{quote}
+
+\end{fulllineitems}
+
+\index{\_\_continuous\_settup() (nloed.design.Design method)@\spxentry{\_\_continuous\_settup()}\spxextra{nloed.design.Design method}}
+
+\begin{fulllineitems}
+\phantomsection\label{\detokenize{nloed:nloed.design.Design.__continuous_settup}}\pysiglinewithargsret{\sphinxbfcode{\sphinxupquote{\_\_continuous\_settup}}}{\emph{\DUrole{n}{continuous\_inputs}}, \emph{\DUrole{n}{options}}}{}
+A private helper function that parses the continuous inputs dictionary.
+
+This private function is used during the NLoed Design class construction.
+
+This function accepts the user\sphinxhyphen{}provided continuous\_inputs dictionary (if one is passed) and
+constructs the required data structures needed to formulate the Casadi/IPOPT design optimization
+problem. This includes creating Casadi symbols for each unique value of each continuous input
+specified by the ‘Structure’ field of the continuous\_inputs dictionary. This function also
+then combines these input symbols into input archetypes (i.e. specifying combination of continuous
+input symbols are grouped together in the same input vector). These arechtypes are latter concatenated
+with the discrete input grid points to create complete model input vectors. This function also
+parses out and collects the continuous input bounds, needed for formulating the optimization
+problem. This function also handles initial values for the continuous input symbol values
+which the optimizer uses as its initialization point (these may be user\sphinxhyphen{}provided or automatically
+generated).
+\begin{quote}\begin{description}
+\item[{Parameters}] \leavevmode\begin{itemize}
+\item {} 
+\sphinxstyleliteralstrong{\sphinxupquote{discrete\_inputs}} (\sphinxstyleliteralemphasis{\sphinxupquote{dictionary}}) \textendash{} The user provided discrete\_inputs dictionary passed to the
+Design constructor.
+
+\item {} 
+\sphinxstyleliteralstrong{\sphinxupquote{options}} (\sphinxstyleliteralemphasis{\sphinxupquote{dictionary}}\sphinxstyleliteralemphasis{\sphinxupquote{, }}\sphinxstyleliteralemphasis{\sphinxupquote{optional}}) \textendash{} A dictionary of user\sphinxhyphen{}defined options, possible key\sphinxhyphen{}value
+pairs include:
+
+\end{itemize}
+
+\item[{Returns}] \leavevmode
+\begin{description}
+\item[{The return object is a list of data structures in the follow order:}] \leavevmode
+continuous\_symbol\_archetypes \textendash{} A list of dictionaries, one for each archetypal
+continuous input point, the keys are the names of the continuous inputs and the
+values are the corresponding Casadi symbols for that inputs value in that archetypal
+point.
+continuous\_symbol\_list \textendash{} A list of Casadi symbols for every continuous input’s possible
+value in the symbol archetypes, as determined by the user\sphinxhyphen{}passed ‘Structure’ field.
+There can be more than one symbol for a given continuous input.
+continuous\_lowerbounds \textendash{} A list of the lower bounds for each continuous input symbol,
+in the same order as the symbols listed in continuous\_symbol\_list.
+continuous\_upperbounds \textendash{} A list of the upper bounds for each continuous input symbol,
+in the same order as the symbols listed in continuous\_symbol\_list.
+continuous\_archetype\_num \textendash{} The number of continuous input archetypes in continuous\_symbol\_archetypes.
+continuous\_symbol\_num \textendash{} The number of continuous input symbols in continuous\_symbol\_list.
+continuous\_input\_num \textendash{} The number of continuous inputs.
+continuous\_input\_names \textendash{} A list of the continuous input string names.
+continuous\_init \textendash{} A list of initial values for each continuous input symbol, in the
+same order as the symbols are listed in continuous\_symbol\_list
+
+\end{description}
+
+
+\item[{Return type}] \leavevmode
+list
+
+\end{description}\end{quote}
+
+\end{fulllineitems}
+
 \index{\_\_optim\_settup() (nloed.design.Design method)@\spxentry{\_\_optim\_settup()}\spxextra{nloed.design.Design method}}
 
 \begin{fulllineitems}
 \phantomsection\label{\detokenize{nloed:nloed.design.Design.__optim_settup}}\pysiglinewithargsret{\sphinxbfcode{\sphinxupquote{\_\_optim\_settup}}}{\emph{\DUrole{n}{fim\_list}}, \emph{\DUrole{n}{continuous\_symbol\_list}}, \emph{\DUrole{n}{continuous\_lowerbounds}}, \emph{\DUrole{n}{continuous\_upperbounds}}, \emph{\DUrole{n}{continuous\_init}}, \emph{\DUrole{n}{weight\_symbol\_list}}, \emph{\DUrole{n}{weight\_sum}}, \emph{\DUrole{n}{weight\_init}}, \emph{\DUrole{n}{options}}}{}
-A function to
+A private helper function
 
 This function
 \begin{quote}\begin{description}
@@ -1592,9 +1725,12 @@ Return:
 
 \begin{fulllineitems}
 \phantomsection\label{\detokenize{nloed:nloed.design.Design.__weighting_settup}}\pysiglinewithargsret{\sphinxbfcode{\sphinxupquote{\_\_weighting\_settup}}}{\emph{\DUrole{n}{discrete\_input\_names}}, \emph{\DUrole{n}{discrete\_input\_grid}}, \emph{\DUrole{n}{continuous\_input\_names}}, \emph{\DUrole{n}{continuous\_symbol\_archetypes}}, \emph{\DUrole{n}{fixed\_design}}, \emph{\DUrole{n}{options}}}{}
-A function to
+A private helper function used to create Casadi optimization symbols for the relaxed
+sampling weights of the design optimization problem
 
-This function
+This function is private helper function called during instantiation of a Design object.
+
+This function iterates
 \begin{quote}\begin{description}
 \item[{Parameters}] \leavevmode\begin{itemize}
 \item {} 
@@ -1611,52 +1747,6 @@ This function
 
 \item {} 
 \sphinxstyleliteralstrong{\sphinxupquote{(}}\sphinxstyleliteralstrong{\sphinxupquote{)}} \textendash{} 
-
-\item {} 
-\sphinxstyleliteralstrong{\sphinxupquote{(}}\sphinxstyleliteralstrong{\sphinxupquote{)}} \textendash{} 
-
-\end{itemize}
-
-\end{description}\end{quote}
-
-Return:
-
-\end{fulllineitems}
-
-\index{\_\_discrete\_settup() (nloed.design.Design method)@\spxentry{\_\_discrete\_settup()}\spxextra{nloed.design.Design method}}
-
-\begin{fulllineitems}
-\phantomsection\label{\detokenize{nloed:nloed.design.Design.__discrete_settup}}\pysiglinewithargsret{\sphinxbfcode{\sphinxupquote{\_\_discrete\_settup}}}{\emph{\DUrole{n}{discrete\_inputs}}, \emph{\DUrole{n}{options}}}{}
-A function to
-
-This function
-\begin{quote}\begin{description}
-\item[{Parameters}] \leavevmode\begin{itemize}
-\item {} 
-\sphinxstyleliteralstrong{\sphinxupquote{(}}\sphinxstyleliteralstrong{\sphinxupquote{)}} (\sphinxstyleliteralemphasis{\sphinxupquote{options}}) \textendash{} 
-
-\item {} 
-\sphinxstyleliteralstrong{\sphinxupquote{(}}\sphinxstyleliteralstrong{\sphinxupquote{)}} \textendash{} 
-
-\end{itemize}
-
-\end{description}\end{quote}
-
-Return:
-
-\end{fulllineitems}
-
-\index{\_\_continuous\_settup() (nloed.design.Design method)@\spxentry{\_\_continuous\_settup()}\spxextra{nloed.design.Design method}}
-
-\begin{fulllineitems}
-\phantomsection\label{\detokenize{nloed:nloed.design.Design.__continuous_settup}}\pysiglinewithargsret{\sphinxbfcode{\sphinxupquote{\_\_continuous\_settup}}}{\emph{\DUrole{n}{continuous\_inputs}}, \emph{\DUrole{n}{options}}}{}
-A function to
-
-This function
-\begin{quote}\begin{description}
-\item[{Parameters}] \leavevmode\begin{itemize}
-\item {} 
-\sphinxstyleliteralstrong{\sphinxupquote{(}}\sphinxstyleliteralstrong{\sphinxupquote{)}} (\sphinxstyleliteralemphasis{\sphinxupquote{options}}) \textendash{} 
 
 \item {} 
 \sphinxstyleliteralstrong{\sphinxupquote{(}}\sphinxstyleliteralstrong{\sphinxupquote{)}} \textendash{} 

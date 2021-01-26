@@ -417,8 +417,191 @@ class Design:
 
 # --------------- Private functions (for constructor) ----------------------------------------------
 
+    def __discrete_settup(self, discrete_inputs, options):
+        """ A private helper function that parses the discrete inputs dictionary.
+
+        This private function is used during the NLoed Design class construction.
+
+        This function accepts the user-provided discrete_inputs dictionary (if one is passed) and
+        constructs the grid of candidate inputs for the discrete input subpace of the model inputs.
+        Regardless of how the user provides the discrete grid information (i.e. 'Grid', 'Bounds', or
+        'Candidates") this function uses that information to construct a list of candidate points
+        for the discrete inputs which are used to set up the design optimization problem in later
+        stages of the Design constructor.
+
+        Args:
+            discrete_inputs (dictionary): The user provided discrete_inputs dictionary passed to the
+                Design constructor.
+            options (dictionary, optional): A dictionary of user-defined options, possible key-value
+                pairs include:
+
+        Return:
+            list: The return object is a list of data structures in the follow order: 
+                discrete_input_grid -- a list of dictionaries, each dictionary contains a candidate
+                grid point where the dictionary keys are the discrete input string names and
+                the dictionary values are the candidates input values for that point,
+                discrete_grid_length -- The number of candidate grid point (dictionaries) in the 
+                discrete_input_grid list.
+                discrete_input_names -- A list of names of the discrete inputs.
+                discrete_input_num -- The number of model inputs being handled discretetly.
+        """
+        #get names, number and indices of discrete inputs
+        discrete_input_names =  discrete_inputs['Inputs']
+        discrete_input_num = len(discrete_input_names)
+        
+        #check if inquality OptimConstraintsains have been passed, if so store them 
+        discrete_input_constr = []
+        if 'Constraints' in  discrete_inputs:
+            discrete_input_constr  =  discrete_inputs['Constraints']   
+
+        #create a list for storing possible levels of each discretemate input
+        discrete_input_candidates = []
+        if not 'Grid' in discrete_inputs:
+            if 'Bounds' in   discrete_inputs:
+                #set resolution of grid NOTE: this should be able to be specified by the user, will change
+                if 'NumPoints' in discrete_inputs:
+                    num_points = discrete_inputs['NumPoints']
+                else:
+                    num_points = 5
+                #loop over bounds passed, and use resolution and bounds to populate xlist
+                for bound in discrete_inputs['Bounds']:
+                    discrete_input_candidates.append(np.linspace(bound[0],bound[1],num_points).tolist())
+            elif  'Candidates' in discrete_inputs:
+                for grid in discrete_inputs['Candidates']:
+                    discrete_input_candidates.append(grid)
+            else:
+                raise Exception('Discerete inputs must be passed with either input \'Bounds\' or a pre-defined list of \'Grid\' candidats!')
+            #call recursive createGrid function to generate ApproxInputGrid, a list of all possible permuations of xlist's that also satisfy inequality OptimConstraintsaints
+            #NOTE: currently, createGrid doesn't actually check the inequality OptimConstraintsaints, need to add, and perhaps add points on inequality boundary??!
+            discrete_input_grid = self.__create_grid(cp.deepcopy(discrete_input_names), discrete_input_candidates, discrete_input_constr)
+        else:
+            discrete_input_array = discrete_inputs['Grid']
+            discrete_input_grid = []
+            for row in discrete_input_array:
+                row_dict = {}
+                for indx in range(discrete_input_num):
+                    row_dict[discrete_input_names[indx]] = row[indx]
+                discrete_input_grid.append(row_dict)
+        
+        discrete_grid_length = len(discrete_input_grid)
+        return [discrete_input_grid, discrete_grid_length, discrete_input_names, discrete_input_num]
+
+    def __continuous_settup(self, continuous_inputs, options):
+        """ A private helper function that parses the continuous inputs dictionary.
+
+        This private function is used during the NLoed Design class construction.
+
+        This function accepts the user-provided continuous_inputs dictionary (if one is passed) and
+        constructs the required data structures needed to formulate the Casadi/IPOPT design optimization
+        problem. This includes creating Casadi symbols for each unique value of each continuous input
+        specified by the 'Structure' field of the continuous_inputs dictionary. This function also 
+        then combines these input symbols into input archetypes (i.e. specifying combination of continuous
+        input symbols are grouped together in the same input vector). These arechtypes are latter concatenated 
+        with the discrete input grid points to create complete model input vectors. This function also
+        parses out and collects the continuous input bounds, needed for formulating the optimization
+        problem. This function also handles initial values for the continuous input symbol values 
+        which the optimizer uses as its initialization point (these may be user-provided or automatically
+        generated).
+
+        Args:
+            discrete_inputs (dictionary): The user provided discrete_inputs dictionary passed to the
+                Design constructor.
+            options (dictionary, optional): A dictionary of user-defined options, possible key-value
+                pairs include:
+
+        Return:
+            list: The return object is a list of data structures in the follow order: 
+                continuous_symbol_archetypes -- A list of dictionaries, one for each archetypal
+                continuous input point, the keys are the names of the continuous inputs and the
+                values are the corresponding Casadi symbols for that inputs value in that archetypal
+                point.
+                continuous_symbol_list -- A list of Casadi symbols for every continuous input's possible
+                value in the symbol archetypes, as determined by the user-passed 'Structure' field.
+                There can be more than one symbol for a given continuous input.
+                continuous_lowerbounds -- A list of the lower bounds for each continuous input symbol,
+                in the same order as the symbols listed in continuous_symbol_list.
+                continuous_upperbounds -- A list of the upper bounds for each continuous input symbol,
+                in the same order as the symbols listed in continuous_symbol_list.
+                continuous_archetype_num -- The number of continuous input archetypes in continuous_symbol_archetypes.
+                continuous_symbol_num -- The number of continuous input symbols in continuous_symbol_list.
+                continuous_input_num -- The number of continuous inputs.
+                continuous_input_names -- A list of the continuous input string names.
+                continuous_init -- A list of initial values for each continuous input symbol, in the
+                same order as the symbols are listed in continuous_symbol_list
+
+        """
+        #get names, number and indices of continuous inputs
+        continuous_input_names = continuous_inputs['Inputs']
+        continuous_input_num = len(continuous_input_names)
+        continuous_input_bounds = continuous_inputs['Bounds']
+        continuous_input_structure = continuous_inputs['Structure']
+        if 'Initial' in continuous_inputs:
+            continuous_input_init = continuous_inputs['Initial']
+        # if 'Initial' in continuous_inputs:
+        #     for 
+        #     continuous_input_init = continuous_inputs['Initial']
+        keyword_symbol_list_dict = []
+        #add a dictionary to the list for each continuous input
+        for j in range(continuous_input_num):
+            keyword_symbol_list_dict.append({})
+        #create a list to store casadi optimization symbols for continuous input archetypes
+        continuous_symbol_archetypes = []
+        continuous_symbol_list = []
+        continuous_lowerbounds = []
+        continuous_upperbounds = []
+        continuous_init = []
+        symbol_index = 0
+        #loop over continuous input structure rows 
+        for i in range(len(continuous_input_structure)):
+            keyword_row = continuous_input_structure[i]
+            continuous_archetype_row_dict = {}
+            if 'Initial' in continuous_inputs:
+                init_row = continuous_input_init[i]
+            #archetype_map_row_dict = {}
+            #current_arch_index_list = []
+            #loop over keywords in row
+            for j in range(len(keyword_row)):
+                input_name = continuous_input_names[j]
+                keyword = keyword_row[j]
+                if 'Initial' in continuous_inputs:
+                    init_val = init_row[j]
+                else:
+                    init_val = np.random.uniform(continuous_input_bounds[j][0],
+                                                 continuous_input_bounds[j][1],1)[0]
+                #check if this keyword has been seen before 
+                # NOTE: should really only restrict the use to unique keyworks per column of ExactInputStructure, otherwise we can get bad behaviour
+                if keyword in keyword_symbol_list_dict[j].keys():
+                    #if the keyword has been seen then a symbol already exists, add the casadi symbol to the current archetype list
+                    continuous_archetype_row_dict[input_name] = keyword_symbol_list_dict[j][keyword]
+                else:
+                    #if the keyword is new, a casadi symbol does not exist, create optimizaton symbols for the corresponding continuous input
+                    new_continuous_symbol = cs.MX.sym('ExactSym_'+input_name+'_entry'+str(i)+'_elmnt'+ str(j))
+                    symbol_index_pair = {'Symbol':new_continuous_symbol,'Index':symbol_index}
+                    #now add the new casadi symbol to the current archetype list
+                    continuous_archetype_row_dict[input_name] = symbol_index_pair
+                    keyword_symbol_list_dict[j][keyword]=symbol_index_pair
+                    continuous_symbol_list.append(new_continuous_symbol)
+                    continuous_lowerbounds.append(continuous_input_bounds[j][0])
+                    continuous_upperbounds.append(continuous_input_bounds[j][1])
+                    continuous_init.append(init_val)
+                    symbol_index += 1
+            #add the current archetype list to the list of archetype lists
+            continuous_symbol_archetypes.append(continuous_archetype_row_dict)
+            continuous_archetype_num = len(continuous_symbol_archetypes)
+            continuous_symbol_num = len(continuous_symbol_list)
+
+        return [continuous_symbol_archetypes,
+                continuous_symbol_list,
+                continuous_lowerbounds,
+                continuous_upperbounds,
+                continuous_archetype_num,
+                continuous_symbol_num,
+                continuous_input_num,
+                continuous_input_names,
+                continuous_init]
+
     def __optim_settup(self, fim_list, continuous_symbol_list, continuous_lowerbounds, continuous_upperbounds, continuous_init, weight_symbol_list, weight_sum, weight_init, options):
-        """ A function to 
+        """ A private helper function  
 
         This function 
 
@@ -495,9 +678,12 @@ class Design:
     def __weighting_settup(self, discrete_input_names, discrete_input_grid, continuous_input_names, 
                                 continuous_symbol_archetypes, fixed_design, options):
         #PACKAGE THIS AS A FUNCTION; returns obs vars, samp sum and fim symbols?
-        """ A function to 
+        """ A private helper function used to create Casadi optimization symbols for the relaxed
+        sampling weights of the design optimization problem
 
-        This function 
+        This function is private helper function called during instantiation of a Design object.
+
+        This function iterates
 
         Args:
             discrete_input_names ():
@@ -614,141 +800,7 @@ class Design:
 
         return [fim_list, weight_symbol_list, weight_sum, weight_num, weight_init, weight_design_map]
 
-    def __discrete_settup(self, discrete_inputs, options):
-        """ A function to 
-
-        This function 
-
-        Args:
-            discrete_inputs ():
-            options ():
-
-        Return:
-
-        """
-        #get names, number and indices of discrete inputs
-        discrete_input_names =  discrete_inputs['Inputs']
-        discrete_input_num = len(discrete_input_names)
-        
-        #check if inquality OptimConstraintsains have been passed, if so store them 
-        discrete_input_constr = []
-        if 'Constraints' in  discrete_inputs:
-            discrete_input_constr  =  discrete_inputs['Constraints']   
-
-        #create a list for storing possible levels of each discretemate input
-        discrete_input_candidates = []
-        if not 'Grid' in discrete_inputs:
-            if 'Bounds' in   discrete_inputs:
-                #set resolution of grid NOTE: this should be able to be specified by the user, will change
-                if 'NumPoints' in discrete_inputs:
-                    num_points = discrete_inputs['NumPoints']
-                else:
-                    num_points = 5
-                #loop over bounds passed, and use resolution and bounds to populate xlist
-                for bound in discrete_inputs['Bounds']:
-                    discrete_input_candidates.append(np.linspace(bound[0],bound[1],num_points).tolist())
-            elif  'Candidates' in discrete_inputs:
-                for grid in discrete_inputs['Candidates']:
-                    discrete_input_candidates.append(grid)
-            else:
-                raise Exception('Discerete inputs must be passed with either input \'Bounds\' or a pre-defined list of \'Grid\' candidats!')
-            #call recursive createGrid function to generate ApproxInputGrid, a list of all possible permuations of xlist's that also satisfy inequality OptimConstraintsaints
-            #NOTE: currently, createGrid doesn't actually check the inequality OptimConstraintsaints, need to add, and perhaps add points on inequality boundary??!
-            discrete_input_grid = self.__create_grid(cp.deepcopy(discrete_input_names), discrete_input_candidates, discrete_input_constr)
-        else:
-            discrete_input_array = discrete_inputs['Grid']
-            discrete_input_grid = []
-            for row in discrete_input_array:
-                row_dict = {}
-                for indx in range(discrete_input_num):
-                    row_dict[discrete_input_names[indx]] = row[indx]
-                discrete_input_grid.append(row_dict)
-        
-        discrete_grid_length = len(discrete_input_grid)
-        return [discrete_input_grid, discrete_grid_length, discrete_input_names, discrete_input_num]
-
-    def __continuous_settup(self, continuous_inputs, options):
-        """ A function to 
-
-        This function 
-
-        Args:
-            continuous_inputs ():
-            options ():
-
-        Return:
-
-        """
-        #get names, number and indices of continuous inputs
-        continuous_input_names = continuous_inputs['Inputs']
-        continuous_input_num = len(continuous_input_names)
-        continuous_input_bounds = continuous_inputs['Bounds']
-        continuous_input_structure = continuous_inputs['Structure']
-        if 'Initial' in continuous_inputs:
-            continuous_input_init = continuous_inputs['Initial']
-        # if 'Initial' in continuous_inputs:
-        #     for 
-        #     continuous_input_init = continuous_inputs['Initial']
-        keyword_symbol_list_dict = []
-        #add a dictionary to the list for each continuous input
-        for j in range(continuous_input_num):
-            keyword_symbol_list_dict.append({})
-        #create a list to store casadi optimization symbols for continuous input archetypes
-        continuous_symbol_archetypes = []
-        continuous_symbol_list = []
-        continuous_lowerbounds = []
-        continuous_upperbounds = []
-        continuous_init = []
-        symbol_index = 0
-        #loop over continuous input structure rows 
-        for i in range(len(continuous_input_structure)):
-            keyword_row = continuous_input_structure[i]
-            continuous_archetype_row_dict = {}
-            if 'Initial' in continuous_inputs:
-                init_row = continuous_input_init[i]
-            #archetype_map_row_dict = {}
-            #current_arch_index_list = []
-            #loop over keywords in row
-            for j in range(len(keyword_row)):
-                input_name = continuous_input_names[j]
-                keyword = keyword_row[j]
-                if 'Initial' in continuous_inputs:
-                    init_val = init_row[j]
-                else:
-                    init_val = np.random.uniform(continuous_input_bounds[j][0],
-                                                 continuous_input_bounds[j][1],1)[0]
-                #check if this keyword has been seen before 
-                # NOTE: should really only restrict the use to unique keyworks per column of ExactInputStructure, otherwise we can get bad behaviour
-                if keyword in keyword_symbol_list_dict[j].keys():
-                    #if the keyword has been seen then a symbol already exists, add the casadi symbol to the current archetype list
-                    continuous_archetype_row_dict[input_name] = keyword_symbol_list_dict[j][keyword]
-                else:
-                    #if the keyword is new, a casadi symbol does not exist, create optimizaton symbols for the corresponding continuous input
-                    new_continuous_symbol = cs.MX.sym('ExactSym_'+input_name+'_entry'+str(i)+'_elmnt'+ str(j))
-                    symbol_index_pair = {'Symbol':new_continuous_symbol,'Index':symbol_index}
-                    #now add the new casadi symbol to the current archetype list
-                    continuous_archetype_row_dict[input_name] = symbol_index_pair
-                    keyword_symbol_list_dict[j][keyword]=symbol_index_pair
-                    continuous_symbol_list.append(new_continuous_symbol)
-                    continuous_lowerbounds.append(continuous_input_bounds[j][0])
-                    continuous_upperbounds.append(continuous_input_bounds[j][1])
-                    continuous_init.append(init_val)
-                    symbol_index += 1
-            #add the current archetype list to the list of archetype lists
-            continuous_symbol_archetypes.append(continuous_archetype_row_dict)
-            continuous_archetype_num = len(continuous_symbol_archetypes)
-            continuous_symbol_num = len(continuous_symbol_list)
-
-        return [continuous_symbol_archetypes,
-                continuous_symbol_list,
-                continuous_lowerbounds,
-                continuous_upperbounds,
-                continuous_archetype_num,
-                continuous_symbol_num,
-                continuous_input_num,
-                continuous_input_names,
-                continuous_init]
-
+    
     #Function that recursively builds a grid point list from a set of candidate levels of the provided inputs
     def __create_grid(self,input_names,input_candidates,constraints):
         """ A function to 
