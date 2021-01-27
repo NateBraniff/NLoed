@@ -436,7 +436,7 @@ class Design:
                 pairs include:
 
         Returns:
-            list: The returned object is a list of data structures in the follow order,
+            list: The returned object is a list of data structures in the follow order;
                 discrete_input_grid -- a list of dictionaries, each dictionary contains a candidate
                 grid point where the dictionary keys are the discrete input string names and
                 the dictionary values are the candidates input values for that point,
@@ -510,7 +510,7 @@ class Design:
                 pairs include:
 
         Return:
-            list: The returned object is a list of data structures in the follow order,
+            list: The returned object is a list of data structures in the follow order;
                 continuous_symbol_archetypes -- A list of dictionaries, one for each archetypal
                 continuous input point, the keys are the names of the continuous inputs and the
                 values are the corresponding Casadi symbols for that inputs value in that archetypal
