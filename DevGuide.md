@@ -210,9 +210,11 @@ s
 
 Needs to be added
 
+Scripts folder vs notebooks
+
 jupyter notebook
 
-jupyter nbconvert --to script *.ipynb
+jupyter nbconvert --output-dir='./scripts' --to script *.ipynb
 
 ## Packaging and Release
 In order to make NLoed available using pip, it needs to be packaged properly and uploaded to the
