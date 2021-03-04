@@ -38,21 +38,11 @@ nloed_model = Model(observ_list, xnames, pnames)
 # Fit
 ####################################################################################################
 
-obs = [ 580,
-        544,
-        543,
-        766,
-        699,
-        570,
-        2064,
-        2171,
-        4598,
-        8814,
-        9919,
-        8860,
-        9584,
-        10295,
-        10672]
+obs = [ 580,  544,   543,
+        766,  699,   570,
+        2064, 2171,  4598,
+        8814, 9919,  8860,
+        9584, 10295, 10672]
 
 init_data = pd.DataFrame({'Light':[.1]*3+[63]*3+[254]*3+[1022]*3+[4095]*3,
                           'Variable':['GFP']*15,
@@ -78,9 +68,9 @@ fit_params = fit_info['Estimate'].to_numpy().flatten()
 # EVALUATE INITIAL DESIGN
 ####################################################################################################
 
-# init_design = pd.DataFrame({'Light':[.1]+[63]+[254]+[1022]+[4095],
-#                             'Variable':['GFP']*5,
-#                             'Replicats':[3]*5}) 
+init_design = pd.DataFrame({'Light':[.1]+[63]+[254]+[1022]+[4095],
+                            'Variable':['GFP']*5,
+                            'Replicates':[3]*5}) 
 
 # #get estimated covariance, bias and MSE of parameter fit (use asymptotic method here) 
 # opts={'Method':'Asymptotic','FIM':True,'Covariance':True,'Bias':True,'MSE':True,'SampleNumber':500}
@@ -107,7 +97,7 @@ continuous_inputs={'Inputs':['Light'],
                                [500],
                                [4000]]}
 
-#fixed_design = {'Weight':0.5,'Design':init_design}
+fixed_design = {'Weight':0.5,'Design':init_design}
 
 opts= {'LockWeights':False}
 # generate the optimal discreteimate (relaxed) design
@@ -115,10 +105,10 @@ design_object = Design(nloed_model,
                         fit_params,
                         'D',
                         continuous_inputs=continuous_inputs,
-                        #fixed_design=fixed_design,
+                        fixed_design=fixed_design,
                         options=opts)
 
-sample_size = 15
+sample_size = 16
 relaxed_design = design_object.relaxed()
 print(relaxed_design)
 #generate a rounded exact design 

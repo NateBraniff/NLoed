@@ -600,101 +600,49 @@ class Design:
                 continuous_input_names,
                 continuous_init]
 
-    def __optim_settup(self, fim_list, continuous_symbol_list, continuous_lowerbounds, continuous_upperbounds, continuous_init, weight_symbol_list, weight_sum, weight_init, options):
-        """ A private helper function  
-
-        This function 
-
-        Args:
-            fim_list
-            continuous_symbol_list ():
-            continuous_lowerbounds ():
-            continuous_upperbounds ():
-            continuous_init ():
-            weight_symbol_list ():
-            weight_sum ():
-            weight_init ():
-            options :
-
-        Return:
-
-        """
-        
-        #SETTUP OPTIM VARS, BOUNDS and MAP here
-
-        if not options['LockWeights']:
-            optim_symbol_list = continuous_symbol_list + weight_symbol_list
-            optim_init = continuous_init + weight_init
-
-            var_lowerbounds = continuous_lowerbounds + [0]*len(weight_symbol_list)
-            var_upperbounds = continuous_upperbounds + [1]*len(weight_symbol_list)
-
-            #add a constraint function to ensure sample weights sum to 1
-            constraint_funcs = [weight_sum - 1]
-            #bound the constrain function output to 0
-            constraint_lowerbounds = [0]
-            constraint_upperbounds = [0]
-        else:
-            optim_symbol_list = continuous_symbol_list
-            optim_init = continuous_init
-
-            var_lowerbounds = continuous_lowerbounds
-            var_upperbounds = continuous_upperbounds
-
-            #add a constraint function to ensure sample weights sum to 1
-            constraint_funcs = []
-            #bound the constrain function output to 0
-            constraint_lowerbounds = []
-            constraint_upperbounds = []
-        #MOST RECENT
-        #optim_init = [np.random.uniform(continuous_lowerbounds[i],continuous_upperbounds[i],1)[0]\
-        #                        for i in range(len(continuous_symbol_list))]\
-        #             + [1/len(weight_symbol_list)] * len(weight_symbol_list)
-        #OLD COMMENTED OUT
-        # optim_init = [0.5*(continuous_upperbounds[i] + continuous_lowerbounds[i])\
-        #                         for i in range(len(continuous_symbol_list))]\
-        #              + [1/len(weight_symbol_list)] * len(weight_symbol_list)
-        # optim_init = 0.5*(continuous_upperbounds + continuous_lowerbounds)\
-        #                     +[1/(self.discrete_grid_length \
-        #                             * self.continuous_archetype_num \
-        #                             * self.num_observ_group)] * len(weight_symbol_list)
-
-        cumulative_objective_symbol = 0
-        for m in range(self.num_models): 
-            cumulative_objective_symbol += self.objective_list[m](fim_list[m])/self.num_models
-
-        ipopt_problem_struct = {'f': cumulative_objective_symbol,
-                                'x': cs.vertcat(*optim_symbol_list),
-                                'g': cs.vertcat(*constraint_funcs)}
-
-        return [ipopt_problem_struct,
-                optim_init,
-                var_lowerbounds,
-                var_upperbounds,
-                constraint_funcs,
-                constraint_lowerbounds,
-                constraint_upperbounds]
-
     def __weighting_settup(self, discrete_input_names, discrete_input_grid, continuous_input_names, 
                                 continuous_symbol_archetypes, fixed_design, options):
         #PACKAGE THIS AS A FUNCTION; returns obs vars, samp sum and fim symbols?
         """ A private helper function used to create Casadi optimization symbols for the relaxed
-        sampling weights of the design optimization problem
+        sampling weights of the design optimization problem.
 
         This function is private helper function called during instantiation of a Design object.
 
-        This function iterates
+        This function through the continuous input symbol archetypes and the discrete input
+        grid and assembles complete input vectors for the model. These input vectors, in input_list,
+        contain both real values from the discrete inputs and Casadi symbols from the continuous 
+        inputs. This function then adds the appropriate weighting symbols to each of these cadindidate
+        points and assembles the total fisher information matrix for the optimized design using
+        said weighting. This function also adds any fixed design aspects to the fim computation
+        and constructs the weight sum constraints.
 
         Args:
-            discrete_input_names ():
-            discrete_input_grid ():
-            continuous_input_names ():
-            continuous_symbol_archetypes ():
-            fixed_design ():
-            options ():
+            discrete_input_names (list of strings): A list of the names of the discrete inputs.
+            discrete_input_grid (list of dictionaries): Each element is a dictionary specifying a 
+                candidate point in the discrete input grid. The dictionary keys are discrete input 
+                names and their values are the discrete input values at the given point.
+            continuous_input_names (list of strings): A list of the names of the continuous inputs.
+            continuous_symbol_archetypes (list of dictionaries): Each element is a dictionary specifying a 
+                archetypal input subset of the continuous inputs. The dictionary keys are continuous input 
+                names and their values are the Casadi symbols for the continuous input levels, which
+                will be optimized.
+            fixed_design (dictionary): A dictionary with a 'Weight' key, pointing to a real number
+                between 0 and 1 representing the fraction of overall samples proportioned to the fixed
+                design, and a 'Design' key pointing to dataframe containing the fixed experimental design.
+            options (dictionary, optional): A dictionary of user-defined options, possible key-value
+                pairs include:
 
         Return:
-
+            list: This function returns a list of data structures, as follows: fim_list -- a list
+            of Casadi FIM symbols with one for each model, weight_symbol_list -- a list of Casadi
+            symbols for the sampling weights of each candidate input point that will be optimized, 
+            weight_sum -- a Casadi symbol for the sum of the sampling weights, weight_num -- an integer
+            indicating the number of weight symbols, weight_init -- a list of values corresponding to
+            the sampling weight symbols at which the IPOP solver will initialized the optimization, 
+            weight_design_map -- list of dictionaries, one for each weight symbol, mapping the sampling
+            weight symbol to its corresponding continuous input archetype and discrete input grid point
+            as well as its observation group; used to reconstruct the final optimized design from
+            the solver output.
         """
 
         fim_list = []
@@ -703,6 +651,7 @@ class Design:
 
         if fixed_design:
             #fixed_design
+            #NOTE: perhaps change weight to be of new design?
             pre_weight = fixed_design['Weight']
             post_weight = 1 - pre_weight
             #if 'Design' in fixed_design:
@@ -800,6 +749,80 @@ class Design:
 
         return [fim_list, weight_symbol_list, weight_sum, weight_num, weight_init, weight_design_map]
 
+    def __optim_settup(self, fim_list, continuous_symbol_list, continuous_lowerbounds, continuous_upperbounds, continuous_init, weight_symbol_list, weight_sum, weight_init, options):
+        """ A private helper function  
+
+        This function 
+
+        Args:
+            fim_list
+            continuous_symbol_list ():
+            continuous_lowerbounds ():
+            continuous_upperbounds ():
+            continuous_init ():
+            weight_symbol_list ():
+            weight_sum ():
+            weight_init ():
+            options :
+
+        Return:
+
+        """
+        
+        #SETTUP OPTIM VARS, BOUNDS and MAP here
+
+        if not options['LockWeights']:
+            optim_symbol_list = continuous_symbol_list + weight_symbol_list
+            optim_init = continuous_init + weight_init
+
+            var_lowerbounds = continuous_lowerbounds + [0]*len(weight_symbol_list)
+            var_upperbounds = continuous_upperbounds + [1]*len(weight_symbol_list)
+
+            #add a constraint function to ensure sample weights sum to 1
+            constraint_funcs = [weight_sum - 1]
+            #bound the constrain function output to 0
+            constraint_lowerbounds = [0]
+            constraint_upperbounds = [0]
+        else:
+            optim_symbol_list = continuous_symbol_list
+            optim_init = continuous_init
+
+            var_lowerbounds = continuous_lowerbounds
+            var_upperbounds = continuous_upperbounds
+
+            #add a constraint function to ensure sample weights sum to 1
+            constraint_funcs = []
+            #bound the constrain function output to 0
+            constraint_lowerbounds = []
+            constraint_upperbounds = []
+        #MOST RECENT
+        #optim_init = [np.random.uniform(continuous_lowerbounds[i],continuous_upperbounds[i],1)[0]\
+        #                        for i in range(len(continuous_symbol_list))]\
+        #             + [1/len(weight_symbol_list)] * len(weight_symbol_list)
+        #OLD COMMENTED OUT
+        # optim_init = [0.5*(continuous_upperbounds[i] + continuous_lowerbounds[i])\
+        #                         for i in range(len(continuous_symbol_list))]\
+        #              + [1/len(weight_symbol_list)] * len(weight_symbol_list)
+        # optim_init = 0.5*(continuous_upperbounds + continuous_lowerbounds)\
+        #                     +[1/(self.discrete_grid_length \
+        #                             * self.continuous_archetype_num \
+        #                             * self.num_observ_group)] * len(weight_symbol_list)
+
+        cumulative_objective_symbol = 0
+        for m in range(self.num_models): 
+            cumulative_objective_symbol += self.objective_list[m](fim_list[m])/self.num_models
+
+        ipopt_problem_struct = {'f': cumulative_objective_symbol,
+                                'x': cs.vertcat(*optim_symbol_list),
+                                'g': cs.vertcat(*constraint_funcs)}
+
+        return [ipopt_problem_struct,
+                optim_init,
+                var_lowerbounds,
+                var_upperbounds,
+                constraint_funcs,
+                constraint_lowerbounds,
+                constraint_upperbounds]
     
     #Function that recursively builds a grid point list from a set of candidate levels of the provided inputs
     def __create_grid(self,input_names,input_candidates,constraints):

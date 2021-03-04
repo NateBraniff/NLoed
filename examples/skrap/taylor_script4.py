@@ -42,7 +42,7 @@ model_object = Model(observ_list,input_names,parameter_names)
 #generate initial dataset 
 init_design = pd.DataFrame({'Light':np.linspace(0.1,4095,5),
                             'Variable':['GFP']*5 ,
-                            'Replicats':[3]*5})
+                            'Replicates':[3]*5})
 true_param = np.log([5.53127845e+02, 9.52661655e+03, 2.41382438e+00, 3.62505725e+02])
 init_data = model_object.sample(init_design,true_param)
 print('')
@@ -55,7 +55,7 @@ print('')
 ####################################################################################################
 #request contours and use a simple initial search
 fit_options={'Confidence':'None',
-             'InitParamBounds':[(5,87),(8,10),(-1,2),(3,5)],
+             'InitParamBounds':[(5,8),(8,10),(-1,2),(3,5)],
              'InitSearchNumber':7,
              'SearchBound':5.}
 #fit the model to the initial data
