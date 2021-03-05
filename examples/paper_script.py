@@ -46,7 +46,7 @@ opts={'InitParamBounds':[(3,8),(5,10),(-1,1),(1,6)],
 #Fit the model
 est = model.fit(data0, options=opts)
 #Extract parameter estimate vector
-nom_param=est['Estimate'].to_numpy().flatten()
+param = est['Estimate'].to_numpy().flatten()
 
 print(np.exp(est))
 
@@ -65,19 +65,21 @@ inputs={'Inputs':['Light'],
 #Set objective and nominal parameters
 obj = 'D'
 #Declare init design dataframe
-init_design = pd.DataFrame({'Light':[.01]+[1.5]+[6]+[25]+[100],
-                            'Variable':['GFP']*5,
-                            'Replicates':[3]*5}) 
+design0 = pd.DataFrame({'Light':[.01]+[1.5]+[6]+[25]+[100],
+                        'Variable':['GFP']*5,
+                        'Replicates':[3]*5}) 
 #Set the fixed design information
-init = {'Weight':0.5,'Design':init_design}
+init = {'Weight':0.5,'Design':design0}
 #Instantiate the design object
-design=nl.Design(model,nom_param,obj,
+opt_des = nl.Design(model,param,obj,
                  fixed_design=init,
                  continuous_inputs=inputs)
 #Generate a rounded exact design 
-opt_design = design.round(15)
+design1 = opt_des.round(15)
 
-## Listing 5 ##############################################
+###########################################################################################
+## Re-fit #################################################################################
+###########################################################################################
 #Optimal green light levels
 x_lvls1 = \
 [.001]*4+[2.88]*5+[8.33]*4+[100]*2
@@ -93,11 +95,55 @@ data1 = pd.DataFrame(
             'Observation':y_obs0+y_obs1}) 
 
 #Fit the model
-est = model.fit(data1, start_param=nom_param)
+est = model.fit(data1, start_param=param)
 #Extract parameter estimate vector
-fit_param=est['Estimate'].to_numpy().flatten()
+param = est['Estimate'].to_numpy().flatten()
 
 print(np.exp(est))
+
+
+## Listing 5 ##############################################
+#Merge initial and optimal designs
+design_tot = pd.concat([design0, design1], ignore_index=True)
+#Compute the covariance matrix
+cov = model.evaluate(design_tot, param).to_numpy()
+#convert the covariance matrix to numpy
+#covariance_matrix_opt = covariance_opt['Covariance'].to_numpy()
+#Set the list of input vectors
+inputs = pd.DataFrame({'Light':np.linspace(0.1,100,100),
+                       'Variable':['GFP']*100})
+#set options for prediction method
+opts = {'Method':'Delta',
+        'ObservationInterval':True}
+#Generate predictions and intervals
+predictions = model.predict(inputs,
+                            param,
+                            covariance_matrix = cov,
+                            options=opts)
+
+###########################################################################################
+## Plotting Prediction Intervals ##########################################################
+###########################################################################################
+#create plot
+fig, ax = plt.subplots()
+#plot observation interval
+ax.fill_between(predictions['Inputs','Light'],
+                predictions['Observation','Lower'],
+                predictions['Observation','Upper'],
+                alpha=0.3,
+                color='C2',
+                label='95% Observation Interval')
+#plot mean model prediction
+ax.plot(predictions['Inputs','Light'], predictions['Prediction','Mean'], '-',color='C4',label='Mean Observation')
+#plot initial dataset
+ax.plot(x_lvls0, y_obs0, 'o', color='C0',label='Initial Data')
+ax.plot(x_lvls1, y_obs1, 'o', color='C1',label='Optimal Data')
+ax.set_xlabel('Green Light %')
+ax.set_ylabel('Mean Batch GFP Expression (a.u.)')
+ax.set_title('Model Prediction and Observation Uncertainty Interval\n \
+After Fitting to the Combined Dataset')
+ax.legend(loc=4)
+plt.show()
 
 ###########################################################################################
 ## Plotting CIs ###########################################################################
@@ -107,28 +153,28 @@ print(np.exp(est))
 #get estimated covariance, bias and MSE of parameter fit (use asymptotic method here) 
 #opts={'Method':'Asymptotic','FIM':True,'Covariance':True,'Bias':True,'MSE':True,'SampleNumber':500}
 #get estimated covariance, bias and MSE of parameter fit (use asymptotic method here) 
-covariance_init = model.evaluate(init_design, fit_param)
+covariance_init = model.evaluate(design0, param)
 stderr_init = np.sqrt(np.diag(covariance_init['Covariance']))
-upper_bnd_init = fit_param + 2*stderr_init
-lower_bnd_init = fit_param - 2*stderr_init
+upper_bnd_init = param + 2*stderr_init
+lower_bnd_init = param - 2*stderr_init
 
 #eval the optimal design + initial design
-opt_design_tot = pd.concat([init_design, opt_design], ignore_index=True)
-covariance_opt = model.evaluate(opt_design_tot, fit_param)
+opt_design_tot = pd.concat([design0, design1], ignore_index=True)
+covariance_opt = model.evaluate(opt_design_tot, param)
 stderr_opt = np.sqrt(np.diag(covariance_opt['Covariance']))
-upper_bnd_opt = fit_param + 2*stderr_opt
-lower_bnd_opt = fit_param - 2*stderr_opt
+upper_bnd_opt = param + 2*stderr_opt
+lower_bnd_opt = param - 2*stderr_opt
 
 #repeat init design 
-rep_init_design_tot = pd.concat([init_design, init_design], ignore_index=True)
+rep_init_design_tot = pd.concat([design0, design0], ignore_index=True)
 #get estimated covariance, bias and MSE of parameter fit (use asymptotic method here) 
-covariance_rept = model.evaluate(rep_init_design_tot, fit_param)
+covariance_rept = model.evaluate(rep_init_design_tot, param)
 stderr_rept = np.sqrt(np.diag(covariance_rept['Covariance']))
-upper_bnd_rept = fit_param + 2*stderr_rept
-lower_bnd_rept = fit_param - 2*stderr_rept
+upper_bnd_rept = param + 2*stderr_rept
+lower_bnd_rept = param - 2*stderr_rept
 
 #PLOT THE COMPARED CI's
-exp_vals = np.exp(fit_param)
+exp_vals = np.exp(param)
 #exp_vals = np.tile(np.exp(nom_param),(1,3))
 exp_diff_opt = (np.exp(upper_bnd_opt)-np.exp(lower_bnd_opt))/exp_vals
 exp_diff_init = (np.exp(upper_bnd_init)-np.exp(lower_bnd_init))/exp_vals
@@ -142,59 +188,9 @@ rects1 = ax.bar(x - width-0.01, exp_diff_init.flatten(), width, label='Initial D
 rects2 = ax.bar(x, exp_diff_rept.flatten(), width, label='Repeated Initial Design')
 rects3 = ax.bar(x + width+0.01, exp_diff_opt.flatten(), width, label='Optimal Design')
 ax.set_ylabel('Interval Size as % of MLE Parameter Value')
-ax.set_title('Comparing 95% Confidence Interval Size\n Expressed in % Error of MLE Values')
+ax.set_title('Comparison of 95% Confidence Interval Sizes\n Expressed in % Error of MLE Values')
 ax.set_xticks(x)
 ax.set_xticklabels(labels)
 ax.legend(loc=2)
 fig.tight_layout()
-plt.show()
-
-###########################################################################################
-## Plotting Prediction Intervals ##########################################################
-###########################################################################################
-
-#convert the covariance matrix to numpy
-covariance_matrix_opt = covariance_opt['Covariance'].to_numpy()
-covariance_matrix_rept = covariance_init['Covariance'].to_numpy()
-#generate predictions with error bars fdor a random selection of inputs)
-prediction_inputs = pd.DataFrame({'Light':np.linspace(0.1,100,100),
-                                  'Variable':['GFP']*100})
-#request prediction and observation intervals
-prediction_options = {'Method':'Delta',
-                      'PredictionInterval':True,
-                      'ObservationInterval':True}
-#generate predictions and intervals
-predictions_opt = model.predict(prediction_inputs,
-                                   fit_param,
-                                   covariance_matrix = covariance_matrix_opt,
-                                   options=prediction_options)
-predictions_rept = model.predict(prediction_inputs,
-                                   fit_param,
-                                   covariance_matrix = covariance_matrix_rept,
-                                   options=prediction_options)
-#create plot
-fig, ax = plt.subplots()
-#plot observation interval
-ax.fill_between(predictions_rept['Inputs','Light'],
-                predictions_rept['Observation','Lower'],
-                predictions_rept['Observation','Upper'],
-                alpha=0.3,
-                color='C2',
-                label='95% Observation Interval')
-#plot prediction interval
-# ax.fill_between(predictions_opt['Inputs','Light'],
-#                 predictions_opt['Observation','Lower'],
-#                 predictions_opt['Observation','Upper'],
-#                 alpha=0.4,
-#                 color='C0')
-#plot mean model prediction
-ax.plot(predictions_opt['Inputs','Light'], predictions_opt['Prediction','Mean'], '-',color='C4',label='Mean Observation')
-#plot initial dataset
-ax.plot(x_lvls0, y_obs0, 'o', color='C0',label='Initial Data')
-ax.plot(x_lvls1, y_obs1, 'o', color='C1',label='Optimal Data')
-ax.set_xlabel('Green Light %')
-ax.set_ylabel('Mean Batch GFP Expression (a.u.)')
-ax.set_title('Model Prediction and Observation Uncertainty Interval\n \
-After Fitting to the Combined Dataset')
-ax.legend(loc=4)
 plt.show()
