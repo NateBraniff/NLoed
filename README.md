@@ -20,12 +20,12 @@ A Python package for nonlinear optimal experimental design.
 
 ## Description
 NLoed (suggested pronounciation: "en-load") is an open source Python package for building and 
-optimizing experimental designs for non-linear models, with a specific emphasis on applications in systems 
+optimizing experimental designs for fitting non-linear models, with a specific emphasis on applications in systems 
 biology. The package is primarily focused on generating optimal designs for improved parameter estimation
 using a relaxed formulation of the design optimization problem. Objectives in NLoed are primarily based
 on the expected Fisher information matrix.
 
-NLoed is built on top of [Casadi](https://web.casadi.org/), an optimal control prototyping framework, and users construct their models using Casadi's symbolic classes. Casadi's symbolic interface allows the user to encode a wide variety of nonlinear mathematical structures into their NLoed model. NLoed supports both static and dynamic nonlinear models including systems of nonlinear differential equations. Casadi also provides a number of numerical
+NLoed is built on top of [Casadi](https://web.casadi.org/), an optimal control prototyping framework, and users of NLoed construct their models using Casadi's symbolic classes. Casadi's symbolic interface allows the user to encode a wide variety of nonlinear mathematical structures into their NLoed model. NLoed supports both static and dynamic nonlinear models including systems of nonlinear differential equations. Casadi also provides a number of numerical
 tools such as automatic differentiation and interfaces to nonlinear programming solvers, such as [IPOPT](https://github.com/coin-or/Ipopt),
 which greatly improve NLoed's performance.
 

@@ -9,6 +9,7 @@ p = cs.SX.sym('p',4)
 q=cs.exp(p)
 #Compute the sampling statistics
 mean = q[0] + q[1]*x[0]**q[2]/(q[3]**q[2]+x[0]**q[2])
+#var = (0.059*mean)**2
 var = (0.059*mean)**2
 #Create a sampling statistics vector
 stats = cs.vertcat(mean, var)
@@ -77,6 +78,8 @@ opt_des = nl.Design(model,param,obj,
 #Generate a rounded exact design 
 design1 = opt_des.round(15)
 
+print(design1)
+
 ###########################################################################################
 ## Re-fit #################################################################################
 ###########################################################################################
@@ -121,6 +124,23 @@ predictions = model.predict(inputs,
                             covariance_matrix = cov,
                             options=opts)
 
+
+# #Compute the covariance matrix
+# cov0 = model.evaluate(design0, param).to_numpy()
+# #convert the covariance matrix to numpy
+# #covariance_matrix_opt = covariance_opt['Covariance'].to_numpy()
+# #Set the list of input vectors
+# inputs = pd.DataFrame({'Light':np.linspace(0.1,100,100),
+#                        'Variable':['GFP']*100})
+# #set options for prediction method
+# opts = {'Method':'Delta',
+#         'ObservationInterval':True}
+# #Generate predictions and intervals
+# predictions0 = model.predict(inputs,
+#                             param,
+#                             covariance_matrix = cov0,
+#                             options=opts)
+
 ###########################################################################################
 ## Plotting Prediction Intervals ##########################################################
 ###########################################################################################
@@ -132,9 +152,18 @@ ax.fill_between(predictions['Inputs','Light'],
                 predictions['Observation','Upper'],
                 alpha=0.3,
                 color='C2',
-                label='95% Observation Interval')
+                label='Final 95% Observation Interval')
 #plot mean model prediction
-ax.plot(predictions['Inputs','Light'], predictions['Prediction','Mean'], '-',color='C4',label='Mean Observation')
+ax.plot(predictions['Inputs','Light'], predictions['Prediction','Mean'], '-',color='C4',label='Final Predictions')
+# #plot observation interval
+# ax.fill_between(predictions0['Inputs','Light'],
+#                 predictions0['Observation','Lower'],
+#                 predictions0['Observation','Upper'],
+#                 alpha=0.2,
+#                 color='C3',
+#                 label='Initial 95% Observation Interval')
+# #plot mean model prediction
+# ax.plot(predictions0['Inputs','Light'], predictions0['Prediction','Mean'], '-',color='C5',label='Initial Predictions')
 #plot initial dataset
 ax.plot(x_lvls0, y_obs0, 'o', color='C0',label='Initial Data')
 ax.plot(x_lvls1, y_obs1, 'o', color='C1',label='Optimal Data')
