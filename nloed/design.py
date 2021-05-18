@@ -1,5 +1,9 @@
+import os as os
+import sys as sys
 import random as rn
 import copy as cp
+#need to clean up this import style (below)
+from contextlib import contextmanager
 
 import casadi as cs
 import numpy as np
@@ -89,23 +93,33 @@ class Design:
             options (dict, optional): A dictionary of user-defined options, possible key-value pairs
                 include:
 
-                "LockWeights" --
-                Purpose: 
-                Type: ,
-                Default Value: ,
-                Possible Values: 
+                "PrintLevel" --
+                Purpose: Sets the amount of printed feedback returned during instantiation
+                Type: string,
+                Default Value: 'Basic',
+                Possible Values: 'None', 'Basic', 'Verbose'
 
-                "NumGridPoints" --
-                Purpose: 
-                Type: ,
-                Default Value: ,
-                Possible Values: 
+                "IPOPTHessian" --
+                Purpose: Determines whether IPOPT uses an exact hessian computed with symbolic 
+                derivatives or an approximate BFGS
+                Type: string,
+                Default Value: 'Exact,
+                Possible Values: 'Exact', 'BFGS'
+
+                "LockWeights" --
+                Purpose: A boolean, should be used with continuous inputs, if true only input levels
+                are optimized input weights kept constant at their inital values. By default the inital
+                values are all equal resulting in equal sampling weight for each optimized input condition.
+                Type: bool,
+                Default Value: False,
+                Possible Values: True or False
 
         """
 
         default_options = \
-                 { 'LockWeights':         [False,    lambda x: isinstance(x,bool)],
-                    'NumGridPoints':       [5,        lambda x: isinstance(x,int) and x>0 ] } #NumGridPoints is removed now (sept '20)
+                 {  'PrintLevel':          ['Basic',  lambda x: isinstance(x,str) and (x=='None' or x=='Basic' or x=='Verbose')],
+                    'IPOPTHessian':        ['Exact',  lambda x: isinstance(x,str) and (x=='Exact' or x=='BFGS')],
+                    'LockWeights':         [False,    lambda x: isinstance(x,bool)]}
         options=cp.deepcopy(options)
         for key in options.keys():
             if not key in options.keys():
@@ -246,23 +260,35 @@ class Design:
         
         #NOTE: should test init, and error out if init is nonvalid
 
-        #NOTE: should be checking solution for convergence, should allow use to pass options to ipopt
+        
+        if options['IPOPTHessian'] == 'Exact':
+            hessian_type = 'exact'
+        else:
+            hessian_type = 'limited-memory'
+        if not options['PrintLevel'] == 'None':
+            print('Setting up optimization problem...',end='')
         #Create an IPOPT solver
-        #IPOPTProblemStructure = {'f': cumulative_objective_symbol, 'x': cs.vertcat(*OptimSymbolList), 'g': cs.vertcat(*OptimConstraints)}
-        #print('Setting up optimization problem, this can take some time...')
-        #"verbose":True,
         ipopt_solver = cs.nlpsol('solver', 'ipopt', ipopt_problem_struct, 
-                                    {'ipopt.hessian_approximation':'exact',#'limited-memory',
+                                    {'ipopt.hessian_approximation':hessian_type,
                                     'ipopt.max_iter':10000})
-                                    #NOTE: need to give option to turn off full hessian (or coloring), may need to restucture problem mx/sx, maybe use quadratic programming in full discrete mode?
-        #print('Problem set up complete.')
-        # Solve the NLP with IPOPT call
-        #print('Begining optimization...')
-        ipopt_solution_struct = ipopt_solver(x0=optim_init,
-                                             lbx=var_lowerbounds,
-                                             ubx=var_upperbounds,
-                                             lbg=constraint_lowerbounds,
-                                             ubg=constraint_upperbounds)
+        if not options['PrintLevel'] == 'None':
+            print('problem set-up complete.')
+            print('Begining optimization:')
+        with silence_stdout(not(options['PrintLevel'] == 'Verbose')):
+            # Solve the NLP with IPOPT call
+            ipopt_solution_struct = ipopt_solver(x0=optim_init,
+                                                lbx=var_lowerbounds,
+                                                ubx=var_upperbounds,
+                                                lbg=constraint_lowerbounds,
+                                                ubg=constraint_upperbounds)
+        if not options['PrintLevel'] == 'None':
+            if ipopt_solver.stats()['success']:
+                print('Optimization succeded!')
+            else:
+                print('Optimization failed!')
+            print('Return status: ',ipopt_solver.stats()['return_status'])
+            print('Iteration count: ',ipopt_solver.stats()['iter_count'])
+
         optim_solution = ipopt_solution_struct['x'].full().flatten()
 
         optim_continuous_values = optim_solution[:continuous_symbol_num]
@@ -875,6 +901,19 @@ class Design:
                 i+=1
         return rowpntr
 
+#NOTE: Note sure if these can be included in the class somehow
+@contextmanager
+def silence_stdout(flag):
+    if flag:
+        old_target = sys.stdout
+        try:
+            with open(os.devnull, "w") as new_target:
+                sys.stdout = new_target
+                yield new_target
+        finally:
+            sys.stdout = old_target
+    else:
+        yield None
 
 # def design(models, discreteinputs=None, continuousinputs=None, observgroups=None, fixeddesign=None):
 #     """ 

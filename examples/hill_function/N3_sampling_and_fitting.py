@@ -7,7 +7,8 @@
 # In[24]:
 
 
-from scripts.N2_optimizing_a_design import *
+#%%capture
+from N2_optimizing_a_design import *
 
 
 # ### Sampling the Model using Simulated Data

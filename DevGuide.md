@@ -208,13 +208,50 @@ s
 
 ## Notebook Examples and the Example Pack
 
-Needs to be added
+The examples folder contains a collection of projects demonstrating some of the basic uses of NLoed.
+Each project has its own folder within the examples folder; projects currently include demonstrations
+on a hill function model, multiple linear regression, a multi-input/output non-normal model (similar
+to a generalized linear model), and a nonlinear ODE. 
 
-Scripts folder vs notebooks
+The example projects consists of a set of Jupyter notebook (.pynb) files, each devoted to a specific
+task within the project. For example there are seperate notebooks for creating a model, designing 
+experiments and fitting a model. This is intended to provide new users with a modular and incremental
+introduction to using NLoed. 
 
+At the time of writing, Github will render these examples as notebooks in the online repository.
+This makes it useful for those browsing the repository to get a sense for how the package is used. 
+In order to run the notebooks on your local machine you will first need to clone the repository
+or download the examples folder and ensure that NLoed is installed. Installing Jupyter notebook can 
+be done using pip via the command:
+```sh
+pip install notebook
+```
+Then, from the example folder or a given project folder, start a Jupyter notebook instance using:
+```sh
 jupyter notebook
+```
+This will open a web browser tab which will allow you to navigate the project folders and open the desired
+notebook file. The notebook code can be run using the standard Jupyter notebook commands in the browser.
 
-jupyter nbconvert --output-dir='./scripts' --to script *.ipynb
+Regular python scripts (.py) are also provided for each notebook in a project. 
+Note, that the later notebooks in a project depend on the objects generated in earlier notebooks.
+(The notebooks are named starting with 'N#_' where the number '#' indicates the order they would 
+normally be run in.) In each notebook after the first, the notebook starts with a call to the regular
+python script version of the previous notebook in order to load the previously generated objects 
+into the notebook session of the current notebook. This is done automatically and so, for existing
+notebooks, user do not need to worry about the dependence between notebooks. However, when writing
+new examples developers should follow the established naming convention (using the 'N#_' prefix), and
+generate python scripts for each notebook in a project by running the following command in the project
+directory after they have created all of their project notebooks:
+```sh
+jupyter nbconvert --to script *.ipynb
+```
+This command will create a regular python script (.py) from all the notebooks (.pynb)
+Previous notebooks can then be linked to a current notebook by adding the following command to the top
+ of the current notebook:
+ ```sh
+ from N#_previous_notebook_name import *
+ ```
 
 ## Packaging and Release
 In order to make NLoed available using pip, it needs to be packaged properly and uploaded to the
