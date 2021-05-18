@@ -270,7 +270,7 @@ It is also a good idea to tag all releases to PyPI on the Github repo.
     Wheels distrobutions are built and ready to install, pip uses these by default. 
     * Create a Wheels Built Distribution:
         ```sh
-        python setup.py bdist_wheels
+        python setup.py bdist_wheel
         ```
 
 3. **Uploading to PyPI using Twine**

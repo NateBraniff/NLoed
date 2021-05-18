@@ -6,7 +6,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="nloed", 
-    version="0.0.1",
+    version="0.0.2",
     author='Nate Braniff',
     author_email='nbraniff@uwaterloo.ca',
     description="A package for nonlinear optimal experimental design",
