@@ -1,6 +1,7 @@
 ## Listing 1 ##############################################
 import nloed as nl, casadi as cs
 import numpy as np, pandas as pd
+import time
 #CasADi input and parameter symbols
 x = cs.SX.sym('x',1)
 theta = cs.SX.sym('theta',4)
@@ -53,6 +54,20 @@ est = model.fit(data0, options=opts)
 #Extract parameter estimate vector
 param = est.to_numpy().flatten()
 
+###Added for aceBayes comparison
+#Declare init design dataframe
+design0 = pd.DataFrame({
+            'Light':[.01,1.5,6,25,100],
+            'Variable':['GFP']*5,
+            'Replicates':[3]*5}) 
+#Compute the design metrics
+metrics = model.evaluate(design0, param)
+#Extract the covariance matrix
+cov = metrics['Covariance'].to_numpy()
+print(param)
+print(cov)
+###
+
 ## Listing 4 ##############################################
 #Specify input dictionary for the design
 inp = {'Inputs':['Light'],
@@ -74,10 +89,14 @@ design0 = pd.DataFrame({
 init = {'Weight':0.5,'Design':design0}
 #Set objective type
 obj = 'D'
+start = time.time()
 #Instantiate the design object
 opt_des = nl.Design(model,param,obj,
                   fixed_design=init,
                   continuous_inputs=inp)
+end = time.time()
+print("Design time:")
+print(end - start)
 #Generate a rounded exact design 
 design1 = opt_des.round(15)
 
@@ -100,6 +119,16 @@ opts = {'Method':'Delta',
 pred = model.predict(inputs, param,
                 covariance_matrix = cov,
                 options=opts)
+
+# ##ACS reviewer addition
+# #Compute the design metrics
+# metrics0 = model.evaluate(design0, param)
+# #Extract the covariance matrix
+# cov0 = metrics0['Covariance'].to_numpy()
+# #Generate predictions and intervals
+# pred0 = model.predict(inputs, param,
+#                 covariance_matrix = cov0,
+#                 options=opts)
 
 ## Supplemental Listing 1 ##############################################
 #optimal green light levels
@@ -192,6 +221,12 @@ ax.fill_between(pred['Inputs','Light'],
                 alpha=0.3,
                 color='C2',
                 label='95% Observation Interval')
+# ax.fill_between(pred0['Inputs','Light'],
+#                 pred0['Observation','Lower'],
+#                 pred0['Observation','Upper'],
+#                 alpha=0.2,
+#                 color='C3',
+#                 label='95% Observation Interval')
 #plot mean model prediction
 ax.plot(pred['Inputs','Light'], pred['Prediction','Mean'], '-',color='C4',label='Mean Observation')
 #plot initial dataset
